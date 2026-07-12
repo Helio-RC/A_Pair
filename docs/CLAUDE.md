@@ -249,7 +249,7 @@ python3 scripts/i18n.py sync                     # 从 .resx 重新生成 Design
 | Roster | `1.1` | `{data}/Rosters/*.roster.json` | `RosterFile` |
 | Snapshot | `1.0` | `{data}/Assignments/{venueId}/{date}/*.json` | `SeatingSnapshot` |
 | VenueInfo | `1.0` | `{data}/Assignments/{venueId}/_venue.json` | `VenueSnapshotInfo` |
-| AppSettings | `1.0` | `{data}/AppSettings.json` | `AppSettings` |
+| AppSettings | `1.1` | `{data}/AppSettings.json` | `AppSettings` |
 | StrategyConfig | `1.0` | `{data}/StrategyConfig/{strategyId}.config.json` | `StrategyConfig` |
 | StrategyDatasetConfig | `1.0` | `{data}/StrategyConfig/{strategyId}/*.config.json` | `StrategyDatasetConfig` |
 

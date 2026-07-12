@@ -370,15 +370,15 @@ namespace SeatFlow.Presentation.Avalonia
             // 在 AppData 创建前先检查自动导入 .seatsets（仅在 AppData 不存在时生效）
             await CheckSeatSetsAutoImportAsync();
 
-            await RestoreSettingsAsync();
-
-            // 1. 检测首次启动（在任何遥测保存操作之前，确保 isTrueFirstLaunch 不受后续文件创建影响）
+            // 1. 检测首次启动（必须在 RestoreSettings 之前，因为后者会创建 AppSettings.json）
             var needsOnboarding = await DetectAndMarkFirstLaunchAsync();
 
-            // 2. 遥测同意弹窗（在引导之前，避免引导 Popup 覆盖）
+            await RestoreSettingsAsync();
+
+            // 2. 遥测同意弹窗
             await ShowTelemetryConsentIfNeededAsync();
 
-            // 3. 启动引导（在遥测弹窗之后）
+            // 3. 启动引导（在遥测弹窗之后，避免 Popup 覆盖）
             if (needsOnboarding)
                 StartOnboardingDeferred();
 
