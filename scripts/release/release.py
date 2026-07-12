@@ -434,6 +434,7 @@ class ReleaseManager:
         release_url = f"{api_base}/releases"
         payload = {
             "tag_name": tag,
+            "target_commitish": "main",
             "name": f"SeatFlow {self.version}",
             "body": body,
             "prerelease": False,
@@ -485,6 +486,46 @@ class ReleaseManager:
 
     # ── 前置检查 ───────────────────────────────
 
+    def _check_main_branch(self) -> bool:
+        """确保当前在 main 分支。不在则自动切换。"""
+        result = subprocess.run(
+            ["git", "branch", "--show-current"],
+            cwd=str(self.root),
+            capture_output=True,
+            text=True,
+        )
+        current = result.stdout.strip()
+
+        if current == "main":
+            print("[0/5] 分支检查  ✓ 已在 main 分支")
+            return True
+
+        # 检查是否有未提交的改动
+        status = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=str(self.root),
+            capture_output=True,
+            text=True,
+        )
+        if status.stdout.strip():
+            print(f"[0/5] 分支检查  ✗ 当前在 '{current}' 分支，且有未提交的改动。")
+            print("    请先 commit 或 stash 改动后再切换。")
+            return False
+
+        # 干净，切换到 main
+        print(f"[0/5] 分支检查  → 从 '{current}' 切换到 main...")
+        result = subprocess.run(
+            ["git", "checkout", "main"],
+            cwd=str(self.root),
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            print(f"[0/5] 分支检查  ✗ 切换失败: {result.stderr.strip()}")
+            return False
+        print("[0/5] 分支检查  ✓ 已切换到 main")
+        return True
+
     def _check_versions(self) -> bool:
         """运行 version.py check，确保版本号一致性。"""
         version_py = self.root / "scripts" / "version.py"
@@ -510,6 +551,10 @@ class ReleaseManager:
         print(f"=== SeatFlow Release v{self.version} ===\n")
 
         try:
+            # 步骤 0: 确保在 main 分支
+            if not self._check_main_branch():
+                return 1
+
             # 步骤 0: 版本号一致性检查
             if not self._check_versions():
                 print("\n请先运行 python3 scripts/version.py check 查看详情，"
