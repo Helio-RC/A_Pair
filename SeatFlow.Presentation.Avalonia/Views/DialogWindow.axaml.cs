@@ -71,7 +71,7 @@ internal partial class DialogWindow : Window
             ThirdButton.Content = Button2Text ?? Lang.Resources.Common_OK;
             CancelButton.Content = Button3Text ?? Lang.Resources.Common_Cancel;
             ThirdButton.IsVisible = true;
-            CancelButton.IsVisible = true;
+            CancelButton.IsVisible = !string.IsNullOrWhiteSpace(Button3Text);
         }
     }
 

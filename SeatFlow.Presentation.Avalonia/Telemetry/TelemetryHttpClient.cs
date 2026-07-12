@@ -17,6 +17,7 @@ namespace SeatFlow.Presentation.Avalonia.Telemetry;
 /// <summary>
 /// 遥测 HTTP 发送器。从 Channel 读取事件，批量发送到 Web API。
 /// 实现自适应退避、熔断、Gzip 压缩等流量优化策略。
+/// 仅由 Timer 驱动 flush（可选容量阈值触发立即发送）。
 /// </summary>
 public sealed class TelemetryHttpClient : IDisposable
 {
@@ -30,7 +31,7 @@ public sealed class TelemetryHttpClient : IDisposable
     private readonly CancellationTokenSource _cts = new();
     private int _consecutiveFailures;
     private bool _circuitBroken;
-    private Task? _backgroundTask;
+    private int _flushInProgress; // 0 = idle, 1 = flushing
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -66,24 +67,25 @@ public sealed class TelemetryHttpClient : IDisposable
         _flushTimer = new Timer(OnFlushTimerTick, null,
             TimeSpan.FromMilliseconds(_normalFlushIntervalMs),
             TimeSpan.FromMilliseconds(_normalFlushIntervalMs));
-
-        _backgroundTask = ConsumerLoopAsync(_cts.Token);
     }
 
-    /// <summary>尝试将事件写入队列（非阻塞）。</summary>
+    /// <summary>尝试将事件写入队列（非阻塞）。队列满时自动 DropOldest。</summary>
     public bool TryEnqueue(TelemetryEvent evt)
     {
-        return _channel.Writer.TryWrite(evt);
-    }
-
-    /// <summary>返回当前队列中的事件数量。</summary>
-    public int QueuedCount
-    {
-        get
+        if (_channel.Writer.TryWrite(evt))
         {
-            var reader = _channel.Reader;
-            return reader.CanCount ? reader.Count : 0;
+            // 容量阈值触发：积压超过 MaxBatchSize 时立即 flush
+            if (_channel.Reader.Count >= _maxBatchSize)
+            {
+                _ = Task.Run(async () =>
+                {
+                    try { await FlushBatchAsync(_cts.Token); }
+                    catch (Exception ex) { _logger.LogDebug(ex, "容量阈值刷新异常"); }
+                });
+            }
+            return true;
         }
+        return false;
     }
 
     /// <summary>强制刷新。熔断状态下也会尝试发送一次。</summary>
@@ -106,6 +108,9 @@ public sealed class TelemetryHttpClient : IDisposable
     {
         if (_circuitBroken) return;
 
+        // 防止重入：如果上一次 flush 还在进行中，跳过本次
+        if (Interlocked.CompareExchange(ref _flushInProgress, 1, 0) != 0) return;
+
         _ = Task.Run(async () =>
         {
             try
@@ -116,50 +121,11 @@ public sealed class TelemetryHttpClient : IDisposable
             {
                 _logger.LogDebug(ex, "遥测定时刷新异常");
             }
+            finally
+            {
+                Interlocked.Exchange(ref _flushInProgress, 0);
+            }
         });
-    }
-
-    private async Task ConsumerLoopAsync(CancellationToken ct)
-    {
-        var batch = new List<TelemetryEvent>(_maxBatchSize);
-        while (!ct.IsCancellationRequested)
-        {
-            try
-            {
-                // 等待有数据或超时
-                var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                timeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
-
-                try
-                {
-                    var evt = await _channel.Reader.ReadAsync(timeoutCts.Token);
-                    batch.Add(evt);
-                }
-                catch (OperationCanceledException) when (!ct.IsCancellationRequested)
-                {
-                    // 5 秒无数据，跳过
-                    continue;
-                }
-
-                // 尽量填满批次
-                while (batch.Count < _maxBatchSize && _channel.Reader.TryRead(out var next))
-                    batch.Add(next);
-
-                if (batch.Count > 0 && !_circuitBroken)
-                {
-                    await SendBatchAsync(batch, ct);
-                    batch.Clear();
-                }
-                else if (_circuitBroken)
-                {
-                    batch.Clear();
-                }
-            }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
-            {
-                break;
-            }
-        }
     }
 
     private async Task FlushBatchAsync(CancellationToken ct)
@@ -187,7 +153,7 @@ public sealed class TelemetryHttpClient : IDisposable
                 await JsonSerializer.SerializeAsync(uncompressed, request, JsonOptions, ct);
                 uncompressed.Position = 0;
 
-                var compressed = new MemoryStream();
+                using var compressed = new MemoryStream();
                 await using (var gzip = new GZipStream(compressed, CompressionLevel.Fastest, leaveOpen: true))
                 {
                     await uncompressed.CopyToAsync(gzip, ct);
@@ -255,7 +221,7 @@ public sealed class TelemetryHttpClient : IDisposable
     private void UpdateFlushInterval()
     {
         var backoffMs = _normalFlushIntervalMs * (int)Math.Pow(2, _consecutiveFailures);
-        _flushTimer.Change(backoffMs, backoffMs);
+        _flushTimer.Change(TimeSpan.FromMilliseconds(backoffMs), TimeSpan.FromMilliseconds(backoffMs));
     }
 
     public void Dispose()
@@ -263,14 +229,6 @@ public sealed class TelemetryHttpClient : IDisposable
         _cts.Cancel();
         _flushTimer.Dispose();
         _httpClient.Dispose();
-
-        try
-        {
-            _backgroundTask?.Wait(TimeSpan.FromSeconds(2));
-        }
-        catch { /* 忽略 */ }
-
-        _backgroundTask?.Dispose();
         _cts.Dispose();
     }
 }

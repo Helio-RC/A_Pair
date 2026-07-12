@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using OpenTelemetry;
@@ -31,17 +30,7 @@ public static class TelemetryServiceCollectionExtensions
             var settingsRepo = sp.GetRequiredService<IAppSettingsRepository>();
             var logger = sp.GetRequiredService<ILogger<TelemetryHttpClient>>();
 
-            // 同步加载配置（首次启动时配置文件可能尚不存在，使用默认值）
-            TelemetryConfig config;
-            try
-            {
-                var settings = Task.Run(() => settingsRepo.LoadAsync()).GetAwaiter().GetResult();
-                config = settings.Telemetry;
-            }
-            catch
-            {
-                config = new TelemetryConfig();
-            }
+            var config = LoadTelemetryConfigSafe(settingsRepo);
 
             return new TelemetryHttpClient(
                 config.ServerUrl,
@@ -54,38 +43,23 @@ public static class TelemetryServiceCollectionExtensions
         // 2. 注册遥测服务
         services.AddSingleton<ITelemetryService, TelemetryService>();
 
-        // 3. 注册自定义导出器（由 TelemetryService 的内部管线和 TelemetryHttpClient 共享）
+        // 3. 注册自定义导出器
         services.AddSingleton<AppTelemetryExporter>();
         services.AddSingleton(sp =>
         {
             var httpClient = sp.GetRequiredService<TelemetryHttpClient>();
             var settingsRepo = sp.GetRequiredService<IAppSettingsRepository>();
-            int windowSec;
-            try
-            {
-                var settings = Task.Run(() => settingsRepo.LoadAsync()).GetAwaiter().GetResult();
-                windowSec = settings.Telemetry.MetricSnapshotIntervalSeconds;
-            }
-            catch
-            {
-                windowSec = 120;
-            }
-            return new AppTelemetryMetricExporter(httpClient, windowSec);
+            var config = LoadTelemetryConfigSafe(settingsRepo);
+            return new AppTelemetryMetricExporter(httpClient, config.MetricSnapshotIntervalSeconds);
         });
 
-        // 4. 构建 TracerProvider（注册 3 个 ActivitySource + 自定义 Exporter）
+        // 4. 构建 TracerProvider
         services.AddSingleton(sp =>
         {
             var exporter = sp.GetRequiredService<AppTelemetryExporter>();
-            var resource = TelemetryService.GetResourceBuilder().Build();
 
             return Sdk.CreateTracerProviderBuilder()
-                .SetResourceBuilder(ResourceBuilder.CreateDefault()
-                    .AddAttributes(new Dictionary<string, object>
-                    {
-                        ["service.name"] = "SeatFlow",
-                        ["service.version"] = VersionInfo.Version
-                    }))
+                .SetResourceBuilder(CreateResource())
                 .AddSource("SeatFlow.App")
                 .AddSource("SeatFlow.UI")
                 .AddSource("SeatFlow.Features")
@@ -94,31 +68,17 @@ public static class TelemetryServiceCollectionExtensions
                 .Build();
         });
 
-        // 5. 构建 MeterProvider（注册 Meter + PeriodicExportingMetricReader）
+        // 5. 构建 MeterProvider
         services.AddSingleton(sp =>
         {
             var exporter = sp.GetRequiredService<AppTelemetryMetricExporter>();
             var settingsRepo = sp.GetRequiredService<IAppSettingsRepository>();
-            int intervalMs;
-            try
-            {
-                var settings = Task.Run(() => settingsRepo.LoadAsync()).GetAwaiter().GetResult();
-                intervalMs = settings.Telemetry.MetricSnapshotIntervalSeconds * 1000;
-            }
-            catch
-            {
-                intervalMs = 120_000;
-            }
+            var config = LoadTelemetryConfigSafe(settingsRepo);
 
             return Sdk.CreateMeterProviderBuilder()
-                .SetResourceBuilder(ResourceBuilder.CreateDefault()
-                    .AddAttributes(new Dictionary<string, object>
-                    {
-                        ["service.name"] = "SeatFlow",
-                        ["service.version"] = VersionInfo.Version
-                    }))
+                .SetResourceBuilder(CreateResource())
                 .AddMeter("SeatFlow.App.Metrics")
-                .AddReader(new PeriodicExportingMetricReader(exporter, intervalMs)
+                .AddReader(new PeriodicExportingMetricReader(exporter, config.MetricSnapshotIntervalSeconds * 1000)
                 {
                     TemporalityPreference = MetricReaderTemporalityPreference.Delta
                 })
@@ -126,5 +86,30 @@ public static class TelemetryServiceCollectionExtensions
         });
 
         return services;
+    }
+
+    /// <summary>构建 OpenTelemetry Resource，描述此遥测来源。</summary>
+    private static ResourceBuilder CreateResource()
+    {
+        return ResourceBuilder.CreateDefault()
+            .AddAttributes(new Dictionary<string, object>
+            {
+                ["service.name"] = "SeatFlow",
+                ["service.version"] = VersionInfo.Version
+            });
+    }
+
+    /// <summary>安全加载遥测配置，首次启动时文件可能不存在，回退到默认值。</summary>
+    private static TelemetryConfig LoadTelemetryConfigSafe(IAppSettingsRepository repo)
+    {
+        try
+        {
+            var settings = System.Threading.Tasks.Task.Run(() => repo.LoadAsync()).GetAwaiter().GetResult();
+            return settings.Telemetry;
+        }
+        catch
+        {
+            return new TelemetryConfig();
+        }
     }
 }

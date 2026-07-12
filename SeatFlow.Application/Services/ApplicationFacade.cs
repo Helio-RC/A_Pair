@@ -385,35 +385,50 @@ namespace SeatFlow.Application.Services
     CancellationToken cancellationToken = default)
         {
             logger.LogInformation("开始导出座位：格式={Format}，路径={Path}" , options.Format , path);
-            ISeatingPlanExporter? exporter = _exporters.FirstOrDefault(e => e.Format == options.Format) ?? throw new NotSupportedException($"No exporter registered for format {options.Format}.");
-            if (layout != null)
-            {
-                var assignments = workspace.BuildSeatingPlan().Assignments;
-                var studentNames = workspace.Students.ToDictionary(s => s.Id , s => s.Name);
-                var model = LayoutSeatingExportModel.FromLayout(layout , assignments , studentNames);
-                // 教师视角：行前后反转（讲台移至底部）+ 列左右镜像（教师左侧对应学生右侧）
-                if (options.Perspective == LayoutPerspective.TeacherView)
-                {
-                    model.Rows.Reverse();
-                    foreach (var row in model.Rows)
-                        row.Cells.Reverse();
-                }
-                await exporter.ExportLayoutAsync(model , path , options , cancellationToken);
-            }
-            else
-            {
-                var plan = workspace.BuildSeatingPlan();
-                await exporter.ExportAsync(plan , path , options , cancellationToken);
-            }
-            logger.LogInformation("座位导出完成：格式={Format}，路径={Path}" , options.Format , path);
-
-            // 记录导出遥测
             try
             {
-                var telemetry = _serviceProvider.GetService<ITelemetryService>();
-                telemetry?.RecordExport(options.Format.ToString() , success: true);
+                ISeatingPlanExporter? exporter = _exporters.FirstOrDefault(e => e.Format == options.Format) ?? throw new NotSupportedException($"No exporter registered for format {options.Format}.");
+                if (layout != null)
+                {
+                    var assignments = workspace.BuildSeatingPlan().Assignments;
+                    var studentNames = workspace.Students.ToDictionary(s => s.Id , s => s.Name);
+                    var model = LayoutSeatingExportModel.FromLayout(layout , assignments , studentNames);
+                    // 教师视角：行前后反转（讲台移至底部）+ 列左右镜像（教师左侧对应学生右侧）
+                    if (options.Perspective == LayoutPerspective.TeacherView)
+                    {
+                        model.Rows.Reverse();
+                        foreach (var row in model.Rows)
+                            row.Cells.Reverse();
+                    }
+                    await exporter.ExportLayoutAsync(model , path , options , cancellationToken);
+                }
+                else
+                {
+                    var plan = workspace.BuildSeatingPlan();
+                    await exporter.ExportAsync(plan , path , options , cancellationToken);
+                }
+                logger.LogInformation("座位导出完成：格式={Format}，路径={Path}" , options.Format , path);
+
+                // 记录导出成功遥测
+                try
+                {
+                    var telemetry = _serviceProvider.GetService<ITelemetryService>();
+                    telemetry?.RecordExport(options.Format.ToString() , success: true);
+                }
+                catch { /* 遥测未注册时静默处理 */ }
             }
-            catch { /* 遥测未注册时静默处理 */ }
+            catch (Exception ex)
+            {
+                // 记录导出失败遥测
+                try
+                {
+                    var telemetry = _serviceProvider.GetService<ITelemetryService>();
+                    telemetry?.RecordExport(options.Format.ToString() , success: false);
+                    telemetry?.RecordError("export", ex.Message.Length > 200 ? ex.Message[..200] : ex.Message);
+                }
+                catch { /* 遥测未注册时静默处理 */ }
+                throw;
+            }
         }
 
         /// <inheritdoc />

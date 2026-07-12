@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
@@ -31,8 +32,8 @@ public sealed class TelemetryService : ITelemetryService, IDisposable
     private readonly Counter<long> _exportCounter;
     private readonly Counter<long> _errorCounter;
 
-    // ── 去重追踪 ──
-    private readonly Dictionary<string, DateTime> _lastEventTime = new();
+    // ── 去重追踪（线程安全）──
+    private readonly ConcurrentDictionary<string, DateTime> _lastEventTime = new();
 
     // ── ActivitySource 实例 ──
     private static readonly ActivitySource AppActivitySource = new("SeatFlow.App");
@@ -68,11 +69,27 @@ public sealed class TelemetryService : ITelemetryService, IDisposable
             TelemetryInstrumentNames.Errors, "次", "错误次数");
     }
 
+    /// <summary>
+    /// 同步加载 AppSettings。调用方必须确保不在 UI 线程上（构造函数/DI 解析路径）。
+    /// </summary>
+    private static AppSettings LoadSettingsSync(IAppSettingsRepository repo)
+    {
+        return Task.Run(() => repo.LoadAsync()).GetAwaiter().GetResult();
+    }
+
+    /// <summary>
+    /// 同步保存 AppSettings。调用方必须确保不在 UI 线程上。
+    /// </summary>
+    private static void SaveSettingsSync(IAppSettingsRepository repo, AppSettings settings)
+    {
+        Task.Run(() => repo.SaveAsync(settings)).GetAwaiter().GetResult();
+    }
+
     private void ReloadConfig()
     {
         try
         {
-            var settings = Task.Run(() => _settingsRepo.LoadAsync()).GetAwaiter().GetResult();
+            var settings = LoadSettingsSync(_settingsRepo);
             var cfg = settings.Telemetry;
             _enabled = cfg.Enabled;
             _pageViewSampleRate = cfg.PageViewSampleRate;
@@ -93,9 +110,9 @@ public sealed class TelemetryService : ITelemetryService, IDisposable
         // 持久化到 AppSettings
         try
         {
-            var settings = Task.Run(() => _settingsRepo.LoadAsync()).GetAwaiter().GetResult();
+            var settings = LoadSettingsSync(_settingsRepo);
             settings.Telemetry.Enabled = enabled;
-            Task.Run(() => _settingsRepo.SaveAsync(settings)).GetAwaiter().GetResult();
+            SaveSettingsSync(_settingsRepo, settings);
         }
         catch (Exception ex)
         {
@@ -243,13 +260,11 @@ public sealed class TelemetryService : ITelemetryService, IDisposable
     private void CleanupStaleCoalesceEntries()
     {
         var cutoff = DateTime.UtcNow.AddSeconds(-_pageViewCoalesceSeconds * 2);
-        var staleKeys = _lastEventTime
-            .Where(kv => kv.Value < cutoff)
-            .Select(kv => kv.Key)
-            .ToList();
-
-        foreach (var key in staleKeys)
-            _lastEventTime.Remove(key);
+        foreach (var kv in _lastEventTime)
+        {
+            if (kv.Value < cutoff)
+                _lastEventTime.TryRemove(kv.Key, out _);
+        }
     }
 
     // ── Lifecycle ──

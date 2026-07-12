@@ -1600,7 +1600,16 @@
     <value>暂不开启</value>
   </data>
   <data name="Telemetry_ConsentMessage" xml:space="preserve">
-    <value>开启匿名遥测以帮助我们改进产品。\n\n上报的数据包括：\n• 应用版本和运行环境（OS/.NET 版本）\n• 页面访问统计（如设置页）\n• 功能使用统计（排座次数、导出次数）\n• 匿名错误报告（不含个人信息）\n\n我们不会收集任何个人身份信息。\n您可以随时在此设置页面关闭遥测。</value>
+    <value>开启匿名遥测以帮助我们改进产品。
+
+上报的数据包括：
+• 应用版本和运行环境（OS/.NET 版本）
+• 页面访问统计（如设置页）
+• 功能使用统计（排座次数、导出次数）
+• 匿名错误报告（不含个人信息）
+
+我们不会收集任何个人身份信息。
+您可以随时在此设置页面关闭遥测。</value>
   </data>
   <data name="Telemetry_ConsentTitle" xml:space="preserve">
     <value>帮助我们改进 SeatFlow</value>

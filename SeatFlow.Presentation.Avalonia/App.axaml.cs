@@ -90,6 +90,12 @@ namespace SeatFlow.Presentation.Avalonia
             {
                 var logger = _serviceProvider.GetRequiredService<ILogger<App>>();
                 logger.LogWarning(ex, "恢复窗口设置失败");
+                try
+                {
+                    _serviceProvider.GetRequiredService<ITelemetryService>()
+                        .RecordError("startup", $"RestoreSettings: {ex.Message}");
+                }
+                catch { /* 遥测可能未启用 */ }
             }
         }
 
@@ -356,12 +362,14 @@ namespace SeatFlow.Presentation.Avalonia
             // 在 AppData 创建前先检查自动导入 .seatsets（仅在 AppData 不存在时生效）
             await CheckSeatSetsAutoImportAsync();
 
-            // 先检查引导，再恢复设置；确保首次启动检测在文件创建之前
-            await CheckAndStartOnboardingAsync();
+            // 恢复设置后再显示遥测同意弹窗（必须在引导之前，避免引导 Popup 覆盖弹窗）
             await RestoreSettingsAsync();
 
-            // 遥测同意弹窗（在设置恢复之后，引导之前）
+            // 遥测同意弹窗（必须在引导之前）
             await ShowTelemetryConsentIfNeededAsync();
+
+            // 先检查引导，再恢复设置；确保首次启动检测在文件创建之前
+            await CheckAndStartOnboardingAsync();
 
             // 记录应用启动遥测
             RecordAppStartTelemetry();
@@ -452,7 +460,8 @@ namespace SeatFlow.Presentation.Avalonia
                     Lang.Resources.Telemetry_ConsentTitle,
                     Lang.Resources.Telemetry_ConsentMessage,
                     Lang.Resources.Telemetry_ConsentEnable,
-                    Lang.Resources.Telemetry_ConsentLater);
+                    Lang.Resources.Telemetry_ConsentLater,
+                    cancelText: "");
 
                 if (result == 0) // "开启"
                 {
