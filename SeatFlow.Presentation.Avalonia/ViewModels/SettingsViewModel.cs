@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using SeatFlow.Application.Interfaces;
 using SeatFlow.Core.Models;
+using SeatFlow.Core.Telemetry;
 using SeatFlow.Core.Utilities;
 using SeatFlow.Presentation.Avalonia.Lang;
 using SeatFlow.Presentation.Avalonia.Services;
@@ -27,6 +28,7 @@ public partial class SettingsViewModel : ViewModelBase
     private readonly IDialogService _dialog;
     private readonly IOnboardingService _onboarding;
     private readonly IFileService _fileService;
+    private readonly ITelemetryService _telemetry;
     private readonly ILogger<SettingsViewModel> _logger;
 
     [ObservableProperty]
@@ -81,12 +83,16 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     public partial bool IsSaving { get; set; }
 
-    public SettingsViewModel (IApplicationFacade facade , IDialogService dialog , IOnboardingService onboarding , IFileService fileService , ILogger<SettingsViewModel>? logger = null)
+    [ObservableProperty]
+    public partial bool TelemetryEnabled { get; set; }
+
+    public SettingsViewModel (IApplicationFacade facade , IDialogService dialog , IOnboardingService onboarding , IFileService fileService , ITelemetryService telemetry , ILogger<SettingsViewModel>? logger = null)
     {
         _facade = facade;
         _dialog = dialog;
         _onboarding = onboarding;
         _fileService = fileService;
+        _telemetry = telemetry;
         _logger = logger ?? NullLogger<SettingsViewModel>.Instance;
         _ = LoadAsync(CancellationToken.None);
     }
@@ -113,6 +119,8 @@ public partial class SettingsViewModel : ViewModelBase
             ZoomIndex = _defaultZoomLevel switch { 0.75 => 0, 1.0 => 1, 1.25 => 2, 1.5 => 3, _ => 1 };
 
             MaxSnapshotsPerVenue = settings.MaxSnapshotsPerVenue;
+
+            TelemetryEnabled = settings.Telemetry.Enabled;
 
         }
         catch (Exception ex)
@@ -177,6 +185,9 @@ public partial class SettingsViewModel : ViewModelBase
             };
 
             await _facade.SaveAppSettingsAsync(settings , ct);
+
+            // 同步遥测状态
+            _telemetry.SetEnabled(TelemetryEnabled);
 
             var langChanged = !string.Equals(_originalLanguage , Language , StringComparison.Ordinal);
             _originalLanguage = Language;

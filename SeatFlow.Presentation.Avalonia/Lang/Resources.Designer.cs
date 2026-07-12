@@ -409,6 +409,9 @@ public class Resources
     public static string Settings_Saved => ResourceManager.GetString("Settings_Saved", Culture)!;
     public static string Settings_Saving => ResourceManager.GetString("Settings_Saving", Culture)!;
     public static string Settings_Storage => ResourceManager.GetString("Settings_Storage", Culture)!;
+    public static string Settings_Telemetry => ResourceManager.GetString("Settings_Telemetry", Culture)!;
+    public static string Settings_TelemetryHint => ResourceManager.GetString("Settings_TelemetryHint", Culture)!;
+    public static string Settings_TelemetryToggle => ResourceManager.GetString("Settings_TelemetryToggle", Culture)!;
     public static string Settings_ThemeMode => ResourceManager.GetString("Settings_ThemeMode", Culture)!;
     public static string Settings_Title => ResourceManager.GetString("Settings_Title", Culture)!;
     public static string Snapshot_BatchDelete => ResourceManager.GetString("Snapshot_BatchDelete", Culture)!;
@@ -527,6 +530,10 @@ public class Resources
     public static string Strategy_Title => ResourceManager.GetString("Strategy_Title", Culture)!;
     public static string Strategy_UnsavedChanges => ResourceManager.GetString("Strategy_UnsavedChanges", Culture)!;
     public static string Strategy_UnsavedChangesMsg => ResourceManager.GetString("Strategy_UnsavedChangesMsg", Culture)!;
+    public static string Telemetry_ConsentEnable => ResourceManager.GetString("Telemetry_ConsentEnable", Culture)!;
+    public static string Telemetry_ConsentLater => ResourceManager.GetString("Telemetry_ConsentLater", Culture)!;
+    public static string Telemetry_ConsentMessage => ResourceManager.GetString("Telemetry_ConsentMessage", Culture)!;
+    public static string Telemetry_ConsentTitle => ResourceManager.GetString("Telemetry_ConsentTitle", Culture)!;
     public static string Theme_Dark => ResourceManager.GetString("Theme_Dark", Culture)!;
     public static string Theme_Light => ResourceManager.GetString("Theme_Light", Culture)!;
     public static string Theme_System => ResourceManager.GetString("Theme_System", Culture)!;

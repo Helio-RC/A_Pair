@@ -10,6 +10,7 @@ using SeatFlow.Application.Services;
 using SeatFlow.Core.Models.SeatSets;
 using SeatFlow.Core.Utilities;
 using SeatFlow.Presentation.Avalonia.Services;
+using SeatFlow.Presentation.Avalonia.Telemetry;
 using SeatFlow.Presentation.Avalonia.ViewModels;
 using SeatFlow.Presentation.Avalonia.Views;
 using Avalonia;
@@ -61,6 +62,9 @@ namespace SeatFlow.Presentation.Avalonia
             services.AddSeatFlowApplication(
                 Path.Combine(AppEnvironment.ExeDirectory , "AppData") ,
                 Path.Combine(AppEnvironment.ExeDirectory , "Plugins"));
+
+            // 注册 OpenTelemetry 遥测（必须在 AddSeatFlowApplication 之后，依赖 IAppSettingsRepository）
+            services.AddSeatFlowTelemetry();
 
             // 注册导航服务
             services.AddSingleton<INavigationService , NavigationService>();

@@ -1213,6 +1213,15 @@ Place plugins in the Plugins directory</value>
   <data name="Settings_Storage" xml:space="preserve">
     <value>Storage</value>
   </data>
+  <data name="Settings_Telemetry" xml:space="preserve">
+    <value>Telemetry</value>
+  </data>
+  <data name="Settings_TelemetryHint" xml:space="preserve">
+    <value>Send anonymous usage data (version, feature usage stats, error reports) to help us improve the product. No personal information.</value>
+  </data>
+  <data name="Settings_TelemetryToggle" xml:space="preserve">
+    <value>Anonymous Telemetry</value>
+  </data>
   <data name="Settings_ThemeMode" xml:space="preserve">
     <value>Theme mode</value>
   </data>
@@ -1574,6 +1583,18 @@ Current seating will be overwritten.</value>
   </data>
   <data name="Strategy_UnsavedChangesMsg" xml:space="preserve">
     <value>Unsaved strategy changes. Save before leaving?</value>
+  </data>
+  <data name="Telemetry_ConsentEnable" xml:space="preserve">
+    <value>Enable</value>
+  </data>
+  <data name="Telemetry_ConsentLater" xml:space="preserve">
+    <value>Not Now</value>
+  </data>
+  <data name="Telemetry_ConsentMessage" xml:space="preserve">
+    <value>Enable anonymous telemetry to help us improve the product.\n\nData collected:\n• App version and environment (OS/.NET version)\n• Page visit statistics (e.g. Settings page)\n• Feature usage stats (seating count, export count)\n• Anonymous error reports (no personal info)\n\nWe do not collect any personally identifiable information.\nYou can disable telemetry at any time on this Settings page.</value>
+  </data>
+  <data name="Telemetry_ConsentTitle" xml:space="preserve">
+    <value>Help Us Improve SeatFlow</value>
   </data>
   <data name="Theme_Dark" xml:space="preserve">
     <value>Dark</value>

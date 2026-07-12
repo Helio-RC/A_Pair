@@ -5,6 +5,7 @@ using SeatFlow.Application.Plugins;
 using SeatFlow.Contracts.Interfaces;
 using SeatFlow.Core.DomainServices;
 using SeatFlow.Core.Enums;
+using SeatFlow.Core.Telemetry;
 using SeatFlow.Core.Exporters;
 using SeatFlow.Core.Interfaces;
 using SeatFlow.Core.Models;
@@ -360,6 +361,18 @@ namespace SeatFlow.Application.Services
                 StatusMessage = "座位生成完成"
             });
 
+            // 记录排座生成遥测
+            try
+            {
+                var telemetry = _serviceProvider.GetService<ITelemetryService>();
+                telemetry?.RecordSeatingGeneration(
+                    success: true,
+                    studentCount: students.Count,
+                    venueCount: seats.Count,
+                    strategyCount: strategies.Count);
+            }
+            catch { /* 遥测未注册时静默处理 */ }
+
             return workspace;
         }
 
@@ -393,6 +406,14 @@ namespace SeatFlow.Application.Services
                 await exporter.ExportAsync(plan , path , options , cancellationToken);
             }
             logger.LogInformation("座位导出完成：格式={Format}，路径={Path}" , options.Format , path);
+
+            // 记录导出遥测
+            try
+            {
+                var telemetry = _serviceProvider.GetService<ITelemetryService>();
+                telemetry?.RecordExport(options.Format.ToString() , success: true);
+            }
+            catch { /* 遥测未注册时静默处理 */ }
         }
 
         /// <inheritdoc />

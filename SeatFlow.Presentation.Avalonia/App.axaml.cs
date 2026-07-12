@@ -8,7 +8,9 @@ using System.Threading.Tasks;
 using SeatFlow.Application.Interfaces;
 using SeatFlow.Core.Models;
 using SeatFlow.Core.Providers;
+using SeatFlow.Core.Telemetry;
 using SeatFlow.Presentation.Avalonia.Services;
+using SeatFlow.Presentation.Avalonia.Telemetry;
 using SeatFlow.Presentation.Avalonia.ViewModels;
 using SeatFlow.Presentation.Avalonia.Views;
 using Avalonia;
@@ -171,6 +173,16 @@ namespace SeatFlow.Presentation.Avalonia
                 // 退出看门狗：关闭信号发出后 20s 内未退出则强制终止
                 desktop.ShutdownRequested += (_ , _) =>
                 {
+                    // 记录应用退出遥测
+                    try
+                    {
+                        var telemetry = _serviceProvider.GetRequiredService<ITelemetryService>();
+                        telemetry.RecordEvent(TelemetryEventTypes.AppExit);
+                        // 同步刷新（有限等待）
+                        telemetry.FlushAsync(TimeSpan.FromSeconds(2)).GetAwaiter().GetResult();
+                    }
+                    catch { /* 遥测退出失败静默处理 */ }
+
                     // 手动关闭 Serilog（因为 DI 注册使用了 dispose: false 避免竞态）
                     Log.CloseAndFlush();
 
@@ -347,6 +359,12 @@ namespace SeatFlow.Presentation.Avalonia
             // 先检查引导，再恢复设置；确保首次启动检测在文件创建之前
             await CheckAndStartOnboardingAsync();
             await RestoreSettingsAsync();
+
+            // 遥测同意弹窗（在设置恢复之后，引导之前）
+            await ShowTelemetryConsentIfNeededAsync();
+
+            // 记录应用启动遥测
+            RecordAppStartTelemetry();
         }
 
         /// <summary>
@@ -407,6 +425,63 @@ namespace SeatFlow.Presentation.Avalonia
                 var logger = _serviceProvider.GetRequiredService<ILogger<App>>();
                 logger.LogError(ex, "[SeatSets] 自动导入异常");
             }
+        }
+
+        /// <summary>
+        /// 首次启动时弹出遥测同意弹窗。仅在 ConsentShown==false 时触发。
+        /// </summary>
+        private async Task ShowTelemetryConsentIfNeededAsync()
+        {
+            try
+            {
+                var facade = _serviceProvider.GetRequiredService<IApplicationFacade>();
+                var settings = await facade.LoadAppSettingsAsync();
+
+                // 已经展示过同意弹窗，跳过
+                if (settings.Telemetry.ConsentShown)
+                    return;
+
+                // 标记已展示（防止弹窗被关闭导致反复弹出）
+                settings.Telemetry.ConsentShown = true;
+                await facade.SaveAppSettingsAsync(settings);
+
+                var dialog = _serviceProvider.GetRequiredService<IDialogService>();
+                var telemetry = _serviceProvider.GetRequiredService<ITelemetryService>();
+
+                var result = await dialog.ShowMultiOptionAsync(
+                    Lang.Resources.Telemetry_ConsentTitle,
+                    Lang.Resources.Telemetry_ConsentMessage,
+                    Lang.Resources.Telemetry_ConsentEnable,
+                    Lang.Resources.Telemetry_ConsentLater);
+
+                if (result == 0) // "开启"
+                {
+                    telemetry.SetEnabled(true);
+                    var logger = _serviceProvider.GetRequiredService<ILogger<App>>();
+                    logger.LogInformation("用户同意开启遥测");
+                }
+            }
+            catch (Exception ex)
+            {
+                var logger = _serviceProvider.GetRequiredService<ILogger<App>>();
+                logger.LogDebug(ex, "遥测同意弹窗异常");
+            }
+        }
+
+        /// <summary>
+        /// 记录应用启动遥测事件（仅在遥测启用时）。
+        /// </summary>
+        private void RecordAppStartTelemetry()
+        {
+            try
+            {
+                var telemetry = _serviceProvider.GetRequiredService<ITelemetryService>();
+                if (telemetry.IsEnabled)
+                {
+                    telemetry.RecordAppLaunch();
+                }
+            }
+            catch { /* 遥测启动失败静默处理 */ }
         }
 
         /// <summary>

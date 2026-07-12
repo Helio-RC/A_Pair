@@ -153,6 +153,26 @@
           </DockPanel>
         </Border>
 
+        <!-- 遥测 -->
+        <TextBlock Text="{x:Static lang:Resources.Settings_Telemetry}"
+                   Classes="settingSectionHeader" Margin="0,16,0,6" />
+
+        <Border Classes="settingRow" BorderThickness="0">
+          <DockPanel>
+            <StackPanel DockPanel.Dock="Left" Spacing="2">
+              <TextBlock Text="{x:Static lang:Resources.Settings_TelemetryToggle}"
+                         Classes="body" VerticalAlignment="Center" />
+              <TextBlock Text="{x:Static lang:Resources.Settings_TelemetryHint}"
+                         Classes="caption"
+                         Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                         TextWrapping="Wrap" MaxWidth="400" />
+            </StackPanel>
+            <ToggleSwitch IsChecked="{Binding TelemetryEnabled, Mode=TwoWay}"
+                          AutomationProperties.Name="{x:Static lang:Resources.Settings_TelemetryToggle}"
+                          HorizontalAlignment="Right" />
+          </DockPanel>
+        </Border>
+
         <!-- 重新开始引导 -->
         <Border Classes="settingRow" BorderThickness="0">
           <DockPanel>
