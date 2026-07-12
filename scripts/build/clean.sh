@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # ============================================================
-# 清理 bin/ & obj/ — 请在 scripts/ 目录下执行
+# 清理 bin/ & obj/ — 请在 scripts/build/ 目录下执行
 # 用法: ./clean.sh       # 确认后删除
 #        ./clean.sh -f    # 直接删除
 #        ./clean.sh -n    # 仅预览
 # ============================================================
 set -euo pipefail
-cd ..
+cd ../..
 
 FORCE=false; DRY=false
 while getopts "fn" opt; do case "$opt" in f) FORCE=true ;; n) DRY=true ;; *) echo "用法: $0 [-f] [-n]" && exit 1 ;; esac; done

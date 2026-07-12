@@ -1,9 +1,9 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-  清理解决方案下所有 bin/ 和 obj/ — 请在 scripts/ 目录下执行
+  清理解决方案下所有 bin/ 和 obj/ — 请在 scripts/build/ 目录下执行
 .EXAMPLE
-  cd scripts
+  cd scripts\build
   .\clean.ps1              # 列出 + 确认
   .\clean.ps1 -Force       # 直接删除
   .\clean.ps1 -DryRun      # 仅预览
@@ -11,7 +11,7 @@
 
 param([switch]$Force, [switch]$DryRun)
 $ErrorActionPreference = "Stop"
-Set-Location ..
+Set-Location ../..
 
 Write-Host "=== SeatFlow 清理 bin/ & obj/ ===" -ForegroundColor Cyan
 

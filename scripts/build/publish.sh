@@ -7,7 +7,7 @@
 # ============================================================
 set -euo pipefail
 OLDPWD="$PWD"; trap 'cd "$OLDPWD"' EXIT
-cd ..
+cd ../..
 
 APP_NAME="SeatFlow"; PROJECT="SeatFlow.Presentation.Avalonia"; CONFIG="Release"
 RIDS=("win-x64" "linux-x64" "osx-x64" "osx-arm64")

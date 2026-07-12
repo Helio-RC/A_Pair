@@ -1,0 +1,12 @@
+{
+  "oss": {
+    "accessKeyId": "YOUR_OSS_ACCESS_KEY_ID",
+    "accessKeySecret": "YOUR_OSS_ACCESS_KEY_SECRET",
+    "endpoint": "oss-cn-hangzhou.aliyuncs.com",
+    "bucket": "seatflow-cn"
+  },
+  "github": {
+    "repo": "Helio-RC/Seatflow",
+    "token": "ghp_YOUR_GITHUB_PERSONAL_ACCESS_TOKEN"
+  }
+}

@@ -28,6 +28,18 @@ from version import (
 )
 
 
+def make_version_json(path: Path, version: str):
+    """创建 version.json。"""
+    data = {
+        "version": version,
+        "releaseTag": f"v{version}",
+        "commitId": "test1234",
+        "buildDate": "2026-01-01T00:00:00+08:00",
+    }
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
 def make_about_json(path: Path, version: str):
     """创建 about.json。"""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -137,6 +149,9 @@ class TestVersionManager(unittest.TestCase):
         for d in [about_dir, fv_dir, model_dir, manifest_dir, provider_dir, service_dir]:
             d.mkdir(parents=True, exist_ok=True)
 
+        # version.json
+        make_version_json(self.root / "version.json", "1.2.0")
+
         # about.json
         make_about_json(about_dir / "about.json", "1.2.0")
 
@@ -200,15 +215,15 @@ public class StrategyManifestProvider
         issues = self.mgr.check()
         self.assertEqual(issues, [])
 
-    def test_check_detects_app_version_mismatch(self):
-        data = json.loads(self.mgr.about_path.read_text(encoding="utf-8"))
-        data["en-US"]["version"] = "1.3.0"
-        with open(self.mgr.about_path, "w", encoding="utf-8") as f:
+    def test_check_detects_release_tag_mismatch(self):
+        data = json.loads(self.mgr.version_json_path.read_text(encoding="utf-8"))
+        data["releaseTag"] = "v9.9.9"
+        with open(self.mgr.version_json_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
 
         issues = self.mgr.check()
-        errors = [i for i in issues if i["level"] == "ERROR" and "about.json" in i["msg"]]
-        self.assertTrue(len(errors) > 0, f"应检测到 about.json 版本不一致, got: {errors}")
+        errors = [i for i in issues if i["level"] == "ERROR" and "releaseTag" in i["msg"]]
+        self.assertTrue(len(errors) > 0, f"应检测到 releaseTag 与 version 不一致, got: {errors}")
 
     def test_check_detects_model_mismatch(self):
         path = self.root / "SeatFlow.Core/Models/StrategyConfig.cs"
@@ -222,19 +237,19 @@ public class StrategyManifestProvider
 
     def test_bump_app_patch(self):
         changes = self.mgr.bump_app(level="patch")
-        self.assertEqual(changes["about.json"]["from"], "1.2.0")
-        self.assertEqual(changes["about.json"]["to"], "1.2.1")
+        self.assertEqual(changes["version.json"]["from"], "1.2.0")
+        self.assertEqual(changes["version.json"]["to"], "1.2.1")
 
     def test_bump_app_set(self):
         changes = self.mgr.bump_app(set_to="2.0.0")
-        self.assertEqual(changes["about.json"]["to"], "2.0.0")
+        self.assertEqual(changes["version.json"]["to"], "2.0.0")
 
     def test_bump_app_apply(self):
         changes = self.mgr.bump_app(level="patch")
         self.mgr.apply_changes(changes)
-        data = json.loads(self.mgr.about_path.read_text(encoding="utf-8"))
-        self.assertEqual(data["zh-CN"]["version"], "1.2.1")
-        self.assertEqual(data["en-US"]["version"], "1.2.1")
+        data = json.loads(self.mgr.version_json_path.read_text(encoding="utf-8"))
+        self.assertEqual(data["version"], "1.2.1")
+        self.assertEqual(data["releaseTag"], "v1.2.1")
 
     # ── bump-file ──
 

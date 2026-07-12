@@ -87,6 +87,24 @@
     </ItemGroup>
   </Target>
 
+  <!-- 编译前从 version.json + git 生成 VersionInfo.g.cs -->
+  <Target Name="GenerateVersionInfo" BeforeTargets="BeforeBuild"
+          DependsOnTargets="GenerateGitCommit">
+    <!-- Linux / macOS -->
+    <Exec Command="python3 &quot;$(MSBuildProjectDirectory)/../scripts/update_version_info.py&quot; --root &quot;$(MSBuildProjectDirectory)/..&quot; --version-json &quot;$(MSBuildProjectDirectory)/../version.json&quot; --output &quot;$(IntermediateOutputPath)Generated/VersionInfo.g.cs&quot;"
+          Condition="'$(OS)' != 'Windows_NT'"
+          ConsoleToMSBuild="true" StandardOutputImportance="low"
+          IgnoreExitCode="false" LogStandardErrorAsError="true" />
+    <!-- Windows -->
+    <Exec Command="python &quot;$(MSBuildProjectDirectory)/../scripts/update_version_info.py&quot; --root &quot;$(MSBuildProjectDirectory)/..&quot; --version-json &quot;$(MSBuildProjectDirectory)/../version.json&quot; --output &quot;$(IntermediateOutputPath)Generated/VersionInfo.g.cs&quot;"
+          Condition="'$(OS)' == 'Windows_NT'"
+          ConsoleToMSBuild="true" StandardOutputImportance="low"
+          IgnoreExitCode="false" LogStandardErrorAsError="true" />
+    <ItemGroup>
+      <Compile Include="$(IntermediateOutputPath)Generated/VersionInfo.g.cs" />
+    </ItemGroup>
+  </Target>
+
   <!-- 编译前从所有项目收集 PackageReference 版本号，生成 PackageVersions.g.cs -->
   <Target Name="GeneratePackageVersions" BeforeTargets="BeforeBuild">
     <!-- 从其他源项目收集 PackageReference -->

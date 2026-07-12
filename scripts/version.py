@@ -3,7 +3,7 @@
 version — SeatFlow 版本号统一管理。
 
 管理项目中的 4 类版本号：
-  - App 版本（about.json）
+  - App 版本（version.json）
   - 文件格式版本（file_versions.json + Model 类默认值）
   - 策略清单版本（Manifests/*.json）
   - 引导配置版本（onboarding_config.json）
@@ -129,6 +129,7 @@ class VersionManager:
         self.backup_dir = root / ".version-backups"
 
         # 路径定义
+        self.version_json_path = root / "version.json"
         self.about_path = root / "SeatFlow.Presentation.Avalonia/Data/about.json"
         self.file_versions_path = root / "SeatFlow.Infrastructure/Migration/file_versions.json"
         self.onboarding_path = root / "SeatFlow.Presentation.Avalonia/Data/onboarding_config.json"
@@ -144,6 +145,7 @@ class VersionManager:
         self.backup_dir.mkdir(parents=True, exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         files_to_backup = set()
+        files_to_backup.add(self.version_json_path)
         files_to_backup.add(self.about_path)
         files_to_backup.add(self.file_versions_path)
         files_to_backup.add(self.onboarding_path)
@@ -163,10 +165,8 @@ class VersionManager:
 
     def get_app_version(self) -> str:
         """读取 App 版本。"""
-        data = read_json(self.about_path)
-        zh_ver = data.get("zh-CN", {}).get("version", "")
-        en_ver = data.get("en-US", {}).get("version", "")
-        return zh_ver  # 两者应相同
+        data = read_json(self.version_json_path)
+        return data.get("version", "0.0.0")
 
     def get_file_versions(self) -> dict[str, str]:
         """读取文件格式版本。"""
@@ -214,7 +214,7 @@ class VersionManager:
         print("═══════════════════════════════════════")
         print("  App 版本")
         print("═══════════════════════════════════════")
-        print(f"  about.json                 {app}")
+        print(f"  version.json                 {app}")
 
         # File format
         print()
@@ -255,14 +255,15 @@ class VersionManager:
         issues = []
 
         # App 版本
-        if self.about_path.exists():
-            data = read_json(self.about_path)
-            zh_ver = data.get("zh-CN", {}).get("version", "")
-            en_ver = data.get("en-US", {}).get("version", "")
-            if zh_ver != en_ver:
-                issues.append({"level": "ERROR", "msg": f"about.json: zh-CN({zh_ver}) ≠ en-US({en_ver})"})
-            if zh_ver and not APP_VERSION_RE.match(zh_ver):
-                issues.append({"level": "ERROR", "msg": f"App 版本 '{zh_ver}' 格式不正确 (应为 X.Y.Z)"})
+        if self.version_json_path.exists():
+            data = read_json(self.version_json_path)
+            ver = data.get("version", "")
+            tag = data.get("releaseTag", "")
+            expected_tag = f"v{ver}"
+            if tag != expected_tag:
+                issues.append({"level": "ERROR", "msg": f"version.json: releaseTag '{tag}' != 'v{ver}'"})
+            if ver and not APP_VERSION_RE.match(ver):
+                issues.append({"level": "ERROR", "msg": f"App 版本 '{ver}' 格式不正确 (应为 X.Y.Z)"})
 
         # 文件格式版本
         file_vers = self.get_file_versions()
@@ -327,9 +328,9 @@ class VersionManager:
     # ── Bump App ──────────────────────────────
 
     def bump_app(self, level: Optional[str] = None, set_to: Optional[str] = None):
-        """调整 App 版本。"""
-        data = read_json(self.about_path)
-        current = data.get("zh-CN", {}).get("version", "0.0.0")
+        """调整 App 版本（更新 version.json）。"""
+        data = read_json(self.version_json_path)
+        current = data.get("version", "0.0.0")
 
         if set_to:
             new_ver = set_to
@@ -340,11 +341,11 @@ class VersionManager:
         else:
             raise ValueError("必须指定 --set 或 bump 级别")
 
-        data["zh-CN"]["version"] = new_ver
-        data["en-US"]["version"] = new_ver
+        data["version"] = new_ver
+        data["releaseTag"] = f"v{new_ver}"
         return {
-            "about.json": {"from": current, "to": new_ver},
-            "_app_data": data,
+            "version.json": {"from": current, "to": new_ver},
+            "_version_data": data,
         }
 
     # ── Bump File ─────────────────────────────
@@ -500,9 +501,9 @@ class VersionManager:
 
     def apply_changes(self, changes: dict):
         """将变更字典写入磁盘。"""
-        # 写入 about.json
-        if "_app_data" in changes:
-            write_json(self.about_path, changes.pop("_app_data"))
+        # 写入 version.json
+        if "_version_data" in changes:
+            write_json(self.version_json_path, changes.pop("_version_data"))
 
         # 写入 onboarding_config.json
         if "_onboarding_data" in changes:

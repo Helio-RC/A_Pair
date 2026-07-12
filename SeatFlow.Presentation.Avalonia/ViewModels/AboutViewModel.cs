@@ -28,7 +28,7 @@ public partial class AboutViewModel : ViewModelBase
     {
         var data = LoadAboutData();
 
-        Version = $"{data.Version ?? "1.0.0"}-{GitCommit.Hash}";
+        Version = $"{VersionInfo.Version}-{VersionInfo.CommitId}";
         VersionDisplay = string.Format(Resources.About_Version , Version);
 
         RuntimeVersion = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription;
@@ -79,7 +79,6 @@ public partial class AboutViewModel : ViewModelBase
 
     private sealed class AboutData
     {
-        public string? Version { get; set; }
         public string Description { get; set; } = "";
         public string ProjectUrl { get; set; } = "";
         public string License { get; set; } = "";

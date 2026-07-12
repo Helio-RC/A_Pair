@@ -217,8 +217,10 @@ Besides `scripts/i18n.py` (documented above), the following scripts exist — al
 |--------|---------|
 | `scripts/i18n.py` | i18n .resx resource CRUD + Designer.cs sync (45 unit tests) |
 | `scripts/version.py` | Unified version management across 15+ files — App, file format, strategy manifest, onboarding config versions. Subcommands: `show`, `check`, `bump-app`, `bump-file`, `bump-strategy`, `bump-onboarding`, `sync` (26 unit tests) |
-| `scripts/publish.sh` / `scripts/publish.ps1` | Multi-platform TUI/CLI publishing (self-contained + framework-dependent, trimming, AOT, SHA256 table) |
-| `scripts/clean.sh` / `scripts/clean.ps1` | Recursive bin/obj cleanup |
+| `scripts/build/publish.sh` / `scripts/build/publish.ps1` | Multi-platform TUI/CLI publishing (self-contained + framework-dependent, trimming, AOT, SHA256 table) |
+| `scripts/build/clean.sh` / `scripts/build/clean.ps1` | Recursive bin/obj cleanup |
+| `scripts/update_version_info.py` | MSBuild helper — reads version.json + git → generates VersionInfo.g.cs at build time |
+| `scripts/release/release.py` | Release orchestrator — build → package → OSS upload → GitHub Release |
 
 Unit tests are in `scripts/tests/`.
 
@@ -459,10 +461,35 @@ python3 scripts/version.py sync --force
 
 **重要**：`bump-file` 自动同步 `file_versions.json` → 7 个 Model C# 类 → `JsonStudentWriter.cs`，无需手动修改。
 
-### 发布 (`scripts/publish.sh` / `scripts/publish.ps1`)
+### RELEASE.md — 发布说明
+
+**路径**: `RELEASE.md`（项目根目录）。独立于 `CHANGELOG.md`，由开发者在每次发布前手动编写。`release.py` 读取该文件作为 GitHub Release body（末尾自动附加 SHA256 表格）。
+
+格式：
+```markdown
+# SeatFlow v1.3.0 发布说明
+
+本次发布主要修复了...
+
+## 新增
+- ...
+
+## 修复
+- ...
+```
+
+### 版本真相源 (`version.json`)
+
+**路径**: `version.json`（项目根目录）。App 版本号的唯一来源。字段：`version`, `releaseTag`, `commitId`, `buildDate`。
+
+- `version` / `releaseTag` → 由 `version.py bump-app` 管理
+- `commitId` / `buildDate` → 编译时由 `update_version_info.py` 从 git 实时获取，生成 `VersionInfo.g.cs` 供 C# 使用
+- `AboutViewModel` 使用 `VersionInfo.Version` + `VersionInfo.CommitId` 显示版本
+
+### 发布 (`scripts/build/publish.sh` / `scripts/build/publish.ps1`)
 
 ```bash
-cd scripts
+cd scripts/build
 ./publish.sh                    # TUI 交互模式（多选平台/选项）
 ./publish.sh hash               # 仅为已有发布文件生成 SHA256 表
 
@@ -472,10 +499,24 @@ cd scripts
 ./publish.sh both Release "" "1.2.1" clean aot   # 全平台独立+框架依赖，裁剪+AOT，版本 1.2.1
 ```
 
-### 清理 (`scripts/clean.sh` / `scripts/clean.ps1`)
+### 发布流水线 (`scripts/release/release.py`)
 
 ```bash
-cd scripts
+python3 scripts/release/release.py --dry-run        # 预览全流程
+python3 scripts/release/release.py                  # 完整发布
+python3 scripts/release/release.py --skip-build     # 跳过构建，仅打包和发布
+```
+
+**流程**: dotnet publish (4 RID) → zip/tar.gz 打包 → SHA256 → OSS 上传 + releases.json 更新 → GitHub REST API 创建 Release。
+
+**配置文件**: `scripts/release/config.json`（gitignored，含 OSS AccessKey + GitHub token）。模板见 `config.json.example`。
+
+**依赖**: `pip install oss2 requests`
+
+### 清理 (`scripts/build/clean.sh` / `scripts/build/clean.ps1`)
+
+```bash
+cd scripts/build
 ./clean.sh          # 确认后删除所有 bin/ 和 obj/
 ./clean.sh -n       # 仅预览（dry-run）
 ./clean.sh -f       # 直接删除（跳过确认）

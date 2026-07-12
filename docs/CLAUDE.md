@@ -218,8 +218,10 @@ python3 scripts/i18n.py sync                     # 从 .resx 重新生成 Design
 |--------|------|
 | `scripts/i18n.py` | i18n .resx 资源 CRUD + Designer.cs 同步（45 个单元测试） |
 | `scripts/version.py` | 跨 15+ 个文件的统一版本管理 — App 版本、文件格式版本、策略清单版本、引导配置版本。子命令：`show`、`check`、`bump-app`、`bump-file`、`bump-strategy`、`bump-onboarding`、`sync`（26 个单元测试） |
-| `scripts/publish.sh` / `scripts/publish.ps1` | 多平台 TUI/CLI 发布（独立 + 框架依赖，裁剪，AOT，SHA256 表格） |
-| `scripts/clean.sh` / `scripts/clean.ps1` | 递归清理 bin/obj |
+| `scripts/build/publish.sh` / `scripts/build/publish.ps1` | 多平台 TUI/CLI 发布（独立 + 框架依赖，裁剪，AOT，SHA256 表格） |
+| `scripts/build/clean.sh` / `scripts/build/clean.ps1` | 递归清理 bin/obj |
+| `scripts/update_version_info.py` | MSBuild 辅助 — 读取 version.json + git → 编译时生成 VersionInfo.g.cs |
+| `scripts/release/release.py` | 发布编排器 — 构建→打包→OSS 上传→GitHub Release |
 
 单元测试位于 `scripts/tests/`。
 
@@ -460,10 +462,10 @@ python3 scripts/version.py sync --force
 
 **重要**：`bump-file` 自动同步 `file_versions.json` → 7 个 Model C# 类 → `JsonStudentWriter.cs`，无需手动修改。
 
-### 发布 (`scripts/publish.sh` / `scripts/publish.ps1`)
+### 发布 (`scripts/build/publish.sh` / `scripts/build/publish.ps1`)
 
 ```bash
-cd scripts
+cd scripts/build
 ./publish.sh                    # TUI 交互模式（多选平台/选项）
 ./publish.sh hash               # 仅为已有发布文件生成 SHA256 表
 
@@ -473,10 +475,10 @@ cd scripts
 ./publish.sh both Release "" "1.2.1" clean aot   # 全平台独立+框架依赖，裁剪+AOT，版本 1.2.1
 ```
 
-### 清理 (`scripts/clean.sh` / `scripts/clean.ps1`)
+### 清理 (`scripts/build/clean.sh` / `scripts/build/clean.ps1`)
 
 ```bash
-cd scripts
+cd scripts/build
 ./clean.sh          # 确认后删除所有 bin/ 和 obj/
 ./clean.sh -n       # 仅预览（dry-run）
 ./clean.sh -f       # 直接删除（跳过确认）

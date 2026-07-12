@@ -1,0 +1,617 @@
+#!/usr/bin/env python3
+"""
+release — SeatFlow 发布编排脚本。
+
+将构建 (dotnet publish)、打包 (zip/tar.gz)、SHA256 校验、
+阿里云 OSS 上传、GitHub Release 创建串成一条自动化流水线。
+
+用法:
+  python3 scripts/release/release.py [--dry-run] [--skip-build] [--root DIR] [--config FILE]
+
+依赖:
+  pip install oss2 requests
+"""
+
+import argparse
+import hashlib
+import json
+import shutil
+import subprocess
+import sys
+import tarfile
+import zipfile
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
+
+
+# ──────────────────────────────────────────────
+# 常量
+# ──────────────────────────────────────────────
+
+APP_NAME = "SeatFlow"
+PROJECT = "SeatFlow.Presentation.Avalonia"
+CONFIGURATION = "Release"
+
+# RID → 平台标识 + 打包格式
+RIDS: list[dict] = [
+    {"rid": "win-x64",      "platform": "windows",     "ext": ".zip"},
+    {"rid": "linux-x64",    "platform": "linux",       "ext": ".tar.gz"},
+    {"rid": "osx-x64",      "platform": "macos-x64",   "ext": ".tar.gz"},
+    {"rid": "osx-arm64",    "platform": "macos-arm64", "ext": ".tar.gz"},
+]
+
+EXE_SUFFIX = ".exe"  # Windows RID 的可执行文件后缀
+
+
+# ──────────────────────────────────────────────
+# 工具函数
+# ──────────────────────────────────────────────
+
+
+def resolve_root(root_arg: Optional[str] = None) -> Path:
+    """解析项目根目录。"""
+    if root_arg:
+        return Path(root_arg)
+    return Path(__file__).resolve().parent.parent.parent
+
+
+def read_json(path: Path) -> dict:
+    """读取 JSON 文件。"""
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def write_json(path: Path, data: dict) -> None:
+    """写入 JSON 文件。"""
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+
+
+def sha256_file(path: Path) -> str:
+    """计算文件的 SHA256 哈希值。"""
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        while chunk := f.read(8192):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def format_size(bytes_count: int) -> str:
+    """人类可读的文件大小。"""
+    for unit in ("B", "KiB", "MiB", "GiB"):
+        if bytes_count < 1024:
+            return f"{bytes_count:.1f} {unit}"
+        bytes_count /= 1024
+    return f"{bytes_count:.1f} TiB"
+
+
+# ──────────────────────────────────────────────
+# ReleaseManager
+# ──────────────────────────────────────────────
+
+
+class ReleaseManager:
+    """发布编排器。"""
+
+    def __init__(self, root: Path, config_path: Path, dry_run: bool = False,
+                 skip_build: bool = False):
+        self.root = root
+        self.dry_run = dry_run
+        self.skip_build = skip_build
+
+        # 路径
+        self.version_json_path = root / "version.json"
+        self.release_md_path = root / "RELEASE.md"
+        self.project_path = root / PROJECT
+        self.dist_dir = root / "publish" / "release"
+
+        # 加载配置
+        self.config = self._load_config(config_path)
+
+        # 加载版本信息
+        self.version_info = self._load_version_info()
+        self.version = self.version_info["version"]
+
+        # dist 子目录
+        self.version_dist_dir = self.dist_dir / self.version
+
+    # ── 配置 ──────────────────────────────────
+
+    def _load_config(self, config_path: Path) -> dict:
+        """读取并验证 release 配置文件。"""
+        if not config_path.exists():
+            raise ValueError(
+                f"配置文件不存在: {config_path}\n"
+                f"请参考 {config_path.parent / 'config.json.example'} 创建。"
+            )
+
+        cfg = read_json(config_path)
+
+        # 验证 OSS 配置
+        oss = cfg.get("oss", {})
+        required_oss = ["accessKeyId", "accessKeySecret", "endpoint", "bucket"]
+        for key in required_oss:
+            if not oss.get(key):
+                raise ValueError(f"config.json: oss.{key} 未设置")
+
+        # 验证 GitHub 配置
+        gh = cfg.get("github", {})
+        if not gh.get("repo"):
+            raise ValueError("config.json: github.repo 未设置")
+        if not gh.get("token"):
+            raise ValueError("config.json: github.token 未设置")
+
+        return cfg
+
+    def _load_version_info(self) -> dict:
+        """读取 version.json。"""
+        if not self.version_json_path.exists():
+            raise FileNotFoundError(f"version.json 不存在: {self.version_json_path}")
+
+        data = read_json(self.version_json_path)
+        for key in ("version", "releaseTag"):
+            if not data.get(key):
+                raise ValueError(f"version.json: '{key}' 字段缺失")
+        return data
+
+    # ── 步骤 1: 构建 ──────────────────────────
+
+    def build_all(self) -> dict:
+        """并行构建所有平台的单文件可执行文件。返回 {rid: exe_path}。"""
+        if self.skip_build:
+            print("[1/5] 跳过构建 (--skip-build)")
+            return {}
+
+        print("[1/5] 构建所有平台...")
+
+        self.version_dist_dir.mkdir(parents=True, exist_ok=True)
+
+        results: dict[str, Path] = {}
+
+        # 串行构建避免 obj/ 目录冲突
+        for r in RIDS:
+            rid = r["rid"]
+            try:
+                exe_path = self._build_one(r)
+                results[rid] = exe_path
+                print(f"  ✓ {rid}")
+            except subprocess.CalledProcessError as e:
+                print(f"  ✗ {rid}: 构建失败")
+                raise SystemExit(1) from e
+
+        return results
+
+    def _build_one(self, r: dict) -> Path:
+        """构建单个 RID。返回可执行文件路径。"""
+        rid = r["rid"]
+        tmp_dir = self.version_dist_dir / f".tmp_{rid}"
+        tmp_dir.mkdir(parents=True, exist_ok=True)
+
+        cmd = [
+            "dotnet", "publish", str(self.project_path),
+            "-c", CONFIGURATION,
+            "-r", rid,
+            "--self-contained", "true",
+            "-p:PublishSingleFile=true",
+            "-p:IncludeNativeLibrariesForSelfExtract=true",
+            "-p:IncludeAllContentForSelfExtract=true",
+            "-o", str(tmp_dir),
+        ]
+
+        result = subprocess.run(cmd, cwd=str(self.root),
+                                capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"    stderr: {result.stderr[-500:]}", file=sys.stderr)
+            result.check_returncode()
+
+        # 查找输出可执行文件
+        exe_name = "SeatFlow.exe" if rid.startswith("win") else "SeatFlow"
+        exe_path = tmp_dir / exe_name
+        if not exe_path.exists():
+            # fallback: 搜索目录
+            candidates = list(tmp_dir.glob("SeatFlow*"))
+            if candidates:
+                exe_path = candidates[0]
+            else:
+                raise FileNotFoundError(f"构建产物未找到: {tmp_dir}")
+
+        return exe_path
+
+    # ── 步骤 2: 打包 ──────────────────────────
+
+    def package_all(self, build_outputs: dict) -> list[dict]:
+        """打包各平台产物，计算 SHA256。返回文件信息列表。"""
+        print("[2/5] 打包平台产物...")
+
+        files: list[dict] = []
+
+        for r in RIDS:
+            rid = r["rid"]
+            platform = r["platform"]
+            ext = r["ext"]
+
+            exe_path = build_outputs.get(rid)
+            if exe_path is None:
+                print(f"  ! {rid}: 无构建产物，跳过")
+                continue
+
+            file_name = f"{APP_NAME}-{self.version}-{platform}{ext}"
+            archive_path = self.version_dist_dir / file_name
+
+            if ext == ".zip":
+                self._create_zip(exe_path, archive_path, rid)
+            else:
+                self._create_tar_gz(exe_path, archive_path, rid)
+
+            file_size = archive_path.stat().st_size
+            file_hash = sha256_file(archive_path)
+
+            files.append({
+                "platform": platform,
+                "fileName": file_name,
+                "size": file_size,
+                "sha256": file_hash,
+                "localPath": str(archive_path),
+            })
+
+            print(f"  {file_name} ({format_size(file_size)}, sha256: {file_hash[:12]}...)")
+
+        # 清理临时构建目录
+        for r in RIDS:
+            tmp_dir = self.version_dist_dir / f".tmp_{r['rid']}"
+            if tmp_dir.exists():
+                shutil.rmtree(tmp_dir)
+
+        return files
+
+    def _create_zip(self, exe_path: Path, archive_path: Path, rid: str) -> None:
+        """创建 .zip 包。"""
+        exe_name = f"{APP_NAME}.exe" if rid.startswith("win") else APP_NAME
+        with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.write(exe_path, exe_name)
+
+    def _create_tar_gz(self, exe_path: Path, archive_path: Path, rid: str) -> None:
+        """创建 .tar.gz 包。"""
+        with tarfile.open(archive_path, "w:gz") as tf:
+            tf.add(exe_path, APP_NAME)
+
+    # ── 步骤 3: 发布说明 ───────────────────────
+
+    def build_release_notes(self) -> str:
+        """读取 RELEASE.md，附加 SHA256 表格。"""
+        print("[3/5] 读取 RELEASE.md...")
+
+        if not self.release_md_path.exists():
+            raise FileNotFoundError(
+                f"RELEASE.md 不存在: {self.release_md_path}\n"
+                f"请在项目根目录创建 RELEASE.md 发布说明文件。"
+            )
+
+        content = self.release_md_path.read_text(encoding="utf-8")
+
+        print(f"  RELEASE.md 已读取 ({len(content)} 字符)")
+        return content
+
+    # ── 步骤 4: OSS 上传 ───────────────────────
+
+    def upload_to_oss(self, files: list[dict], release_notes: str) -> None:
+        """上传到阿里云 OSS。"""
+        print("[4/5] 上传到阿里云 OSS...")
+
+        if self.dry_run:
+            print("  [dry-run] 跳过 OSS 上传。")
+            return
+
+        try:
+            import oss2
+        except ImportError:
+            print("  ! oss2 库未安装。跳过 OSS 上传。")
+            print("    安装: pip install oss2")
+            return
+
+        oss_cfg = self.config["oss"]
+        auth = oss2.Auth(oss_cfg["accessKeyId"], oss_cfg["accessKeySecret"])
+        bucket = oss2.Bucket(auth, oss_cfg["endpoint"], oss_cfg["bucket"])
+
+        prefix = f"releases/{self.version}"
+
+        # 上传 RELEASE.md
+        self._oss_put(bucket, f"{prefix}/RELEASE.md", release_notes.encode("utf-8"),
+                      "text/markdown")
+        print(f"  ✓ {prefix}/RELEASE.md")
+
+        # 上传各平台包
+        for f in files:
+            local_path = Path(f["localPath"])
+            oss_key = f"{prefix}/{f['fileName']}"
+            self._oss_put_file(bucket, oss_key, str(local_path))
+            print(f"  ✓ {oss_key} ({format_size(f['size'])})")
+
+        # 更新 releases.json 索引
+        self._update_releases_index(bucket, files, release_notes)
+
+    def _oss_put(self, bucket, key: str, data: bytes, content_type: str) -> None:
+        """上传数据到 OSS。"""
+        try:
+            bucket.put_object(key, data, headers={"Content-Type": content_type})
+        except Exception as e:
+            print(f"  ✗ OSS 上传失败: {key} — {e}")
+            raise
+
+    def _oss_put_file(self, bucket, key: str, local_path: str) -> None:
+        """上传文件到 OSS。"""
+        try:
+            bucket.put_object_from_file(key, local_path)
+        except Exception as e:
+            print(f"  ✗ OSS 上传失败: {key} — {e}")
+            raise
+
+    def _update_releases_index(self, bucket, files: list[dict],
+                               release_notes: str) -> None:
+        """更新 releases.json 版本索引。"""
+        index_key = "releases/releases.json"
+        existing = None
+
+        try:
+            result = bucket.get_object(index_key)
+            existing = json.loads(result.read())
+        except Exception:
+            # releases.json 不存在 → 首次发布
+            print("  releases.json 不存在，将创建新的版本索引。")
+
+        if existing is None:
+            existing = {"latest": self.version, "versions": []}
+        else:
+            # 检查版本是否已存在
+            for v in existing.get("versions", []):
+                if v["version"] == self.version:
+                    raise ValueError(
+                        f"版本 {self.version} 已存在于 releases.json 中。"
+                        f"禁止覆盖已发布版本。"
+                    )
+
+        # 构建新条目（插入到头部）
+        release_date = datetime.now(timezone.utc).astimezone().isoformat()
+
+        entry = {
+            "version": self.version,
+            "commitId": self.version_info.get("commitId", "unknown"),
+            "releaseDate": release_date,
+            "notes": release_notes.strip(),
+            "files": [
+                {
+                    "platform": f["platform"],
+                    "fileName": f["fileName"],
+                    "size": f["size"],
+                    "sha256": f["sha256"],
+                }
+                for f in files
+            ],
+        }
+
+        existing["versions"].insert(0, entry)
+        existing["latest"] = self.version
+
+        # 上传
+        data = json.dumps(existing, ensure_ascii=False, indent=2).encode("utf-8")
+        self._oss_put(bucket, index_key, data, "application/json")
+        print(f"  ✓ {index_key} (latest: {self.version})")
+
+    # ── 步骤 5: GitHub Release ────────────────
+
+    def create_github_release(self, files: list[dict], release_notes: str) -> None:
+        """通过 GitHub REST API 创建 Release。"""
+        print("[5/5] 创建 GitHub Release...")
+
+        if self.dry_run:
+            print("  [dry-run] 跳过 GitHub Release 创建。")
+            return
+
+        try:
+            import requests
+        except ImportError:
+            print("  ! requests 库未安装。跳过 GitHub Release。")
+            print("    安装: pip install requests")
+            return
+
+        gh_cfg = self.config["github"]
+        repo = gh_cfg["repo"]
+        token = gh_cfg["token"]
+        tag = self.version_info["releaseTag"]
+
+        api_base = f"https://api.github.com/repos/{repo}"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+        }
+
+        # 1. 构建 body（RELEASE.md + SHA256 表格）
+        body = self._build_release_body(release_notes, files)
+
+        # 2. 创建 Release
+        release_url = f"{api_base}/releases"
+        payload = {
+            "tag_name": tag,
+            "name": f"SeatFlow {self.version}",
+            "body": body,
+            "prerelease": False,
+        }
+
+        resp = requests.post(release_url, json=payload, headers=headers)
+        if resp.status_code == 422 and "already_exists" in resp.text:
+            print(f"  ! Release tag '{tag}' 已存在，跳过。")
+            return
+        if resp.status_code >= 400:
+            print(f"  ✗ GitHub API 错误: {resp.status_code}")
+            print(f"    {resp.text}")
+            raise SystemExit(1)
+
+        release_data = resp.json()
+        release_id = release_data["id"]
+        print(f"  ✓ Release 已创建: {release_data['html_url']}")
+
+        # 3. 上传资产文件
+        for f in files:
+            local_path = Path(f["localPath"])
+            asset_url = f"{api_base}/releases/{release_id}/assets"
+            params = {"name": f["fileName"]}
+            asset_headers = {
+                **headers,
+                "Content-Type": "application/octet-stream",
+            }
+
+            with open(local_path, "rb") as fh:
+                asset_resp = requests.post(
+                    asset_url, params=params, headers=asset_headers, data=fh
+                )
+
+            if asset_resp.status_code == 201:
+                print(f"  ✓ 已上传: {f['fileName']}")
+            else:
+                print(f"  ✗ 上传失败: {f['fileName']} — {asset_resp.status_code}")
+
+    def _build_release_body(self, release_notes: str, files: list[dict]) -> str:
+        """构建 Release body：RELEASE.md + SHA256 表格。"""
+        lines = [release_notes.strip(), "", "### SHA256 Checksums", ""]
+        lines.append("| File | SHA256 |")
+        lines.append("|------|--------|")
+
+        for f in files:
+            lines.append(f"| {f['fileName']} | {f['sha256']} |")
+
+        return "\n".join(lines) + "\n"
+
+    # ── 前置检查 ───────────────────────────────
+
+    def _check_versions(self) -> bool:
+        """运行 version.py check，确保版本号一致性。"""
+        version_py = self.root / "scripts" / "version.py"
+        result = subprocess.run(
+            ["python3", str(version_py), "check"],
+            cwd=str(self.root),
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            print("[0/5] 版本号一致性检查  ✗ 失败")
+            print(result.stdout)
+            if result.stderr:
+                print(result.stderr)
+            return False
+        print("[0/5] 版本号一致性检查  ✓ 通过")
+        return True
+
+    # ── 编排 ───────────────────────────────────
+
+    def run(self) -> int:
+        """执行全量发布流程。"""
+        print(f"=== SeatFlow Release v{self.version} ===\n")
+
+        try:
+            # 步骤 0: 版本号一致性检查
+            if not self._check_versions():
+                print("\n请先运行 python3 scripts/version.py check 查看详情，"
+                      "再用 python3 scripts/version.py sync --force 修复同步问题。")
+                return 1
+
+            # 步骤 1: 构建
+            build_outputs = self.build_all()
+
+            if self.skip_build:
+                # 从已有 dist 目录恢复
+                build_outputs = self._find_existing_builds()
+
+            if not build_outputs:
+                print("错误: 无可用构建产物。")
+                return 1
+
+            # 步骤 2: 打包 + SHA256
+            files = self.package_all(build_outputs)
+            if not files:
+                print("错误: 无可用包文件。")
+                return 1
+
+            # 步骤 3: 发布说明
+            release_notes = self.build_release_notes()
+
+            # 步骤 4: OSS 上传
+            self.upload_to_oss(files, release_notes)
+
+            # 步骤 5: GitHub Release
+            self.create_github_release(files, release_notes)
+
+            print(f"\n=== Release v{self.version} 完成 ===")
+
+            # 本地输出 SHA256 表格
+            print("\nSHA256 Checksums:")
+            print(self._build_sha256_table(files))
+
+            return 0
+
+        except (ValueError, FileNotFoundError) as e:
+            print(f"\n错误: {e}")
+            return 1
+        except SystemExit as e:
+            return e.code if isinstance(e.code, int) else 1
+
+    def _find_existing_builds(self) -> dict:
+        """从 dist 目录查找已有构建产物。"""
+        results: dict[str, Path] = {}
+        for r in RIDS:
+            rid = r["rid"]
+            exe_name = "SeatFlow.exe" if rid.startswith("win") else "SeatFlow"
+            # 可能在 .tmp_{rid} 中
+            tmp_dir = self.version_dist_dir / f".tmp_{rid}"
+            exe_path = tmp_dir / exe_name
+            if exe_path.exists():
+                results[rid] = exe_path
+        return results
+
+    def _build_sha256_table(self, files: list[dict]) -> str:
+        """构建 SHA256 表格字符串。"""
+        lines = ["| File | SHA256 |", "|------|--------|"]
+        for f in files:
+            lines.append(f"| {f['fileName']} | {f['sha256']} |")
+        return "\n".join(lines)
+
+
+# ──────────────────────────────────────────────
+# CLI 入口
+# ──────────────────────────────────────────────
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="SeatFlow 发布编排脚本 — 构建、打包、上传 OSS、创建 GitHub Release",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+示例:
+  python3 scripts/release/release.py --dry-run        # 预览全流程（不实际上传）
+  python3 scripts/release/release.py                  # 完整发布
+  python3 scripts/release/release.py --skip-build     # 跳过构建，仅打包和发布
+        """,
+    )
+    parser.add_argument("--root", default=None, help="项目根目录 (默认: 自动检测)")
+    parser.add_argument("--config", default=None, help="配置文件路径 (默认: scripts/release/config.json)")
+    parser.add_argument("--dry-run", action="store_true", help="预览模式：构建和打包，但不上传")
+    parser.add_argument("--skip-build", action="store_true", help="跳过 dotnet publish，使用已有构建产物")
+
+    args = parser.parse_args()
+
+    root = resolve_root(args.root)
+    config_path = Path(args.config) if args.config else root / "scripts" / "release" / "config.json"
+
+    mgr = ReleaseManager(
+        root=root,
+        config_path=config_path,
+        dry_run=args.dry_run,
+        skip_build=args.skip_build,
+    )
+
+    return mgr.run()
+
+
+if __name__ == "__main__":
+    sys.exit(main())
