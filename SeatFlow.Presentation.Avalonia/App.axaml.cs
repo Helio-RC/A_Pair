@@ -319,14 +319,10 @@ namespace SeatFlow.Presentation.Avalonia
             }
         }
 
-        private async Task CheckAndStartOnboardingAsync ()
+        private async Task<bool> DetectAndMarkFirstLaunchAsync()
         {
             try
             {
-                var logger = _serviceProvider.GetRequiredService<ILogger<App>>();
-                // 检测是否需要显示引导：
-                // 1. 设置文件不存在 → 真正的首次启动
-                // 2. 用户通过设置页面请求重新引导（IsFirstLaunch = true）
                 var repo = _serviceProvider.GetRequiredService<IAppSettingsRepository>();
                 var isTrueFirstLaunch = repo is Infrastructure.Providers.JsonAppSettingsRepository jsonRepo
                     && !File.Exists(jsonRepo.SettingsFilePath);
@@ -334,26 +330,38 @@ namespace SeatFlow.Presentation.Avalonia
                 var facade = _serviceProvider.GetRequiredService<IApplicationFacade>();
                 var settings = await facade.LoadAppSettingsAsync();
 
-                logger.LogInformation("[Onboarding] isTrueFirstLaunch={A}, IsFirstLaunch={B}" , isTrueFirstLaunch , settings.IsFirstLaunch);
                 if (isTrueFirstLaunch || settings.IsFirstLaunch)
                 {
-                    logger.LogInformation("[Onboarding] 触发启动引导");
-                    // 立即标记完成（崩溃安全）
+                    // 立即标记完成，防止崩溃导致反复触发
                     settings.IsFirstLaunch = false;
                     await facade.SaveAppSettingsAsync(settings);
-
-                    // 在 UI 线程启动引导，给 UI 一些时间完成初始渲染
-                    var onboarding = _serviceProvider.GetRequiredService<IOnboardingService>();
-                    Dispatcher.UIThread.Post(() =>
-                    {
-                        onboarding.StartOnboarding();
-                    } , DispatcherPriority.Background);
+                    return true;
                 }
+
+                return false;
             }
             catch (Exception ex)
             {
                 var logger = _serviceProvider.GetRequiredService<ILogger<App>>();
-                logger.LogError(ex , "[Onboarding] CheckAndStartOnboardingAsync 异常");
+                logger.LogError(ex, "[Onboarding] DetectAndMarkFirstLaunchAsync 异常");
+                return false;
+            }
+        }
+
+        private void StartOnboardingDeferred()
+        {
+            try
+            {
+                var onboarding = _serviceProvider.GetRequiredService<IOnboardingService>();
+                Dispatcher.UIThread.Post(() =>
+                {
+                    onboarding.StartOnboarding();
+                }, DispatcherPriority.Background);
+            }
+            catch (Exception ex)
+            {
+                var logger = _serviceProvider.GetRequiredService<ILogger<App>>();
+                logger.LogError(ex, "[Onboarding] StartOnboardingDeferred 异常");
             }
         }
 
@@ -362,14 +370,17 @@ namespace SeatFlow.Presentation.Avalonia
             // 在 AppData 创建前先检查自动导入 .seatsets（仅在 AppData 不存在时生效）
             await CheckSeatSetsAutoImportAsync();
 
-            // 恢复设置后再显示遥测同意弹窗（必须在引导之前，避免引导 Popup 覆盖弹窗）
             await RestoreSettingsAsync();
 
-            // 遥测同意弹窗（必须在引导之前）
+            // 1. 检测首次启动（在任何遥测保存操作之前，确保 isTrueFirstLaunch 不受后续文件创建影响）
+            var needsOnboarding = await DetectAndMarkFirstLaunchAsync();
+
+            // 2. 遥测同意弹窗（在引导之前，避免引导 Popup 覆盖）
             await ShowTelemetryConsentIfNeededAsync();
 
-            // 先检查引导，再恢复设置；确保首次启动检测在文件创建之前
-            await CheckAndStartOnboardingAsync();
+            // 3. 启动引导（在遥测弹窗之后）
+            if (needsOnboarding)
+                StartOnboardingDeferred();
 
             // 记录应用启动遥测
             RecordAppStartTelemetry();
@@ -449,10 +460,6 @@ namespace SeatFlow.Presentation.Avalonia
                 if (settings.Telemetry.ConsentShown)
                     return;
 
-                // 标记已展示（防止弹窗被关闭导致反复弹出）
-                settings.Telemetry.ConsentShown = true;
-                await facade.SaveAppSettingsAsync(settings);
-
                 var dialog = _serviceProvider.GetRequiredService<IDialogService>();
                 var telemetry = _serviceProvider.GetRequiredService<ITelemetryService>();
 
@@ -463,12 +470,17 @@ namespace SeatFlow.Presentation.Avalonia
                     Lang.Resources.Telemetry_ConsentLater,
                     cancelText: "");
 
+                // 用户做出选择后再持久化
+                settings.Telemetry.ConsentShown = true;
+
                 if (result == 0) // "开启"
                 {
+                    settings.Telemetry.Enabled = true;
                     telemetry.SetEnabled(true);
-                    var logger = _serviceProvider.GetRequiredService<ILogger<App>>();
-                    logger.LogInformation("用户同意开启遥测");
                 }
+
+                // 保存 ConsetShown + 可能 TelemetryEnabled
+                await facade.SaveAppSettingsAsync(settings);
             }
             catch (Exception ex)
             {
