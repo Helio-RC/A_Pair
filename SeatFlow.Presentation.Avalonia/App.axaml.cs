@@ -179,13 +179,13 @@ namespace SeatFlow.Presentation.Avalonia
                 // 退出看门狗：关闭信号发出后 20s 内未退出则强制终止
                 desktop.ShutdownRequested += (_ , _) =>
                 {
-                    // 记录应用退出遥测
+                    // 记录应用退出遥测（fire-and-forget，不阻塞退出）
                     try
                     {
                         var telemetry = _serviceProvider.GetRequiredService<ITelemetryService>();
                         telemetry.RecordEvent(TelemetryEventTypes.AppExit);
-                        // 同步刷新（有限等待）
-                        telemetry.FlushAsync(TimeSpan.FromSeconds(2)).GetAwaiter().GetResult();
+                        // 后台刷新，不等待结果，避免阻塞退出
+                        _ = Task.Run(() => telemetry.FlushAsync(TimeSpan.FromSeconds(2)));
                     }
                     catch { /* 遥测退出失败静默处理 */ }
 
