@@ -256,6 +256,21 @@ All persisted JSON files carry a `version` field. Current versions are defined i
 
 On load, each repository reads the file as `JsonNode`, calls `FileMigrationService.Migrate(fileType, node, fileVersion, targetVersion)`, then deserializes. Migration is **forward-only** — no version rollback. The service finds registered `IFileMigrator` implementations and chains them by matching `FromVersion`/`ToVersion`.
 
+### 何时需要迁移器 vs 依赖模型默认值
+
+**不需要迁移器**（模型默认值即可）：
+- 新增属性/配置节，且所有字段都有合理的默认值（`bool` → `false`、`int` → `0`、`string` → `""`、引用类型 → `new()`）
+- 旧 JSON 缺少该节点时，`System.Text.Json` 反序列化会保留属性的默认值
+- 示例：新增 `TelemetryConfig` 到 `AppSettings`，默认 `Enabled = false`，旧文件无需迁移
+
+**必须写迁移器**：
+- 数据格式变化：如 `VenueMigrators 1.0→1.1` 将座位从列主序重排为行主序
+- 字段语义变化：同一个 JSON key 的含义改变，需要重新计算/转换
+- 字段重命名且不能丢失旧数据：需要将旧 key 的值复制到新 key
+- 数据结构重组：嵌套层级变化（如 `SeatSetsMigrators`）
+
+**原则**：只有旧数据**不转换就会出错或丢失信息**时才写迁移器。能用默认值兜底就不要写。
+
 ### Adding a migration
 
 1. Add a nested class in `Migration/Migrators/{FileType}Migrators.cs` (one file per file type):
