@@ -81,7 +81,7 @@ public class ApplicationFacadeTests
         await exporter.Received(1).ExportAsync(
             Arg.Any<SeatingPlan>() ,
             "test.xlsx" ,
-            Arg.Is<ExportOptions>(o => o.Anonymize == true) ,
+            Arg.Is<ExportOptions>(o => o!.Anonymize == true) ,
             Arg.Any<CancellationToken>());
     }
 
@@ -114,11 +114,11 @@ public class ApplicationFacadeTests
         await exporter.Received(1).ExportLayoutAsync(
             Arg.Is<LayoutSeatingExportModel>(m =>
                 // 行反转：讲台移至最后一行
-                m.Rows[m.Rows.Count - 1].Cells.Any(c => c.IsPodium) &&
+                m!.Rows[m.Rows.Count - 1].Cells.Any(c => c.IsPodium) &&
                 // 列镜像：讲台行内 cells 左右颠倒，讲台从中间移至另一侧
                 m.Rows[m.Rows.Count - 1].Cells[0].IsPodium) ,
             "test.xlsx" ,
-            Arg.Is<ExportOptions>(o => o.Perspective == LayoutPerspective.TeacherView) ,
+            Arg.Is<ExportOptions>(o => o!.Perspective == LayoutPerspective.TeacherView) ,
             Arg.Any<CancellationToken>());
     }
 
