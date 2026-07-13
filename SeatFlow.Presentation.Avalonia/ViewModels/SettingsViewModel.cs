@@ -193,22 +193,20 @@ public partial class SettingsViewModel : ViewModelBase
             IsSaving = true;
             StatusMessage = Resources.Settings_Saving;
 
-            var existing = await _facade.LoadAppSettingsAsync(ct);
+            var settings = await _facade.LoadAppSettingsAsync(ct);
 
-            var settings = new AppSettings
-            {
-                WindowState = existing.WindowState ,
-                Theme = Theme ,
-                Language = Language ,
-                DataDirectory = DataDirectory ,
-                ConfirmBeforeClear = ConfirmBeforeClear ,
-                DefaultZoomLevel = _defaultZoomLevel ,
-                MaxSnapshotsPerVenue = MaxSnapshotsPerVenue
-            };
+            // 直接在现有对象上修改，保留所有其他字段（CompletedPageGuides、Logging、Telemetry 等）
+            settings.Theme = Theme;
+            settings.Language = Language;
+            settings.DataDirectory = DataDirectory;
+            settings.ConfirmBeforeClear = ConfirmBeforeClear;
+            settings.DefaultZoomLevel = _defaultZoomLevel;
+            settings.MaxSnapshotsPerVenue = MaxSnapshotsPerVenue;
+            settings.Telemetry.Enabled = TelemetryEnabled;
 
             await _facade.SaveAppSettingsAsync(settings , ct);
 
-            // 同步遥测状态
+            // 同步内存中的遥测状态（SetEnabled 内部也会持久化，此时 settings 已完整）
             _telemetry.SetEnabled(TelemetryEnabled);
 
             var langChanged = !string.Equals(_originalLanguage , Language , StringComparison.Ordinal);

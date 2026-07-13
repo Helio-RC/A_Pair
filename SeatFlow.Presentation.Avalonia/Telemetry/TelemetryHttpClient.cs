@@ -61,7 +61,6 @@ public sealed class TelemetryHttpClient : IDisposable
             BaseAddress = new Uri(serverUrl),
             Timeout = TimeSpan.FromSeconds(10)
         };
-        _httpClient.DefaultRequestHeaders.Add("Referer", "https://seatflow.work");
         _httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
 
         _flushTimer = new Timer(OnFlushTimerTick, null,

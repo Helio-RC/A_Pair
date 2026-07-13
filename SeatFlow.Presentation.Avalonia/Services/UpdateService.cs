@@ -28,10 +28,18 @@ internal sealed class UpdateService : IUpdateService, IDisposable
     private UpdateInfo? _lastUpdateInfo;
     private UpdateManager? _currentManager;
     private bool _isInstalled;
+    private readonly object _updateLock = new();
 
     public UpdateServiceStatus Status { get; private set; } = UpdateServiceStatus.Unavailable;
 
-    public bool UpdatePendingRestart => _currentManager?.UpdatePendingRestart is not null;
+    public bool UpdatePendingRestart
+    {
+        get
+        {
+            lock (_updateLock)
+                return _currentManager?.UpdatePendingRestart is not null;
+        }
+    }
 
     public UpdateService(ILogger<UpdateService> logger)
     {
@@ -107,7 +115,8 @@ internal sealed class UpdateService : IUpdateService, IDisposable
             ("github", CreateGitHubManager),
         };
 
-        bool primaryHealthy = metadata is not { IsFallback: true };
+        // metadata 为 null（API 不可达）或 IsFallback 为 true 时跳过 API 源
+        bool primaryHealthy = metadata is not null && !metadata.IsFallback;
 
         foreach (var (sourceKey, createManager) in sourcePriority)
         {
@@ -121,8 +130,11 @@ internal sealed class UpdateService : IUpdateService, IDisposable
             {
                 var manager = createManager();
                 var updateInfo = await manager.CheckForUpdatesAsync();
-                _lastUpdateInfo = updateInfo;
-                _currentManager = manager;
+                lock (_updateLock)
+                {
+                    _lastUpdateInfo = updateInfo;
+                    _currentManager = manager;
+                }
 
                 Status = sourceKey == "github"
                     ? UpdateServiceStatus.Fallback
@@ -150,7 +162,8 @@ internal sealed class UpdateService : IUpdateService, IDisposable
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "源 {Source} 检查更新失败，尝试下一个", sourceKey);
-                _currentManager = null;
+                lock (_updateLock)
+                    _currentManager = null;
             }
         }
 
@@ -166,22 +179,35 @@ internal sealed class UpdateService : IUpdateService, IDisposable
 
     public async Task DownloadUpdatesAsync(IProgress<int>? progress = null, CancellationToken ct = default)
     {
-        if (_lastUpdateInfo is null || _currentManager is null)
+        UpdateInfo? info;
+        UpdateManager? mgr;
+        lock (_updateLock)
         {
-            await CheckForUpdatesAsync(ct);
+            info = _lastUpdateInfo;
+            mgr = _currentManager;
         }
 
-        if (_lastUpdateInfo is null || _currentManager is null)
+        if (info is null || mgr is null)
+        {
+            await CheckForUpdatesAsync(ct);
+            lock (_updateLock)
+            {
+                info = _lastUpdateInfo;
+                mgr = _currentManager;
+            }
+        }
+
+        if (info is null || mgr is null)
             return;
 
-        _logger.LogInformation("开始下载更新 {Version}", _lastUpdateInfo.TargetFullRelease.Version);
+        _logger.LogInformation("开始下载更新 {Version}", info.TargetFullRelease.Version);
 
         Action<int>? onProgress = progress is null
             ? null
             : p => progress.Report(p);
 
-        await _currentManager.DownloadUpdatesAsync(
-            _lastUpdateInfo,
+        await mgr.DownloadUpdatesAsync(
+            info,
             onProgress,
             cancelToken: ct);
 
@@ -190,11 +216,22 @@ internal sealed class UpdateService : IUpdateService, IDisposable
 
     public void ApplyUpdatesAndRestart()
     {
-        if (_lastUpdateInfo is null || _currentManager is null)
-            return;
+        UpdateInfo? info;
+        UpdateManager? mgr;
+        lock (_updateLock)
+        {
+            info = _lastUpdateInfo;
+            mgr = _currentManager;
+        }
 
-        _logger.LogInformation("应用更新并重启: {Version}", _lastUpdateInfo.TargetFullRelease.Version);
-        _currentManager.ApplyUpdatesAndRestart(_lastUpdateInfo.TargetFullRelease);
+        if (info?.TargetFullRelease is null || mgr is null)
+        {
+            _logger.LogWarning("无法应用更新：更新信息不完整");
+            return;
+        }
+
+        _logger.LogInformation("应用更新并重启: {Version}", info.TargetFullRelease.Version);
+        mgr.ApplyUpdatesAndRestart(info.TargetFullRelease);
     }
 
     // ============================================================
@@ -232,6 +269,11 @@ internal sealed class UpdateService : IUpdateService, IDisposable
         return new UpdateManager(url, options);
     }
 
+    /// <summary>
+    /// 创建基于 GitHub Releases 的 UpdateManager（兜底源）。
+    /// 注意：未认证的 GitHub API 限制为 60 req/h/IP。
+    /// 桌面应用的更新检查频率较低（手动触发），通常不会达到此限制。
+    /// </summary>
     private UpdateManager CreateGitHubManager()
     {
         _logger.LogDebug("创建 GitHub UpdateManager: {Repo}", GitHubRepoUrl);

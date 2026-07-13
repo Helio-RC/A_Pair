@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using OpenTelemetry;
@@ -10,6 +11,8 @@ using OpenTelemetry.Trace;
 using SeatFlow.Core.Models;
 using SeatFlow.Core.Providers;
 using SeatFlow.Core.Telemetry;
+using SeatFlow.Core.Utilities;
+using SeatFlow.Infrastructure.Migration;
 
 namespace SeatFlow.Presentation.Avalonia.Telemetry;
 
@@ -97,17 +100,29 @@ public static class TelemetryServiceCollectionExtensions
             });
     }
 
-    /// <summary>安全加载遥测配置。直接读取 AppSettings.json 文件（不使用 DI，避免提前构建 ServiceProvider）。</summary>
+    /// <summary>
+    /// 安全加载遥测配置。直接读取 AppSettings.json 并运行文件迁移器（不使用 DI，避免提前构建 ServiceProvider）。
+    /// 路径使用 AppEnvironment.ExeDirectory，与 JsonAppSettingsRepository 保持一致。
+    /// </summary>
     private static TelemetryConfig LoadTelemetryConfigSafe(IServiceCollection services)
     {
         try
         {
-            var exeDir = System.IO.Path.GetDirectoryName(Environment.ProcessPath)!;
-            var settingsPath = System.IO.Path.Combine(exeDir, "AppData", "AppSettings.json");
+            var settingsPath = System.IO.Path.Combine(AppEnvironment.ExeDirectory, "AppData", "AppSettings.json");
             if (!System.IO.File.Exists(settingsPath))
                 return new TelemetryConfig();
 
             var json = System.IO.File.ReadAllText(settingsPath);
+            var node = JsonNode.Parse(json);
+            if (node is not null)
+            {
+                var fileVersion = node["version"]?.GetValue<string>() ?? "1.0";
+                var migration = new FileMigrationService([]); // 目前无 AppSettings 专用迁移器；预留扩展点
+                node = migration.Migrate("appSettings", node, fileVersion,
+                    SeatFlow.Infrastructure.Migration.FileVersionInfo.GetCurrentVersion("appSettings"));
+                json = node.ToJsonString();
+            }
+
             var settings = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(json,
                 new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             return settings?.Telemetry ?? new TelemetryConfig();

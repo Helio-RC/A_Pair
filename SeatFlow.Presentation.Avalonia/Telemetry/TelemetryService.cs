@@ -55,9 +55,6 @@ public sealed class TelemetryService : ITelemetryService, IDisposable
         _httpClient = httpClient;
         _logger = logger;
 
-        // 从存储加载配置
-        ReloadConfig();
-
         // 创建计数器
         _launchCounter = Meter.CreateCounter<long>(
             TelemetryInstrumentNames.AppLaunches, "次", "应用启动次数");
@@ -67,29 +64,16 @@ public sealed class TelemetryService : ITelemetryService, IDisposable
             TelemetryInstrumentNames.Exports, "次", "导出操作次数");
         _errorCounter = Meter.CreateCounter<long>(
             TelemetryInstrumentNames.Errors, "次", "错误次数");
+
+        // 异步加载配置（fire-and-forget，启用前所有方法为安全 no-op）
+        _ = ReloadConfigAsync();
     }
 
-    /// <summary>
-    /// 同步加载 AppSettings。调用方必须确保不在 UI 线程上（构造函数/DI 解析路径）。
-    /// </summary>
-    private static AppSettings LoadSettingsSync(IAppSettingsRepository repo)
-    {
-        return Task.Run(() => repo.LoadAsync()).GetAwaiter().GetResult();
-    }
-
-    /// <summary>
-    /// 同步保存 AppSettings。调用方必须确保不在 UI 线程上。
-    /// </summary>
-    private static void SaveSettingsSync(IAppSettingsRepository repo, AppSettings settings)
-    {
-        Task.Run(() => repo.SaveAsync(settings)).GetAwaiter().GetResult();
-    }
-
-    private void ReloadConfig()
+    private async Task ReloadConfigAsync()
     {
         try
         {
-            var settings = LoadSettingsSync(_settingsRepo);
+            var settings = await _settingsRepo.LoadAsync();
             var cfg = settings.Telemetry;
             _enabled = cfg.Enabled;
             _pageViewSampleRate = cfg.PageViewSampleRate;
@@ -107,12 +91,17 @@ public sealed class TelemetryService : ITelemetryService, IDisposable
         if (_enabled == enabled) return;
         _enabled = enabled;
 
-        // 持久化到 AppSettings
+        // 异步持久化到 AppSettings（fire-and-forget，避免阻塞调用方）
+        _ = PersistEnabledAsync(enabled);
+    }
+
+    private async Task PersistEnabledAsync(bool enabled)
+    {
         try
         {
-            var settings = LoadSettingsSync(_settingsRepo);
+            var settings = await _settingsRepo.LoadAsync();
             settings.Telemetry.Enabled = enabled;
-            SaveSettingsSync(_settingsRepo, settings);
+            await _settingsRepo.SaveAsync(settings);
         }
         catch (Exception ex)
         {
