@@ -149,6 +149,11 @@ class ReleaseManager:
 
         return cfg
 
+    def _has_cloudflare_config(self) -> bool:
+        """检查 Cloudflare Worker 配置是否完整。"""
+        cf = self.config.get("cloudflare", {})
+        return all(cf.get(k) for k in ("accountId", "workerScript", "apiToken"))
+
     def _load_version_info(self) -> dict:
         """读取 version.json。"""
         if not self.version_json_path.exists():
@@ -593,6 +598,75 @@ class ReleaseManager:
             else:
                 print(f"  ✗ 上传失败: {f['fileName']} — {asset_resp.status_code}")
 
+    # ── 步骤 6: Cloudflare Worker Secret 轮换 ──
+
+    def rotate_worker_secrets(self) -> bool:
+        """将当前 OSS AccessKey 通过 Cloudflare API 下发到 Worker Secret。
+
+        Worker Secret 名称: OSS_ACCESS_KEY_ID / OSS_ACCESS_KEY_SECRET
+        需要在 config.json 中配置 cloudflare 节:
+          cloudflare.accountId    — CF 账号 ID
+          cloudflare.workerScript — Worker 脚本名称
+          cloudflare.apiToken     — 具有 Workers Scripts: Edit 权限的 API Token
+        """
+        if not self._has_cloudflare_config():
+            print("[6/6] Worker Secret 轮换  → 跳过 (cloudflare 配置不完整)")
+            return False
+
+        cf = self.config["cloudflare"]
+        account_id = cf["accountId"]
+        script = cf["workerScript"]
+        api_token = cf["apiToken"]
+        oss = self.config["oss"]
+
+        api_url = (
+            f"https://api.cloudflare.com/client/v4/accounts/{account_id}"
+            f"/workers/scripts/{script}/secrets-bulk"
+        )
+
+        payload = {
+            "OSS_ACCESS_KEY_ID": {
+                "name": "OSS_ACCESS_KEY_ID",
+                "text": oss["accessKeyId"],
+                "type": "secret_text",
+            },
+            "OSS_ACCESS_KEY_SECRET": {
+                "name": "OSS_ACCESS_KEY_SECRET",
+                "text": oss["accessKeySecret"],
+                "type": "secret_text",
+            },
+        }
+
+        print(f"[6/6] Worker Secret 轮换: {script}...")
+
+        if self.dry_run:
+            print(f"  [dry-run] 将 PATCH {api_url}")
+            print(f"  [dry-run] payload: {json.dumps(payload, ensure_ascii=False, indent=2)}")
+            return False
+
+        resp = requests.patch(
+            api_url,
+            json=payload,
+            headers={
+                "Authorization": f"Bearer {api_token}",
+                "Content-Type": "application/merge-patch+json",
+            },
+        )
+
+        if resp.status_code == 200:
+            result = resp.json()
+            if result.get("success"):
+                print(f"  ✓ Secret 已更新（Worker 自动重新部署）")
+                return True
+            else:
+                errors = result.get("errors", [])
+                for e in errors:
+                    print(f"  ✗ CF API 错误: {e.get('message', e)}")
+                return False
+        else:
+            print(f"  ✗ CF API HTTP {resp.status_code}: {resp.text}")
+            return False
+
     def _build_release_body(self, release_notes: str, files: list[dict]) -> str:
         """构建 Release body：RELEASE.md + SHA256 表格。"""
         lines = [release_notes.strip(), "", "### SHA256 Checksums", ""]
@@ -729,6 +803,9 @@ class ReleaseManager:
 
             # 步骤 5: OSS 上传（含 releases.json 索引更新）
             self.upload_to_oss(files, vpk_artifacts, release_notes)
+
+            # 步骤 6: Cloudflare Worker Secret 轮换（可选，需配置 cloudflare 节）
+            self.rotate_worker_secrets()
 
             print(f"\n=== Release v{self.version} 完成 ===")
 

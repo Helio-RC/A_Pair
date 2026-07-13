@@ -8,5 +8,10 @@
   "github": {
     "repo": "Helio-RC/Seatflow",
     "token": "ghp_YOUR_GITHUB_PERSONAL_ACCESS_TOKEN"
+  },
+  "cloudflare": {
+    "accountId": "YOUR_CLOUDFLARE_ACCOUNT_ID",
+    "workerScript": "oss-private-proxy",
+    "apiToken": "YOUR_CLOUDFLARE_API_TOKEN"
   }
 }
