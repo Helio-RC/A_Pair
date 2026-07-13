@@ -38,7 +38,7 @@ export default {
         };
 
         const canonicalUri = encodePath(path);
-        const canonicalQuery = '';
+        const canonicalQuery = url.search.slice(1); // 传递原始查询参数
         const signedHeaderKeys = Object.keys(headersToSign).sort();
         const canonicalHeaders = signedHeaderKeys
             .map(k => `${k}:${headersToSign[k]}`)
@@ -74,7 +74,7 @@ export default {
             `Signature=${signature}`;
 
         // ---- 回源请求 ----
-        const ossUrl = `https://${bucket}.${endpoint}${canonicalUri}`;
+        const ossUrl = `https://${bucket}.${endpoint}${canonicalUri}${canonicalQuery ? '?' + canonicalQuery : ''}`;
         const upstream = await fetch(ossUrl, {
             method: 'GET',
             headers: {
@@ -87,8 +87,20 @@ export default {
         });
 
         // ---- 响应 ----
+        if (!upstream.ok && upstream.status !== 304) {
+            console.warn(`OSS 回源异常: ${upstream.status} ${canonicalUri}`);
+        }
+
         const response = new Response(upstream.body, upstream);
-        response.headers.set('Cache-Control', 'public, max-age=3600');
+
+        // 可缓存文件长期缓存，不可缓存（404等）短期
+        if (upstream.ok) {
+            response.headers.set('Cache-Control', 'public, max-age=3600, s-maxage=86400');
+        } else {
+            response.headers.set('Cache-Control', 'public, max-age=60');
+        }
+
+        response.headers.set('X-Content-Type-Options', 'nosniff');
         response.headers.set('X-Served-By', 'cf-oss-proxy');
         return response;
     },
