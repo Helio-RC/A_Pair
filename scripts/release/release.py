@@ -768,7 +768,7 @@ class ReleaseManager:
             print(f"\n=== Release v{self.version} 完成 ===")
 
             # 本地输出安装程序 SHA256 表格
-            installers = [a for a in vpk_artifacts if _is_installer(a["fileName"])]
+            installers = [a for a in vpk_artifacts if self._is_installer(a["fileName"])]
             if installers:
                 print("\nSHA256 Checksums:")
                 print(self._build_sha256_table(installers))
