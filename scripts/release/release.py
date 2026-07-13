@@ -457,6 +457,9 @@ class ReleaseManager:
             result = bucket.get_object(index_key)
             existing = json.loads(result.read())
             etag = result.headers.get("ETag")  # 保存 ETag 用于条件写入
+            # oss2 返回的 ETag 可能包含或不包含引号；If-Match 要求带引号
+            if etag and not etag.startswith('"'):
+                etag = f'"{etag}"'
         except Exception:
             # releases.json 不存在 → 首次发布
             print("  releases.json 不存在，将创建新的版本索引。")
@@ -507,7 +510,8 @@ class ReleaseManager:
             bucket.put_object(index_key, data, headers=headers)
             print(f"  ✓ {index_key} (latest: {self.version})")
         except Exception as e:
-            if etag and "412" in str(e) or "PreconditionFailed" in str(e):
+            # oss2 412 PreconditionFailed → ETag 不匹配（并发写入冲突）
+            if etag and getattr(e, "status", None) == 412:
                 raise RuntimeError(
                     f"并发冲突: releases.json 已被其他进程修改。"
                     f"请重新运行发布脚本。"
