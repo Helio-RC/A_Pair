@@ -221,6 +221,25 @@
           </DockPanel>
         </Border>
 
+        <!-- 已有待应用更新时显示重启按钮（无需重新下载） -->
+        <Border Classes="settingRow" IsVisible="{Binding HasPendingUpdate}" BorderThickness="0">
+          <DockPanel>
+            <StackPanel DockPanel.Dock="Left" Spacing="2">
+              <TextBlock Text="{x:Static lang:Resources.Settings_UpdatePendingRestart}"
+                         Classes="body" VerticalAlignment="Center" />
+            </StackPanel>
+            <Button Command="{Binding ApplyPendingUpdateAndRestartCommand}"
+                    AutomationProperties.Name="{x:Static lang:Resources.Settings_UpdateApply}"
+                    HorizontalAlignment="Right" Padding="12,6"
+                    Classes="accent">
+              <StackPanel Orientation="Horizontal" Spacing="4">
+                <fic:FluentIcon Icon="{x:Static ficEnum:Icon.ArrowSync}" FontSize="14" />
+                <TextBlock Text="{x:Static lang:Resources.Settings_UpdateApply}" Classes="bodySmall" />
+              </StackPanel>
+            </Button>
+          </DockPanel>
+        </Border>
+
         <!-- 更新可用时显示下载按钮 -->
         <Border Classes="settingRow" IsVisible="{Binding IsUpdateAvailable}" BorderThickness="0">
           <DockPanel>

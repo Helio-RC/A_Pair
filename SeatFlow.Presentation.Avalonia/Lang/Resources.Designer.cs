@@ -424,6 +424,7 @@ public class Resources
     public static string Settings_UpdateFallback => ResourceManager.GetString("Settings_UpdateFallback", Culture)!;
     public static string Settings_UpdateLatest => ResourceManager.GetString("Settings_UpdateLatest", Culture)!;
     public static string Settings_UpdateNotInstalled => ResourceManager.GetString("Settings_UpdateNotInstalled", Culture)!;
+    public static string Settings_UpdatePendingRestart => ResourceManager.GetString("Settings_UpdatePendingRestart", Culture)!;
     public static string Settings_UpdateRestartConfirm => ResourceManager.GetString("Settings_UpdateRestartConfirm", Culture)!;
     public static string Snapshot_BatchDelete => ResourceManager.GetString("Snapshot_BatchDelete", Culture)!;
     public static string Snapshot_BatchDeleteFailed => ResourceManager.GetString("Snapshot_BatchDeleteFailed", Culture)!;

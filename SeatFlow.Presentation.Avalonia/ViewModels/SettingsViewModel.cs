@@ -107,6 +107,10 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     public partial bool IsDownloading { get; set; }
 
+    /// <summary>是否有已下载但未应用的更新（重启即可应用）。</summary>
+    [ObservableProperty]
+    public partial bool HasPendingUpdate { get; set; }
+
     public SettingsViewModel (IApplicationFacade facade , IDialogService dialog , IOnboardingService onboarding , IFileService fileService , ITelemetryService telemetry , IUpdateService updateService , ILogger<SettingsViewModel>? logger = null)
     {
         _facade = facade;
@@ -143,6 +147,9 @@ public partial class SettingsViewModel : ViewModelBase
             MaxSnapshotsPerVenue = settings.MaxSnapshotsPerVenue;
 
             TelemetryEnabled = settings.Telemetry.Enabled;
+
+            // 检查是否有已下载但未应用的更新
+            RefreshPendingUpdateState();
 
         }
         catch (Exception ex)
@@ -547,6 +554,20 @@ public partial class SettingsViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// 检查是否有已下载但尚未应用的更新。
+    /// 在页面加载时调用，避免用户下载后关闭应用再打开时丢失待应用状态。
+    /// </summary>
+    private void RefreshPendingUpdateState ()
+    {
+        HasPendingUpdate = _updateService.UpdatePendingRestart;
+        if (HasPendingUpdate)
+        {
+            UpdateStatusMessage = Resources.Settings_UpdatePendingRestart;
+            IsUpdateAvailable = true;
+        }
+    }
+
     [RelayCommand]
     private async Task DownloadAndApplyUpdateAsync ()
     {
@@ -587,6 +608,23 @@ public partial class SettingsViewModel : ViewModelBase
         {
             IsDownloading = false;
         }
+    }
+
+    /// <summary>
+    /// 应用已下载的更新并重启（无需重新下载）。
+    /// </summary>
+    [RelayCommand]
+    private async Task ApplyPendingUpdateAndRestartAsync ()
+    {
+        if (!_updateService.UpdatePendingRestart)
+            return;
+
+        var restart = await _dialog.ShowConfirmAsync(
+            Resources.Settings_UpdateApply,
+            Resources.Settings_UpdateRestartConfirm);
+        if (!restart) return;
+
+        _updateService.ApplyUpdatesAndRestart();
     }
 }
 

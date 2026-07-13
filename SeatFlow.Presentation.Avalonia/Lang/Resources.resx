@@ -1260,6 +1260,9 @@
   <data name="Settings_UpdateNotInstalled" xml:space="preserve">
     <value>开发模式：更新功能不可用</value>
   </data>
+  <data name="Settings_UpdatePendingRestart" xml:space="preserve">
+    <value>已有已下载的更新，重启即可应用</value>
+  </data>
   <data name="Settings_UpdateRestartConfirm" xml:space="preserve">
     <value>更新已下载完成，需要重启应用才能生效。是否立即重启？</value>
   </data>
