@@ -15,6 +15,7 @@ release — SeatFlow 发布编排脚本。
 import argparse
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -96,11 +97,13 @@ class ReleaseManager:
     """发布编排器。"""
 
     def __init__(self, root: Path, config_path: Path, dry_run: bool = False,
-                 skip_build: bool = False, skip_velopack: bool = False):
+                 skip_build: bool = False, skip_velopack: bool = False,
+                 skip_branch_check: bool = False):
         self.root = root
         self.dry_run = dry_run
         self.skip_build = skip_build
         self.skip_velopack = skip_velopack
+        self.skip_branch_check = skip_branch_check
 
         # 路径
         self.version_json_path = root / "version.json"
@@ -381,11 +384,11 @@ class ReleaseManager:
         print(f"  RELEASE.md 已读取 ({len(content)} 字符)")
         return content
 
-    # ── 步骤 4: OSS 上传 ───────────────────────
+    # ── 步骤 5: OSS 上传 ───────────────────────
 
     def upload_to_oss(self, files: list[dict], vpk_artifacts: list[dict], release_notes: str) -> None:
-        """上传 zip/tar.gz + Velopack 产物到阿里云 OSS。"""
-        print("[4/5] 上传到阿里云 OSS...")
+        """上传 zip/tar.gz + Velopack 产物到阿里云 OSS（含 releases.json 索引更新）。"""
+        print("[5/5] 上传到阿里云 OSS...")
 
         if self.dry_run:
             print("  [dry-run] 跳过 OSS 上传。")
@@ -445,13 +448,15 @@ class ReleaseManager:
 
     def _update_releases_index(self, bucket, files: list[dict],
                                release_notes: str) -> None:
-        """更新 releases.json 版本索引。"""
+        """更新 releases.json 版本索引（ETag 乐观锁防并发覆盖）。"""
         index_key = "releases/releases.json"
         existing = None
+        etag = None
 
         try:
             result = bucket.get_object(index_key)
             existing = json.loads(result.read())
+            etag = result.headers.get("ETag")  # 保存 ETag 用于条件写入
         except Exception:
             # releases.json 不存在 → 首次发布
             print("  releases.json 不存在，将创建新的版本索引。")
@@ -470,9 +475,12 @@ class ReleaseManager:
         # 构建新条目（插入到头部）
         release_date = datetime.now(timezone.utc).astimezone().isoformat()
 
+        # 从 git 获取真实 commit ID，而非 version.json 中的静态值
+        commit_id = self._get_git_commit_id()
+
         entry = {
             "version": self.version,
-            "commitId": self.version_info.get("commitId", "unknown"),
+            "commitId": commit_id,
             "releaseDate": release_date,
             "notes": release_notes.strip(),
             "files": [
@@ -489,16 +497,28 @@ class ReleaseManager:
         existing["versions"].insert(0, entry)
         existing["latest"] = self.version
 
-        # 上传
+        # 上传（使用 ETag 条件写入，防止并发覆盖）
         data = json.dumps(existing, ensure_ascii=False, indent=2).encode("utf-8")
-        self._oss_put(bucket, index_key, data, "application/json")
-        print(f"  ✓ {index_key} (latest: {self.version})")
+        headers = {"Content-Type": "application/json"}
+        if etag:
+            headers["If-Match"] = etag
 
-    # ── 步骤 5: GitHub Release ────────────────
+        try:
+            bucket.put_object(index_key, data, headers=headers)
+            print(f"  ✓ {index_key} (latest: {self.version})")
+        except Exception as e:
+            if etag and "412" in str(e) or "PreconditionFailed" in str(e):
+                raise RuntimeError(
+                    f"并发冲突: releases.json 已被其他进程修改。"
+                    f"请重新运行发布脚本。"
+                ) from e
+            raise
+
+    # ── 步骤 4: GitHub Release ────────────────
 
     def create_github_release(self, files: list[dict], vpk_artifacts: list[dict], release_notes: str) -> None:
         """通过 GitHub REST API 创建 Release，上传 zip/tar.gz + Velopack 产物。"""
-        print("[5/5] 创建 GitHub Release...")
+        print("[4/5] 创建 GitHub Release...")
 
         if self.dry_run:
             print("  [dry-run] 跳过 GitHub Release 创建。")
@@ -582,8 +602,28 @@ class ReleaseManager:
 
     # ── 前置检查 ───────────────────────────────
 
+    def _get_git_commit_id(self) -> str:
+        """从 git 获取当前 HEAD 的短 commit ID。"""
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=str(self.root),
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout.strip() if result.returncode == 0 else "unknown"
+
     def _check_main_branch(self) -> bool:
         """确保当前在 main 分支。不在则自动切换。"""
+        # CI 环境（分离 HEAD）跳过分支检查
+        if self.skip_branch_check:
+            print("[0/5] 分支检查  → 跳过 (--skip-branch-check)")
+            return True
+
+        # CI 环境变量检测
+        if any(os.environ.get(v) for v in ("CI", "GITHUB_ACTIONS", "GITLAB_CI")):
+            print("[0/5] 分支检查  → 跳过 (CI 环境)")
+            return True
+
         result = subprocess.run(
             ["git", "branch", "--show-current"],
             cwd=str(self.root),
@@ -680,11 +720,11 @@ class ReleaseManager:
             # 步骤 3: 发布说明
             release_notes = self.build_release_notes()
 
-            # 步骤 4: OSS 上传
-            self.upload_to_oss(files, vpk_artifacts, release_notes)
-
-            # 步骤 5: GitHub Release
+            # 步骤 4: GitHub Release（先创建，失败则 OSS 保持干净）
             self.create_github_release(files, vpk_artifacts, release_notes)
+
+            # 步骤 5: OSS 上传（含 releases.json 索引更新）
+            self.upload_to_oss(files, vpk_artifacts, release_notes)
 
             print(f"\n=== Release v{self.version} 完成 ===")
 
@@ -743,6 +783,7 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true", help="预览模式：构建和打包，但不上传")
     parser.add_argument("--skip-build", action="store_true", help="跳过 dotnet publish，使用已有构建产物")
     parser.add_argument("--skip-velopack", action="store_true", help="跳过 Velopack vpk pack 步骤")
+    parser.add_argument("--skip-branch-check", action="store_true", help="跳过 main 分支检查（CI 环境自动跳过）")
 
     args = parser.parse_args()
 
@@ -755,6 +796,7 @@ def main() -> int:
         dry_run=args.dry_run,
         skip_build=args.skip_build,
         skip_velopack=args.skip_velopack,
+        skip_branch_check=args.skip_branch_check,
     )
 
     return mgr.run()
