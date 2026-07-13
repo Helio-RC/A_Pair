@@ -17,7 +17,7 @@ namespace SeatFlow.Presentation.Avalonia.Services;
 /// API 不可用时自动降级到 GitHub Release。
 /// 开发环境（未通过 Velopack 安装）静默返回 NotInstalled。
 /// </summary>
-internal sealed class UpdateService : IUpdateService
+internal sealed class UpdateService : IUpdateService, IDisposable
 {
     private readonly ILogger<UpdateService> _logger;
     private readonly HttpClient _httpClient;
@@ -237,5 +237,10 @@ internal sealed class UpdateService : IUpdateService
         _logger.LogDebug("创建 GitHub UpdateManager: {Repo}", GitHubRepoUrl);
         return new UpdateManager(
             new GithubSource(GitHubRepoUrl, accessToken: null, prerelease: false));
+    }
+
+    public void Dispose()
+    {
+        _httpClient.Dispose();
     }
 }

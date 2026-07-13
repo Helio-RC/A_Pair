@@ -1258,6 +1258,9 @@ Place plugins in the Plugins directory</value>
   <data name="Settings_UpdateNotInstalled" xml:space="preserve">
     <value>Dev mode: updates unavailable</value>
   </data>
+  <data name="Settings_UpdateRestartConfirm" xml:space="preserve">
+    <value>Update downloaded. A restart is required to apply the update. Restart now?</value>
+  </data>
   <data name="Snapshot_BatchDelete" xml:space="preserve">
     <value>Batch delete</value>
   </data>

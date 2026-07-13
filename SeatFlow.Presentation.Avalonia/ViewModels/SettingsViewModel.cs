@@ -571,7 +571,13 @@ public partial class SettingsViewModel : ViewModelBase
             UpdateDownloadProgress = 100;
             UpdateStatusMessage = Resources.Settings_UpdateApply;
 
-            // 下载完成后应用更新并重启
+            // 下载完成后确认重启——避免丢失未保存的工作
+            var restart = await _dialog.ShowConfirmAsync(
+                Resources.Settings_UpdateApply,
+                Resources.Settings_UpdateRestartConfirm);
+            if (!restart) return;
+
+            // 应用更新并重启
             _updateService.ApplyUpdatesAndRestart();
         }
         catch (Exception ex)

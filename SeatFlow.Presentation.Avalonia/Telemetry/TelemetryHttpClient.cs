@@ -194,7 +194,7 @@ public sealed class TelemetryHttpClient : IDisposable
             _logger.LogDebug("遥测请求超时，{Count} 条事件丢弃", batch.Count);
             OnSendFailure();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException or ThreadAbortException))
         {
             _logger.LogDebug(ex, "遥测发送失败，{Count} 条事件丢弃", batch.Count);
             OnSendFailure();
