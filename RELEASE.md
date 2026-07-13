@@ -1,16 +1,21 @@
 # SeatFlow v1.4.0 发布说明
 
-本次发布完成了从便携式单文件到标准安装包的分发模式迁移，数据存储迁移到操作系统标准用户数据目录。
+本次发布完成了分发模式从便携式单文件到标准安装包的迁移，引入了 Velopack 自动更新框架、遥测系统和标准化数据存储。
+
+## 新增
+- **Velopack 安装与自动更新** — 跨平台安装包（Windows Setup.exe、Linux AppImage、macOS .app），增量自动更新，双源架构（API 网关 → GitHub 兜底），已下载更新包启动时自动应用
+- **遥测系统** — OpenTelemetry 页面浏览/操作事件/性能指标采集，opt-in 同意弹窗，Gzip 批量上报
+- **.seatsets 数据打包格式** — 应用数据打包为单个 JSON 归档（分块 SHA256 校验），支持设置页面、双击文件、首次启动三种导入途径，Windows 文件关联注册
+- **"仅更新人员数据集"** — 不重新排座，仅用最新学生数据更新已有快照
+- **安装时数据迁移** — 安装程序自动复制同目录下的 .seatsets 到应用目录，首次启动自动导入
 
 ## 重大变更
 - 取消单文件发布（PublishSingleFile），改为标准 dotnet publish 文件夹输出
-- Velopack 安装包作为主要分发形式（自动更新），同时保留 zip/tar.gz 便携包
-- 数据存储从 `{exeDir}/AppData/` 迁移到 OS 标准路径（Windows: `%APPDATA%\SeatFlow\`，Linux: `~/.local/share/SeatFlow/`，macOS: `~/Library/Application Support/SeatFlow/`）
-- 安装时自动复制安装程序同目录下的 .seatsets 文件到应用目录
-
-## 改进
-- 移除启动时的目录清洁检查（CheckCleanDirectory），适配安装包目录结构
-- 插件目录支持 Velopack 安装模式（RootAppDir/Plugins）
+- 数据存储从 `{exeDir}/AppData/` 迁移到 OS 标准路径
+- 日志系统重构：Serilog 结构化日志替代 Debug.WriteLine，文件滚动存储
 
 ## 修复
-- 数据目录不再依赖 exe 所在位置，避免更新导致数据丢失
+- 修复单文件发布时数据目录被设定为临时目录导致数据丢失的 BUG
+- 修复引导系统死锁、竞态、窗口状态不同步等多项问题
+- 修复弹窗内容重叠、导入后未自动刷新、教师视角导出列镜像、导出按钮无反应
+- 修复遥测同意窗口与引导的冲突
