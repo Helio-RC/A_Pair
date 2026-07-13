@@ -1,0 +1,241 @@
+using System;
+using System.Net.Http;
+using System.Net.Http.Json;
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Velopack;
+using Velopack.Locators;
+using Velopack.Sources;
+
+namespace SeatFlow.Presentation.Avalonia.Services;
+
+/// <summary>
+/// Velopack 更新服务实现。
+/// 先通过 /updates/metadata 获取源状态，优先使用 API 网关，
+/// API 不可用时自动降级到 GitHub Release。
+/// 开发环境（未通过 Velopack 安装）静默返回 NotInstalled。
+/// </summary>
+internal sealed class UpdateService : IUpdateService
+{
+    private readonly ILogger<UpdateService> _logger;
+    private readonly HttpClient _httpClient;
+
+    private const string UpdateApiBase = "https://api.seatflow.work";
+    private const string GitHubRepoUrl = "https://github.com/SeatFlow/SeatFlow";
+
+    private UpdateInfo? _lastUpdateInfo;
+    private UpdateManager? _currentManager;
+    private bool _isInstalled;
+
+    public UpdateServiceStatus Status { get; private set; } = UpdateServiceStatus.Unavailable;
+
+    public bool UpdatePendingRestart => _currentManager?.UpdatePendingRestart is not null;
+
+    public UpdateService(ILogger<UpdateService> logger)
+    {
+        _logger = logger;
+        _httpClient = new HttpClient
+        {
+            BaseAddress = new Uri(UpdateApiBase),
+            Timeout = TimeSpan.FromSeconds(10),
+        };
+        _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("SeatFlow");
+    }
+
+    private static string GetChannel()
+    {
+        if (OperatingSystem.IsWindows()) return "win-x64";
+        if (OperatingSystem.IsLinux()) return "linux-x64";
+        if (OperatingSystem.IsMacOS())
+        {
+            return RuntimeInformation.ProcessArchitecture switch
+            {
+                Architecture.Arm64 => "osx-arm64",
+                _ => "osx-x64",
+            };
+        }
+        return "win-x64";
+    }
+
+    private static string GetCurrentVersion()
+    {
+        var v = VersionInfo.Version;
+        return string.IsNullOrEmpty(v) ? "1.0.0" : v;
+    }
+
+    // ============================================================
+    // IUpdateService
+    // ============================================================
+
+    public async Task<UpdateCheckResult> CheckForUpdatesAsync(CancellationToken ct = default)
+    {
+        MetadataResponse? metadata = null;
+        try
+        {
+            metadata = await FetchMetadataAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "无法获取更新源元数据");
+        }
+
+        // 检测是否通过 Velopack 安装（首次调用的副作用：标记安装状态）
+        if (!_isInstalled)
+        {
+            try { CheckInstalled(); }
+            catch { _isInstalled = false; }
+        }
+
+        if (!_isInstalled)
+        {
+            _logger.LogInformation("Velopack 未安装（开发模式），跳过更新检查");
+            Status = UpdateServiceStatus.NotInstalled;
+            return new UpdateCheckResult
+            {
+                HasUpdate = false,
+                CurrentVersion = GetCurrentVersion(),
+                ServiceStatus = UpdateServiceStatus.NotInstalled,
+            };
+        }
+
+        // 源优先级：API 网关 → GitHub 兜底
+        var sourcePriority = new (string, Func<UpdateManager>)[]
+        {
+            ("oss_api", CreateApiManager),
+            ("github", CreateGitHubManager),
+        };
+
+        bool primaryHealthy = metadata is not { IsFallback: true };
+
+        foreach (var (sourceKey, createManager) in sourcePriority)
+        {
+            if (!primaryHealthy && sourceKey != "github")
+            {
+                _logger.LogDebug("主源不健康，跳过 {Source}", sourceKey);
+                continue;
+            }
+
+            try
+            {
+                var manager = createManager();
+                var updateInfo = await manager.CheckForUpdatesAsync();
+                _lastUpdateInfo = updateInfo;
+                _currentManager = manager;
+
+                Status = sourceKey == "github"
+                    ? UpdateServiceStatus.Fallback
+                    : UpdateServiceStatus.Healthy;
+
+                var result = updateInfo is null
+                    ? new UpdateCheckResult
+                    {
+                        HasUpdate = false,
+                        CurrentVersion = GetCurrentVersion(),
+                        ServiceStatus = Status,
+                        Message = metadata?.Message,
+                    }
+                    : new UpdateCheckResult
+                    {
+                        HasUpdate = true,
+                        NewVersion = updateInfo.TargetFullRelease.Version.ToString(),
+                        CurrentVersion = GetCurrentVersion(),
+                        ServiceStatus = Status,
+                        Message = metadata?.Message,
+                    };
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "源 {Source} 检查更新失败，尝试下一个", sourceKey);
+                _currentManager = null;
+            }
+        }
+
+        _logger.LogError("所有更新源均不可用");
+        Status = UpdateServiceStatus.Unavailable;
+        return new UpdateCheckResult
+        {
+            HasUpdate = false,
+            CurrentVersion = GetCurrentVersion(),
+            ServiceStatus = UpdateServiceStatus.Unavailable,
+        };
+    }
+
+    public async Task DownloadUpdatesAsync(IProgress<int>? progress = null, CancellationToken ct = default)
+    {
+        if (_lastUpdateInfo is null || _currentManager is null)
+        {
+            await CheckForUpdatesAsync(ct);
+        }
+
+        if (_lastUpdateInfo is null || _currentManager is null)
+            return;
+
+        _logger.LogInformation("开始下载更新 {Version}", _lastUpdateInfo.TargetFullRelease.Version);
+
+        Action<int>? onProgress = progress is null
+            ? null
+            : p => progress.Report(p);
+
+        await _currentManager.DownloadUpdatesAsync(
+            _lastUpdateInfo,
+            onProgress,
+            cancelToken: ct);
+
+        _logger.LogInformation("更新下载完成");
+    }
+
+    public void ApplyUpdatesAndRestart()
+    {
+        if (_lastUpdateInfo is null || _currentManager is null)
+            return;
+
+        _logger.LogInformation("应用更新并重启: {Version}", _lastUpdateInfo.TargetFullRelease.Version);
+        _currentManager.ApplyUpdatesAndRestart(_lastUpdateInfo.TargetFullRelease);
+    }
+
+    // ============================================================
+    // 私有方法
+    // ============================================================
+
+    /// <summary>
+    /// 通过 VelopackLocator 检测当前应用是否通过 Velopack 安装。
+    /// 未安装时 <see cref="IVelopackLocator.CurrentlyInstalledVersion"/> 为 null。
+    /// </summary>
+    private void CheckInstalled()
+    {
+        _isInstalled = VelopackLocator.IsCurrentSet
+            && VelopackLocator.Current.CurrentlyInstalledVersion is not null;
+    }
+
+    private async Task<MetadataResponse?> FetchMetadataAsync(CancellationToken ct)
+    {
+        var response = await _httpClient.GetAsync("/updates/metadata", ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogWarning("元数据端点返回 {StatusCode}", (int)response.StatusCode);
+            return null;
+        }
+
+        return await response.Content.ReadFromJsonAsync(
+            MetadataResponseJsonContext.Default.MetadataResponse, ct);
+    }
+
+    private UpdateManager CreateApiManager()
+    {
+        var url = $"{UpdateApiBase}/updates/";
+        var options = new UpdateOptions { ExplicitChannel = GetChannel() };
+        _logger.LogDebug("创建 API UpdateManager: {Url}, Channel={Channel}", url, GetChannel());
+        return new UpdateManager(url, options);
+    }
+
+    private UpdateManager CreateGitHubManager()
+    {
+        _logger.LogDebug("创建 GitHub UpdateManager: {Repo}", GitHubRepoUrl);
+        return new UpdateManager(
+            new GithubSource(GitHubRepoUrl, accessToken: null, prerelease: false));
+    }
+}

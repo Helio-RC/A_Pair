@@ -96,10 +96,11 @@ class ReleaseManager:
     """发布编排器。"""
 
     def __init__(self, root: Path, config_path: Path, dry_run: bool = False,
-                 skip_build: bool = False):
+                 skip_build: bool = False, skip_velopack: bool = False):
         self.root = root
         self.dry_run = dry_run
         self.skip_build = skip_build
+        self.skip_velopack = skip_velopack
 
         # 路径
         self.version_json_path = root / "version.json"
@@ -219,6 +220,92 @@ class ReleaseManager:
 
         return exe_path
 
+    # ── 步骤 1.5: vpk pack ────────────────────
+
+    # RID → vpk 指令映射（vpk 用括号语法 [win]/[linux]/[osx] 支持跨平台打包）
+    _VPK_DIRECTIVE = {
+        "win-x64": "[win]",
+        "linux-x64": "[linux]",
+        "osx-x64": "[osx]",
+        "osx-arm64": "[osx]",
+    }
+
+    def vpk_pack_all(self, build_outputs: dict) -> list[dict]:
+        """对各 RID 运行 vpk [os] pack，生成 .nupkg + 安装程序 + releases.{channel}.json。
+
+        vpk 使用括号指令语法（如 vpk [win] pack）支持跨平台打包：
+        - Windows 包可在任意 OS 上构建
+        - Linux 包需主机安装 squashfs-tools（AppImage 依赖）
+        - macOS 包仅限 macOS 主机（依赖 codesign/xcrun）
+        """
+        if self.skip_velopack or self.dry_run:
+            label = "跳过 (--skip-velopack)" if self.skip_velopack else "[dry-run] 跳过"
+            print(f"[vpk] {label} Velopack 打包")
+            return []
+
+        print("[vpk] 打包 Velopack 更新包...")
+
+        vpk_artifacts: list[dict] = []
+
+        for r in RIDS:
+            rid = r["rid"]
+            exe_path = build_outputs.get(rid)
+            if exe_path is None:
+                print(f"  ! {rid}: 无构建产物，跳过")
+                continue
+
+            directive = self._VPK_DIRECTIVE.get(rid)
+            if directive is None:
+                print(f"  ! {rid}: 未知 RID，跳过")
+                continue
+
+            # macOS 包仅限 macOS 主机
+            if directive == "[osx]" and sys.platform != "darwin":
+                print(f"  ! {rid}: macOS 包仅限 macOS 主机构建，跳过")
+                continue
+
+            pack_dir = exe_path.parent
+            output_dir = self.version_dist_dir / f"velopack_{rid}"
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            exe_name = "SeatFlow.exe" if rid.startswith("win") else "SeatFlow"
+            cmd = [
+                "vpk", directive, "pack",
+                "--packId", "SeatFlow",
+                "--packVersion", self.version,
+                "--packDir", str(pack_dir),
+                "--mainExe", exe_name,
+                "--channel", rid,
+                "--outputDir", str(output_dir),
+            ]
+
+            result = subprocess.run(cmd, cwd=str(self.root),
+                                    capture_output=True, text=True)
+            if result.returncode != 0:
+                print(f"  ✗ {rid}: vpk pack 失败")
+                if result.stderr:
+                    lines = result.stderr.strip().split("\n")
+                    for line in lines[-8:]:
+                        print(f"    {line}")
+                continue
+
+            print(f"  ✓ {rid}")
+
+            for f in sorted(output_dir.glob("*")):
+                if f.is_file():
+                    file_size = f.stat().st_size
+                    file_hash = sha256_file(f)
+                    vpk_artifacts.append({
+                        "rid": rid,
+                        "fileName": f.name,
+                        "localPath": str(f),
+                        "size": file_size,
+                        "sha256": file_hash,
+                    })
+                    print(f"    {f.name} ({format_size(file_size)})")
+
+        return vpk_artifacts
+
     # ── 步骤 2: 打包 ──────────────────────────
 
     def package_all(self, build_outputs: dict) -> list[dict]:
@@ -296,8 +383,8 @@ class ReleaseManager:
 
     # ── 步骤 4: OSS 上传 ───────────────────────
 
-    def upload_to_oss(self, files: list[dict], release_notes: str) -> None:
-        """上传到阿里云 OSS。"""
+    def upload_to_oss(self, files: list[dict], vpk_artifacts: list[dict], release_notes: str) -> None:
+        """上传 zip/tar.gz + Velopack 产物到阿里云 OSS。"""
         print("[4/5] 上传到阿里云 OSS...")
 
         if self.dry_run:
@@ -328,6 +415,14 @@ class ReleaseManager:
             oss_key = f"{prefix}/{f['fileName']}"
             self._oss_put_file(bucket, oss_key, str(local_path))
             print(f"  ✓ {oss_key} ({format_size(f['size'])})")
+
+        # 上传 Velopack 产物到 updates/ 目录
+        if vpk_artifacts:
+            print("  [Velopack 产物]")
+            for a in vpk_artifacts:
+                oss_key = f"updates/{a['fileName']}"
+                self._oss_put_file(bucket, oss_key, a["localPath"])
+                print(f"    ✓ {oss_key} ({format_size(a['size'])})")
 
         # 更新 releases.json 索引
         self._update_releases_index(bucket, files, release_notes)
@@ -401,8 +496,8 @@ class ReleaseManager:
 
     # ── 步骤 5: GitHub Release ────────────────
 
-    def create_github_release(self, files: list[dict], release_notes: str) -> None:
-        """通过 GitHub REST API 创建 Release。"""
+    def create_github_release(self, files: list[dict], vpk_artifacts: list[dict], release_notes: str) -> None:
+        """通过 GitHub REST API 创建 Release，上传 zip/tar.gz + Velopack 产物。"""
         print("[5/5] 创建 GitHub Release...")
 
         if self.dry_run:
@@ -427,8 +522,9 @@ class ReleaseManager:
             "Accept": "application/vnd.github+json",
         }
 
-        # 1. 构建 body（RELEASE.md + SHA256 表格）
-        body = self._build_release_body(release_notes, files)
+        # 1. 构建 body（RELEASE.md + SHA256 表格，含 Velopack 产物）
+        all_artifacts = files + vpk_artifacts
+        body = self._build_release_body(release_notes, all_artifacts)
 
         # 2. 创建 Release
         release_url = f"{api_base}/releases"
@@ -453,8 +549,8 @@ class ReleaseManager:
         release_id = release_data["id"]
         print(f"  ✓ Release 已创建: {release_data['html_url']}")
 
-        # 3. 上传资产文件
-        for f in files:
+        # 3. 上传所有资产文件（zip/tar.gz + Velopack 产物）
+        for f in all_artifacts:
             local_path = Path(f["localPath"])
             asset_url = f"{api_base}/releases/{release_id}/assets"
             params = {"name": f["fileName"]}
@@ -572,6 +668,9 @@ class ReleaseManager:
                 print("错误: 无可用构建产物。")
                 return 1
 
+            # 步骤 1.5: vpk pack（Velopack 更新包）
+            vpk_artifacts = self.vpk_pack_all(build_outputs)
+
             # 步骤 2: 打包 + SHA256
             files = self.package_all(build_outputs)
             if not files:
@@ -582,16 +681,17 @@ class ReleaseManager:
             release_notes = self.build_release_notes()
 
             # 步骤 4: OSS 上传
-            self.upload_to_oss(files, release_notes)
+            self.upload_to_oss(files, vpk_artifacts, release_notes)
 
             # 步骤 5: GitHub Release
-            self.create_github_release(files, release_notes)
+            self.create_github_release(files, vpk_artifacts, release_notes)
 
             print(f"\n=== Release v{self.version} 完成 ===")
 
-            # 本地输出 SHA256 表格
+            # 本地输出 SHA256 表格（zip/tar.gz + Velopack 产物）
+            all_artifacts = files + vpk_artifacts
             print("\nSHA256 Checksums:")
-            print(self._build_sha256_table(files))
+            print(self._build_sha256_table(all_artifacts))
 
             return 0
 
@@ -642,6 +742,7 @@ def main() -> int:
     parser.add_argument("--config", default=None, help="配置文件路径 (默认: scripts/release/config.json)")
     parser.add_argument("--dry-run", action="store_true", help="预览模式：构建和打包，但不上传")
     parser.add_argument("--skip-build", action="store_true", help="跳过 dotnet publish，使用已有构建产物")
+    parser.add_argument("--skip-velopack", action="store_true", help="跳过 Velopack vpk pack 步骤")
 
     args = parser.parse_args()
 
@@ -653,6 +754,7 @@ def main() -> int:
         config_path=config_path,
         dry_run=args.dry_run,
         skip_build=args.skip_build,
+        skip_velopack=args.skip_velopack,
     )
 
     return mgr.run()

@@ -15,6 +15,7 @@ using SeatFlow.Presentation.Avalonia.ViewModels;
 using SeatFlow.Presentation.Avalonia.Views;
 using Avalonia;
 using Microsoft.Extensions.DependencyInjection;
+using Velopack;
 
 [assembly: System.Resources.NeutralResourcesLanguage("zh-CN")]
 
@@ -28,6 +29,10 @@ namespace SeatFlow.Presentation.Avalonia
         [STAThread]
         public static void Main (string[] args)
         {
+            // Velopack 钩子：必须在 Main() 最开头调用。
+            // 正常启动时 Run() 立即返回；安装/更新/卸载钩子模式下，钩子执行完毕从 Run() 内部退出。
+            VelopackApp.Build().Run();
+
 #if !DEBUG
             CheckCleanDirectory();
 #endif
@@ -71,6 +76,9 @@ namespace SeatFlow.Presentation.Avalonia
             services.AddSingleton<IFileService , FileService>();
             services.AddSingleton<IDialogService , DialogService>();
             services.AddSingleton<WatchdogService>();
+
+            // 注册更新服务（Velopack 自动更新）
+            services.AddSingleton<IUpdateService , UpdateService>();
 
             // 注册 ViewModels
             services.AddSingleton<MainWindow>();

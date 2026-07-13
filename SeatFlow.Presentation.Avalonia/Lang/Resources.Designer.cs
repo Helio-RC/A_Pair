@@ -414,6 +414,16 @@ public class Resources
     public static string Settings_TelemetryToggle => ResourceManager.GetString("Settings_TelemetryToggle", Culture)!;
     public static string Settings_ThemeMode => ResourceManager.GetString("Settings_ThemeMode", Culture)!;
     public static string Settings_Title => ResourceManager.GetString("Settings_Title", Culture)!;
+    public static string Settings_Update => ResourceManager.GetString("Settings_Update", Culture)!;
+    public static string Settings_UpdateApply => ResourceManager.GetString("Settings_UpdateApply", Culture)!;
+    public static string Settings_UpdateAvailable => ResourceManager.GetString("Settings_UpdateAvailable", Culture)!;
+    public static string Settings_UpdateCheck => ResourceManager.GetString("Settings_UpdateCheck", Culture)!;
+    public static string Settings_UpdateChecking => ResourceManager.GetString("Settings_UpdateChecking", Culture)!;
+    public static string Settings_UpdateDownloading => ResourceManager.GetString("Settings_UpdateDownloading", Culture)!;
+    public static string Settings_UpdateFailed => ResourceManager.GetString("Settings_UpdateFailed", Culture)!;
+    public static string Settings_UpdateFallback => ResourceManager.GetString("Settings_UpdateFallback", Culture)!;
+    public static string Settings_UpdateLatest => ResourceManager.GetString("Settings_UpdateLatest", Culture)!;
+    public static string Settings_UpdateNotInstalled => ResourceManager.GetString("Settings_UpdateNotInstalled", Culture)!;
     public static string Snapshot_BatchDelete => ResourceManager.GetString("Snapshot_BatchDelete", Culture)!;
     public static string Snapshot_BatchDeleteFailed => ResourceManager.GetString("Snapshot_BatchDeleteFailed", Culture)!;
     public static string Snapshot_BatchDeleteMsg => ResourceManager.GetString("Snapshot_BatchDeleteMsg", Culture)!;

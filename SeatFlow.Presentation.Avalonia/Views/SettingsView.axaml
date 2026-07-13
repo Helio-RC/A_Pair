@@ -4,6 +4,7 @@
              xmlns:fic="using:FluentIcons.Avalonia"
              xmlns:ficEnum="clr-namespace:FluentIcons.Common;assembly=FluentIcons.Common"
              xmlns:lang="using:SeatFlow.Presentation.Avalonia.Lang"
+             xmlns:conv="clr-namespace:SeatFlow.Presentation.Avalonia.Converters"
              x:Class="SeatFlow.Presentation.Avalonia.Views.SettingsView"
              x:DataType="vm:SettingsViewModel">
 
@@ -192,6 +193,58 @@
               </StackPanel>
             </Button>
           </DockPanel>
+        </Border>
+
+        <!-- 更新 -->
+        <TextBlock Text="{x:Static lang:Resources.Settings_Update}"
+                   Classes="settingSectionHeader" Margin="0,16,0,6" />
+
+        <Border Classes="settingRow">
+          <DockPanel>
+            <StackPanel DockPanel.Dock="Left" Spacing="2">
+              <TextBlock Text="{x:Static lang:Resources.Settings_UpdateCheck}"
+                         Classes="body" VerticalAlignment="Center" />
+              <TextBlock Text="{Binding UpdateStatusMessage}"
+                         Classes="caption"
+                         Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                         TextWrapping="Wrap" MaxWidth="400" />
+            </StackPanel>
+            <Button Command="{Binding CheckForUpdateCommand}"
+                    IsEnabled="{Binding IsCheckingUpdate, Converter={x:Static conv:BoolConverters.Negate}}"
+                    AutomationProperties.Name="{x:Static lang:Resources.Settings_UpdateCheck}"
+                    HorizontalAlignment="Right" Padding="12,6">
+              <StackPanel Orientation="Horizontal" Spacing="4">
+                <fic:FluentIcon Icon="{x:Static ficEnum:Icon.ArrowSync}" FontSize="14" />
+                <TextBlock Text="{x:Static lang:Resources.Settings_UpdateCheck}" Classes="bodySmall" />
+              </StackPanel>
+            </Button>
+          </DockPanel>
+        </Border>
+
+        <!-- 更新可用时显示下载按钮 -->
+        <Border Classes="settingRow" IsVisible="{Binding IsUpdateAvailable}" BorderThickness="0">
+          <DockPanel>
+            <StackPanel DockPanel.Dock="Left" Spacing="2">
+              <TextBlock Text="{Binding UpdateVersionText, StringFormat='v{0}'}"
+                         Classes="body" VerticalAlignment="Center" />
+            </StackPanel>
+            <Button Command="{Binding DownloadAndApplyUpdateCommand}"
+                    IsEnabled="{Binding IsDownloading, Converter={x:Static conv:BoolConverters.Negate}}"
+                    AutomationProperties.Name="{x:Static lang:Resources.Settings_UpdateApply}"
+                    HorizontalAlignment="Right" Padding="12,6">
+              <StackPanel Orientation="Horizontal" Spacing="4">
+                <fic:FluentIcon Icon="{x:Static ficEnum:Icon.ArrowDownload}" FontSize="14" />
+                <TextBlock Text="{x:Static lang:Resources.Settings_UpdateApply}" Classes="bodySmall" />
+              </StackPanel>
+            </Button>
+          </DockPanel>
+        </Border>
+
+        <!-- 下载进度条 -->
+        <Border Classes="settingRow" IsVisible="{Binding IsDownloading}" BorderThickness="0">
+          <ProgressBar Value="{Binding UpdateDownloadProgress}"
+                       Minimum="0" Maximum="100"
+                       Height="6" />
         </Border>
 
         <!-- 数据管理 -->

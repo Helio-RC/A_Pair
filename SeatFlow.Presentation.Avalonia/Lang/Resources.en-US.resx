@@ -1228,6 +1228,36 @@ Place plugins in the Plugins directory</value>
   <data name="Settings_Title" xml:space="preserve">
     <value>Settings</value>
   </data>
+  <data name="Settings_Update" xml:space="preserve">
+    <value>Update</value>
+  </data>
+  <data name="Settings_UpdateApply" xml:space="preserve">
+    <value>Install Update</value>
+  </data>
+  <data name="Settings_UpdateAvailable" xml:space="preserve">
+    <value>Version {0} is available</value>
+  </data>
+  <data name="Settings_UpdateCheck" xml:space="preserve">
+    <value>Check for Updates</value>
+  </data>
+  <data name="Settings_UpdateChecking" xml:space="preserve">
+    <value>Checking...</value>
+  </data>
+  <data name="Settings_UpdateDownloading" xml:space="preserve">
+    <value>Downloading... {0}%</value>
+  </data>
+  <data name="Settings_UpdateFailed" xml:space="preserve">
+    <value>Update check failed</value>
+  </data>
+  <data name="Settings_UpdateFallback" xml:space="preserve">
+    <value>⚠️ Using fallback update source, download may be slower</value>
+  </data>
+  <data name="Settings_UpdateLatest" xml:space="preserve">
+    <value>Up to date</value>
+  </data>
+  <data name="Settings_UpdateNotInstalled" xml:space="preserve">
+    <value>Dev mode: updates unavailable</value>
+  </data>
   <data name="Snapshot_BatchDelete" xml:space="preserve">
     <value>Batch delete</value>
   </data>

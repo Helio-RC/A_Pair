@@ -29,6 +29,7 @@ public partial class SettingsViewModel : ViewModelBase
     private readonly IOnboardingService _onboarding;
     private readonly IFileService _fileService;
     private readonly ITelemetryService _telemetry;
+    private readonly IUpdateService _updateService;
     private readonly ILogger<SettingsViewModel> _logger;
 
     [ObservableProperty]
@@ -86,13 +87,34 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     public partial bool TelemetryEnabled { get; set; }
 
-    public SettingsViewModel (IApplicationFacade facade , IDialogService dialog , IOnboardingService onboarding , IFileService fileService , ITelemetryService telemetry , ILogger<SettingsViewModel>? logger = null)
+    // ---- 更新相关属性 ----
+
+    [ObservableProperty]
+    public partial string UpdateStatusMessage { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial bool IsCheckingUpdate { get; set; }
+
+    [ObservableProperty]
+    public partial bool IsUpdateAvailable { get; set; }
+
+    [ObservableProperty]
+    public partial string? UpdateVersionText { get; set; }
+
+    [ObservableProperty]
+    public partial int UpdateDownloadProgress { get; set; }
+
+    [ObservableProperty]
+    public partial bool IsDownloading { get; set; }
+
+    public SettingsViewModel (IApplicationFacade facade , IDialogService dialog , IOnboardingService onboarding , IFileService fileService , ITelemetryService telemetry , IUpdateService updateService , ILogger<SettingsViewModel>? logger = null)
     {
         _facade = facade;
         _dialog = dialog;
         _onboarding = onboarding;
         _fileService = fileService;
         _telemetry = telemetry;
+        _updateService = updateService;
         _logger = logger ?? NullLogger<SettingsViewModel>.Instance;
         _ = LoadAsync(CancellationToken.None);
     }
@@ -477,6 +499,89 @@ public partial class SettingsViewModel : ViewModelBase
         catch (Exception ex)
         {
             _ = _dialog.ShowErrorAsync(Resources.Settings_OpenDirFailed , ex.Message);
+        }
+    }
+
+    // ---- 更新命令 ----
+
+    [RelayCommand]
+    private async Task CheckForUpdateAsync ()
+    {
+        if (IsCheckingUpdate)
+            return;
+
+        try
+        {
+            IsCheckingUpdate = true;
+            IsUpdateAvailable = false;
+            UpdateStatusMessage = Resources.Settings_UpdateChecking;
+
+            var result = await _updateService.CheckForUpdatesAsync();
+
+            if (result.ServiceStatus == UpdateServiceStatus.NotInstalled)
+            {
+                UpdateStatusMessage = Resources.Settings_UpdateNotInstalled;
+                return;
+            }
+
+            if (result.ServiceStatus == UpdateServiceStatus.Fallback)
+                UpdateStatusMessage = Resources.Settings_UpdateFallback;
+
+            if (result.HasUpdate)
+            {
+                IsUpdateAvailable = true;
+                UpdateVersionText = result.NewVersion;
+                UpdateStatusMessage = string.Format(Resources.Settings_UpdateAvailable, result.NewVersion ?? "");
+            }
+            else if (result.ServiceStatus != UpdateServiceStatus.Fallback)
+            {
+                UpdateStatusMessage = Resources.Settings_UpdateLatest;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "更新检查失败");
+            UpdateStatusMessage = Resources.Settings_UpdateFailed;
+        }
+        finally
+        {
+            IsCheckingUpdate = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task DownloadAndApplyUpdateAsync ()
+    {
+        if (IsDownloading)
+            return;
+
+        try
+        {
+            IsDownloading = true;
+            UpdateDownloadProgress = 0;
+
+            var progress = new Progress<int>(p =>
+            {
+                UpdateDownloadProgress = p;
+                UpdateStatusMessage = string.Format(Resources.Settings_UpdateDownloading, p);
+            });
+
+            await _updateService.DownloadUpdatesAsync(progress);
+
+            UpdateDownloadProgress = 100;
+            UpdateStatusMessage = Resources.Settings_UpdateApply;
+
+            // 下载完成后应用更新并重启
+            _updateService.ApplyUpdatesAndRestart();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "更新下载失败");
+            UpdateStatusMessage = Resources.Settings_UpdateFailed;
+        }
+        finally
+        {
+            IsDownloading = false;
         }
     }
 }
