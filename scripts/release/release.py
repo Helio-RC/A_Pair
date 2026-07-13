@@ -168,7 +168,7 @@ class ReleaseManager:
     # ── 步骤 1: 构建 ──────────────────────────
 
     def build_all(self) -> dict:
-        """并行构建所有平台的单文件可执行文件。返回 {rid: exe_path}。"""
+        """构建所有平台的标准发布。返回 {rid: publish_dir}。"""
         if self.skip_build:
             print("[1/5] 跳过构建 (--skip-build)")
             return {}
@@ -183,8 +183,8 @@ class ReleaseManager:
         for r in RIDS:
             rid = r["rid"]
             try:
-                exe_path = self._build_one(r)
-                results[rid] = exe_path
+                publish_dir = self._build_one(r)
+                results[rid] = publish_dir
                 print(f"  ✓ {rid}")
             except subprocess.CalledProcessError as e:
                 print(f"  ✗ {rid}: 构建失败")
@@ -193,7 +193,7 @@ class ReleaseManager:
         return results
 
     def _build_one(self, r: dict) -> Path:
-        """构建单个 RID。返回可执行文件路径。"""
+        """构建单个 RID。返回发布目录路径。"""
         rid = r["rid"]
         tmp_dir = self.version_dist_dir / f".tmp_{rid}"
         tmp_dir.mkdir(parents=True, exist_ok=True)
@@ -203,9 +203,6 @@ class ReleaseManager:
             "-c", CONFIGURATION,
             "-r", rid,
             "--self-contained", "true",
-            "-p:PublishSingleFile=true",
-            "-p:IncludeNativeLibrariesForSelfExtract=true",
-            "-p:IncludeAllContentForSelfExtract=true",
             "-o", str(tmp_dir),
         ]
 
@@ -215,18 +212,8 @@ class ReleaseManager:
             print(f"    stderr: {result.stderr[-500:]}", file=sys.stderr)
             result.check_returncode()
 
-        # 查找输出可执行文件
-        exe_name = "SeatFlow.exe" if rid.startswith("win") else "SeatFlow"
-        exe_path = tmp_dir / exe_name
-        if not exe_path.exists():
-            # fallback: 搜索目录
-            candidates = list(tmp_dir.glob("SeatFlow*"))
-            if candidates:
-                exe_path = candidates[0]
-            else:
-                raise FileNotFoundError(f"构建产物未找到: {tmp_dir}")
-
-        return exe_path
+        # 返回发布目录
+        return tmp_dir
 
     # ── 步骤 1.5: vpk pack ────────────────────
 
@@ -257,8 +244,8 @@ class ReleaseManager:
 
         for r in RIDS:
             rid = r["rid"]
-            exe_path = build_outputs.get(rid)
-            if exe_path is None:
+            publish_dir = build_outputs.get(rid)
+            if publish_dir is None:
                 print(f"  ! {rid}: 无构建产物，跳过")
                 continue
 
@@ -272,7 +259,7 @@ class ReleaseManager:
                 print(f"  ! {rid}: macOS 包仅限 macOS 主机构建，跳过")
                 continue
 
-            pack_dir = exe_path.parent
+            pack_dir = publish_dir
             output_dir = self.version_dist_dir / f"velopack_{rid}"
             output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -327,18 +314,28 @@ class ReleaseManager:
             platform = r["platform"]
             ext = r["ext"]
 
-            exe_path = build_outputs.get(rid)
-            if exe_path is None:
+            # 使用整个发布目录（非单文件）
+            publish_dir = self.version_dist_dir / f".tmp_{rid}"
+            if not publish_dir.exists():
                 print(f"  ! {rid}: 无构建产物，跳过")
                 continue
+
+            # 验证关键文件存在
+            exe_name = "SeatFlow.exe" if rid.startswith("win") else "SeatFlow"
+            exe_path = publish_dir / exe_name
+            if not exe_path.exists():
+                candidates = list(publish_dir.glob("SeatFlow*"))
+                if not candidates:
+                    print(f"  ! {rid}: 未找到可执行文件，跳过")
+                    continue
 
             file_name = f"{APP_NAME}-{self.version}-{platform}{ext}"
             archive_path = self.version_dist_dir / file_name
 
             if ext == ".zip":
-                self._create_zip(exe_path, archive_path, rid)
+                self._create_zip(publish_dir, archive_path)
             else:
-                self._create_tar_gz(exe_path, archive_path, rid)
+                self._create_tar_gz(publish_dir, archive_path)
 
             file_size = archive_path.stat().st_size
             file_hash = sha256_file(archive_path)
@@ -361,16 +358,18 @@ class ReleaseManager:
 
         return files
 
-    def _create_zip(self, exe_path: Path, archive_path: Path, rid: str) -> None:
-        """创建 .zip 包。"""
-        exe_name = f"{APP_NAME}.exe" if rid.startswith("win") else APP_NAME
+    def _create_zip(self, publish_dir: Path, archive_path: Path) -> None:
+        """创建 .zip 包，包含整个发布目录。"""
         with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as zf:
-            zf.write(exe_path, exe_name)
+            for file_path in sorted(publish_dir.rglob("*")):
+                if file_path.is_file():
+                    arcname = str(file_path.relative_to(publish_dir))
+                    zf.write(file_path, arcname)
 
-    def _create_tar_gz(self, exe_path: Path, archive_path: Path, rid: str) -> None:
-        """创建 .tar.gz 包。"""
+    def _create_tar_gz(self, publish_dir: Path, archive_path: Path) -> None:
+        """创建 .tar.gz 包，包含整个发布目录。"""
         with tarfile.open(archive_path, "w:gz") as tf:
-            tf.add(exe_path, APP_NAME)
+            tf.add(publish_dir, APP_NAME)
 
     # ── 步骤 3: 发布说明 ───────────────────────
 
@@ -827,12 +826,9 @@ class ReleaseManager:
         results: dict[str, Path] = {}
         for r in RIDS:
             rid = r["rid"]
-            exe_name = "SeatFlow.exe" if rid.startswith("win") else "SeatFlow"
-            # 可能在 .tmp_{rid} 中
             tmp_dir = self.version_dist_dir / f".tmp_{rid}"
-            exe_path = tmp_dir / exe_name
-            if exe_path.exists():
-                results[rid] = exe_path
+            if tmp_dir.exists():
+                results[rid] = tmp_dir
         return results
 
     def _build_sha256_table(self, files: list[dict]) -> str:

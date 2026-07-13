@@ -39,6 +39,9 @@ namespace SeatFlow.Presentation.Avalonia
         /// <summary>在 AppData 创建前自动扫描到的 .seatsets 文件路径（首次启动数据恢复）。</summary>
         internal static string? AutoImportSeatSetsPath { get; set; }
 
+        /// <summary>Velopack 安装后首次运行标志，由 Program.Main 中的 OnFirstRun 回调设置。</summary>
+        internal static bool IsFirstRunAfterInstall { get; set; }
+
         internal IServiceProvider ServiceProvider => _serviceProvider;
 
         public override void Initialize ()

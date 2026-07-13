@@ -85,7 +85,29 @@ All user-visible text uses inline i18n: `{ "zh-CN": "...", "en-US": "..." }` dic
 
 New model types (all in `SeatFlow.Core.Models`):
 - `StrategyParameterDefinition` / `StrategyCodeBlock` / `StrategyFieldDefinition` + enums (`StrategyFieldType`, `StrategyDataType`, `StrategyDisplayMode`)
-- `StrategyDatasetConfig` + `StrategyConfigRow` — persistence models stored under `{AppData}/StrategyConfig/{strategyId}/`.
+- `StrategyDatasetConfig` + `StrategyConfigRow` — persistence models stored under `{DataDirectory}/StrategyConfig/{strategyId}/`.
+
+**Data storage**: All user data is stored in OS-standard application data directories via `AppEnvironment.DefaultDataDirectory`:
+- Windows: `%APPDATA%\SeatFlow\`
+- Linux: `~/.local/share/SeatFlow/` (XDG_DATA_HOME)
+- macOS: `~/Library/Application Support/SeatFlow/`
+
+Directory structure:
+```
+{DataDirectory}/
+├── AppSettings.json              # Global settings
+├── Logs/                         # Log files
+│   └── SeatFlow_{yyyyMMdd-HHmmss}.log
+├── Venues/                       # Venue files (*.venue.json)
+├── Rosters/                      # Student rosters (*.roster.json)
+├── Assignments/                  # Seating snapshots
+│   └── {venueId}/{yyyyMMdd}/*.json
+└── StrategyConfig/               # Strategy config files
+    ├── {strategyId}.config.json
+    └── {strategyId}/*.config.json
+```
+
+Users can override via `DataDirectory` in AppSettings.json. Plugins are stored in `RootAppDir/Plugins/` (Velopack install) or `{exeDir}/Plugins/` (dev/portable).
 
 **Project config**: `AvaloniaUseCompiledBindingsByDefault` is `true` in the Avalonia csproj — all bindings are compiled unless explicitly opted out. Key csproj settings:
 - `<AssemblyName>SeatFlow</AssemblyName>` — output EXE is `SeatFlow.exe`, not `SeatFlow.Presentation.Avalonia.exe`
@@ -506,7 +528,6 @@ python3 scripts/version.py sync --force
 ```bash
 cd scripts/build
 ./publish.sh                    # TUI 交互模式（多选平台/选项）
-./publish.sh hash               # 仅为已有发布文件生成 SHA256 表
 
 # CLI 模式参数: <类型> <配置> <版本> <选项>...
 # 类型: both | sc | fde     (全部 / 独立 / 框架依赖)

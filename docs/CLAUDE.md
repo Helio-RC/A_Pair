@@ -86,7 +86,12 @@ SeatFlow 是一个 .NET 10 跨平台桌面座位编排系统，使用 Avalonia U
 
 新建模型类型（均在 `SeatFlow.Core.Models` 中）：
 - `StrategyParameterDefinition` / `StrategyCodeBlock` / `StrategyFieldDefinition` + 枚举（`StrategyFieldType`、`StrategyDataType`、`StrategyDisplayMode`）
-- `StrategyDatasetConfig` + `StrategyConfigRow` — 持久化模型，存储在 `{AppData}/StrategyConfig/{strategyId}/` 下。
+- `StrategyDatasetConfig` + `StrategyConfigRow` — 持久化模型，存储在 `{DataDirectory}/StrategyConfig/{strategyId}/` 下。
+
+**数据存储**：所有用户数据存储在 OS 标准应用数据目录（`AppEnvironment.DefaultDataDirectory`）：
+- Windows: `%APPDATA%\SeatFlow\` / Linux: `~/.local/share/SeatFlow/` / macOS: `~/Library/Application Support/SeatFlow/`
+- 用户可通过 `AppSettings.json` 的 `DataDirectory` 选项自定义
+- 插件目录：Velopack 安装时 `RootAppDir/Plugins/`，开发模式 `{exeDir}/Plugins/`
 
 **项目配置**：Avalonia csproj 中 `AvaloniaUseCompiledBindingsByDefault` 为 `true` — 所有绑定均为编译绑定，除非显式退出。关键 csproj 设置：
 - `<AssemblyName>SeatFlow</AssemblyName>` — 输出 EXE 为 `SeatFlow.exe`，而非 `SeatFlow.Presentation.Avalonia.exe`
@@ -482,7 +487,6 @@ python3 scripts/version.py sync --force
 ```bash
 cd scripts/build
 ./publish.sh                    # TUI 交互模式（多选平台/选项）
-./publish.sh hash               # 仅为已有发布文件生成 SHA256 表
 
 # CLI 模式参数: <类型> <配置> <版本> <选项>...
 # 类型: both | sc | fde     (全部 / 独立 / 框架依赖)

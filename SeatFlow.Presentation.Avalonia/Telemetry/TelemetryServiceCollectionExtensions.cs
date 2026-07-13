@@ -102,13 +102,13 @@ public static class TelemetryServiceCollectionExtensions
 
     /// <summary>
     /// 安全加载遥测配置。直接读取 AppSettings.json 并运行文件迁移器（不使用 DI，避免提前构建 ServiceProvider）。
-    /// 路径使用 AppEnvironment.ExeDirectory，与 JsonAppSettingsRepository 保持一致。
+    /// 路径使用 AppEnvironment.DefaultDataDirectory，与 JsonAppSettingsRepository 保持一致。
     /// </summary>
     private static TelemetryConfig LoadTelemetryConfigSafe(IServiceCollection services)
     {
         try
         {
-            var settingsPath = System.IO.Path.Combine(AppEnvironment.ExeDirectory, "AppData", "AppSettings.json");
+            var settingsPath = System.IO.Path.Combine(AppEnvironment.DefaultDataDirectory, "AppSettings.json");
             if (!System.IO.File.Exists(settingsPath))
                 return new TelemetryConfig();
 

@@ -490,7 +490,7 @@ public partial class SettingsViewModel : ViewModelBase
     private void OpenDataDirectory ()
     {
         var path = string.IsNullOrWhiteSpace(DataDirectory)
-            ? Path.Combine(AppEnvironment.ExeDirectory , "AppData")
+            ? AppEnvironment.DefaultDataDirectory
             : DataDirectory;
 
         try

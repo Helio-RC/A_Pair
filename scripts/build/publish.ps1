@@ -31,11 +31,20 @@ function Publish-One($SC,$Label,$Rids){
         Step "开始编译..." Yellow
         $ta=if($Optimize-and$SC){@("-p:PublishTrimmed=true","-p:TrimMode=partial","-p:SuppressTrimAnalysisWarnings=true")}else{@()}
         if($Aot-and$SC){$ta+=@("-p:PublishAot=true")}
-        dotnet publish $Project -c $Configuration -r $rid --self-contained $(if($SC){"true"}else{"false"}) -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:IncludeAllContentForSelfExtract=true @ta -o $tmp
+        dotnet publish $Project -c $Configuration -r $rid --self-contained $(if($SC){"true"}else{"false"}) @ta -o $tmp
         if($LASTEXITCODE){Step "编译失败" Red;Pop-Location;exit 1}
         $exe="$AppName$sf"
-        if(Test-Path "$tmp/$exe"){mv "$tmp/$exe" "$base/$fn" -Force;rm $tmp -r -Force -ea 0;$s=[math]::Round((gi "$base/$fn").Length/1MB,1);Step "完成 → $Label/$fn ($s MB)" Green}
-        else{$fb=gci $tmp -File|?{$_.Name -like "$AppName*"}|select -First 1;if($fb){mv $fb.FullName "$base/$fn" -Force;rm $tmp -r -Force -ea 0;$s=[math]::Round((gi "$base/$fn").Length/1MB,1);Step "完成 → $Label/$fn ($s MB)" Green}else{Step "未找到可执行文件: $tmp" Red}}
+        if(Test-Path "$tmp/$exe"){
+            # 标准发布：打包整个输出目录
+            $ext=if($rid -like "win*"){".zip"}else{".tar.gz"}
+            $fn="$($fn -replace '\.exe$','')$ext"
+            $archive=Join-Path $base $fn
+            if($ext -eq ".zip"){Compress-Archive -Path "$tmp/*" -DestinationPath $archive -Force}
+            else{& tar -czf $archive -C $tmp .}
+            rm $tmp -r -Force -ea 0
+            $s=[math]::Round((gi $archive).Length/1MB,1)
+            Step "完成 → $Label/$fn ($s MB)" Green
+        }else{Step "未找到可执行文件: $tmp/$exe" Red}
     }
 }
 
