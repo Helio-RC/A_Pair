@@ -601,13 +601,10 @@ class ReleaseManager:
     # ── 步骤 6: Cloudflare Worker Secret 轮换 ──
 
     def rotate_worker_secrets(self) -> bool:
-        """将当前 OSS AccessKey 通过 Cloudflare API 下发到 Worker Secret。
+        """将 Worker 专用 OSS 只读凭证通过 Cloudflare API 下发到 Worker Secret。
 
-        Worker Secret 名称: OSS_ACCESS_KEY_ID / OSS_ACCESS_KEY_SECRET
-        需要在 config.json 中配置 cloudflare 节:
-          cloudflare.accountId    — CF 账号 ID
-          cloudflare.workerScript — Worker 脚本名称
-          cloudflare.apiToken     — 具有 Workers Scripts: Edit 权限的 API Token
+        Worker 凭证与上传用的 oss.accessKeyId/Secret 是不同的子账号密钥：
+        Worker 仅需 OSS 只读权限（回源下载），上传主密钥拥有写权限，不能混用。
         """
         if not self._has_cloudflare_config():
             print("[6/6] Worker Secret 轮换  → 跳过 (cloudflare 配置不完整)")
@@ -617,7 +614,12 @@ class ReleaseManager:
         account_id = cf["accountId"]
         script = cf["workerScript"]
         api_token = cf["apiToken"]
-        oss = self.config["oss"]
+
+        worker_key_id = cf.get("workerOssKeyId")
+        worker_key_secret = cf.get("workerOssKeySecret")
+        if not worker_key_id or not worker_key_secret:
+            print("[6/6] Worker Secret 轮换  → 跳过 (cloudflare.workerOssKeyId/Secret 未配置)")
+            return False
 
         api_url = (
             f"https://api.cloudflare.com/client/v4/accounts/{account_id}"
@@ -627,12 +629,12 @@ class ReleaseManager:
         payload = {
             "OSS_ACCESS_KEY_ID": {
                 "name": "OSS_ACCESS_KEY_ID",
-                "text": oss["accessKeyId"],
+                "text": worker_key_id,
                 "type": "secret_text",
             },
             "OSS_ACCESS_KEY_SECRET": {
                 "name": "OSS_ACCESS_KEY_SECRET",
-                "text": oss["accessKeySecret"],
+                "text": worker_key_secret,
                 "type": "secret_text",
             },
         }
