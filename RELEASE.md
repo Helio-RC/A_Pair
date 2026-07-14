@@ -3,7 +3,7 @@
 本次发布完成了分发模式从便携式单文件到标准安装包的迁移，引入了 Velopack 自动更新框架、遥测系统和标准化数据存储。
 
 ## 新增
-- **Velopack 安装与自动更新** — 跨平台安装包（Windows Setup.exe、Linux AppImage、macOS .app），增量自动更新，双源架构（API 网关 → GitHub 兜底），已下载更新包启动时自动应用
+- **Velopack 安装与自动更新** — 跨平台安装包（Windows Setup.exe、Linux AppImage，macOS 支持计划中，暂无安装包），增量自动更新，双源架构（API 网关 → GitHub 兜底），已下载更新包启动时自动应用
 - **遥测系统** — OpenTelemetry 页面浏览/操作事件/性能指标采集，opt-in 同意弹窗，Gzip 批量上报
 - **.seatsets 数据打包格式** — 应用数据打包为单个 JSON 归档（分块 SHA256 校验），支持设置页面、双击文件、首次启动三种导入途径，Windows 文件关联注册
 - **"仅更新人员数据集"** — 不重新排座，仅用最新学生数据更新已有快照

@@ -5,7 +5,7 @@
 ## [1.4.0] — 2026-07-13
 
 ### Added
-- **Velopack 安装与自动更新**：引入 Velopack 安装框架，支持跨平台安装包（Windows Setup.exe、Linux AppImage、macOS .app）和增量自动更新。双源架构（API 网关 `seatflow.work` → GitHub Releases 兜底），已下载的更新包在启动时自动应用
+- **Velopack 安装与自动更新**：引入 Velopack 安装框架，支持跨平台安装包（Windows Setup.exe、Linux AppImage，macOS 计划中暂无安装包）和增量自动更新。双源架构（API 网关 `seatflow.work` → GitHub Releases 兜底），已下载的更新包在启动时自动应用
 - **遥测系统**：OpenTelemetry 遥测（页面浏览、操作事件、性能指标），opt-in 同意弹窗，支持 Gzip 压缩批量上报
 - **日志系统重构**：Serilog 结构化日志替代 `Debug.WriteLine`，实例隔离文件名（`SeatFlow_{yyyyMMdd-HHmmss}.log`），分模块等级覆盖，文件尺寸/数量上限控制（`docs/LOGGING.md`）
 - **.seatsets 数据打包格式**：将 AppData 全量数据打包为单个 `.seatsets` JSON 归档（分块 SHA256 校验 + 版本号系统），三种导入途径（设置页面按钮 / 双击文件 / 首次启动自动发现），Win32 命名管道多实例转发

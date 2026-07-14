@@ -451,7 +451,7 @@ ViewModel 通过构造函数注入 IApplicationFacade，调用业务逻辑。
 
 7.4 部署与更新
 
-· 打包格式：Windows (.msi / .zip)、macOS (.app / .pkg)、Linux (AppImage / Flatpak)。
+· 打包格式：Windows (.msi / .zip)、Linux (AppImage / Flatpak)、macOS (.app / .pkg，计划中暂无安装包)。
 · 自动更新：可选集成 Velopack 或 Squirrel。
 
 7.5 测试策略
