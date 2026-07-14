@@ -30,6 +30,17 @@ from typing import Optional
 # 常量
 # ──────────────────────────────────────────────
 
+def _should_distribute(file_name: str) -> bool:
+    """过滤不应分发的文件（vpk 内部元数据、便携版等）。"""
+    lower = file_name.lower()
+    # assets.*.json — vpk 内部构建元数据
+    if lower.startswith("assets.") and lower.endswith(".json"):
+        return False
+    # *-portable.zip — 便携版，不发布
+    if "-portable." in lower:
+        return False
+    return True
+
 APP_NAME = "SeatFlow"
 PROJECT = "SeatFlow.Presentation.Avalonia"
 CONFIGURATION = "Release"
@@ -299,8 +310,11 @@ class ReleaseManager:
 
             print(f"  ✓ {rid}")
 
+            # 清理临时发布目录（vpk pack 完成后不再需要）
+            shutil.rmtree(pack_dir, ignore_errors=True)
+
             for f in sorted(output_dir.glob("*")):
-                if f.is_file():
+                if f.is_file() and _should_distribute(f.name):
                     file_size = f.stat().st_size
                     file_hash = sha256_file(f)
                     vpk_artifacts.append({
