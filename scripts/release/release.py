@@ -320,7 +320,13 @@ class ReleaseManager:
                 "--mainExe", exe_name,
                 "--channel", rid,
                 "--outputDir", str(output_dir),
+                "--packTitle", "SeatFlow",
+                "--packAuthors", "Helio-RC",
             ]
+
+            # 如果 RELEASE.md 存在，附加 release notes
+            if self.release_md_path.exists():
+                cmd.extend(["--releaseNotes", str(self.release_md_path)])
 
             result = subprocess.run(cmd, cwd=str(self.root),
                                     capture_output=True, text=True)
