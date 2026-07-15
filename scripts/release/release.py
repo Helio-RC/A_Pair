@@ -347,6 +347,7 @@ class ReleaseManager:
                     file_hash = sha256_file(f)
                     vpk_artifacts.append({
                         "rid": rid,
+                        "platform": r["platform"],
                         "fileName": f.name,
                         "localPath": str(f),
                         "size": file_size,
