@@ -28,6 +28,7 @@ public partial class SeatingArrangementViewModel : ViewModelBase
 {
     private readonly IApplicationFacade _facade;
     private readonly IFileService _fileService;
+    private readonly IArrangementCounterService _counterService;
     private readonly ILogger<SeatingArrangementViewModel> _logger;
 
     // ── 内部状态 ──
@@ -155,11 +156,12 @@ public partial class SeatingArrangementViewModel : ViewModelBase
     [ObservableProperty]
     public partial string SwapHintText { get; set; } = string.Empty;
 
-    public SeatingArrangementViewModel (IApplicationFacade facade , IFileService fileService , INavigationService navigation , ILogger<SeatingArrangementViewModel>? logger = null)
+    public SeatingArrangementViewModel (IApplicationFacade facade , IFileService fileService , INavigationService navigation , IArrangementCounterService counterService , ILogger<SeatingArrangementViewModel>? logger = null)
     {
         _facade = facade;
         _fileService = fileService;
         _navigation = navigation;
+        _counterService = counterService;
         _logger = logger ?? NullLogger<SeatingArrangementViewModel>.Instance;
         navigation.CurrentViewModelChanged += OnNavigationChanged;
         _ = LoadInitialDataAsync();
@@ -336,6 +338,7 @@ public partial class SeatingArrangementViewModel : ViewModelBase
                 InitHistory(Resources.Seating_GenerateDesc);
 
                 HasGenerated = true;
+                _counterService.Increment();
                 StatusMessage = string.Format(Resources.Seating_GeneratedFmt , AssignedSeats , TotalSeats);
             }
             finally
@@ -1015,6 +1018,7 @@ public partial class SeatingArrangementViewModel : ViewModelBase
         if (!HasUnsavedChanges)
         {
             _facade.ClearWorkspace();
+            _ = _counterService.ReportAndResetAsync();
             return true;
         }
 
@@ -1034,6 +1038,7 @@ public partial class SeatingArrangementViewModel : ViewModelBase
         }
 
         _facade.ClearWorkspace();
+        _ = _counterService.ReportAndResetAsync();
         return true;
     }
 

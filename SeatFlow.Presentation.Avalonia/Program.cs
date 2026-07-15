@@ -87,6 +87,9 @@ namespace SeatFlow.Presentation.Avalonia
             // 注册更新服务（Velopack 自动更新）
             services.AddSingleton<IUpdateService , UpdateService>();
 
+            // 注册排座次数计数器
+            services.AddSingleton<IArrangementCounterService , ArrangementCounterService>();
+
             // 注册 ViewModels
             services.AddSingleton<MainWindow>();
             services.AddSingleton<IOnboardingService , OnboardingService>();
