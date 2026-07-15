@@ -19,11 +19,18 @@ import os
 import shutil
 import subprocess
 import sys
-import tarfile
-import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+
+try:
+    import requests
+except ImportError:
+    requests = None  # type: ignore
+try:
+    import oss2
+except ImportError:
+    oss2 = None  # type: ignore
 
 
 # ──────────────────────────────────────────────
@@ -53,7 +60,6 @@ RIDS: list[dict] = [
     {"rid": "osx-arm64",    "platform": "macos-arm64", "ext": ".tar.gz"},
 ]
 
-EXE_SUFFIX = ".exe"  # Windows RID 的可执行文件后缀
 
 
 # ──────────────────────────────────────────────
@@ -109,12 +115,17 @@ class ReleaseManager:
 
     def __init__(self, root: Path, config_path: Path, dry_run: bool = False,
                  skip_build: bool = False, skip_velopack: bool = False,
-                 skip_branch_check: bool = False):
+                 skip_branch_check: bool = False,
+                 clean: bool = True,
+                 skip_oss: bool = False, skip_github: bool = False):
         self.root = root
         self.dry_run = dry_run
         self.skip_build = skip_build
         self.skip_velopack = skip_velopack
         self.skip_branch_check = skip_branch_check
+        self.clean = clean
+        self.skip_oss = skip_oss
+        self.skip_github = skip_github
 
         # 路径
         self.version_json_path = root / "version.json"
@@ -143,6 +154,12 @@ class ReleaseManager:
             )
 
         cfg = read_json(config_path)
+
+        # enabled 为 false 时跳过所有需要密钥的远程操作
+        if cfg.get("enabled") is False:
+            print("[!] config.json: enabled 为 false，跳过所有远程发布操作。")
+            self.skip_oss = True
+            self.skip_github = True
 
         # 验证 OSS 配置
         oss = cfg.get("oss", {})
@@ -179,12 +196,12 @@ class ReleaseManager:
     # ── 步骤 1: 构建 ──────────────────────────
 
     def build_all(self) -> dict:
-        """并行构建所有平台的单文件可执行文件。返回 {rid: exe_path}。"""
+        """构建所有平台的标准发布。返回 {rid: publish_dir}。"""
         if self.skip_build:
-            print("[1/5] 跳过构建 (--skip-build)")
+            print("[2] 跳过构建 (--skip-build)")
             return {}
 
-        print("[1/5] 构建所有平台...")
+        print("[2] 构建所有平台...")
 
         self.version_dist_dir.mkdir(parents=True, exist_ok=True)
 
@@ -194,9 +211,9 @@ class ReleaseManager:
         for r in RIDS:
             rid = r["rid"]
             try:
-                exe_path = self._build_one(r)
-                results[rid] = exe_path
-                print(f"  ✓ {rid}")
+                publish_dir = self._build_one(r)
+                results[rid] = publish_dir
+                print(f"    ✓ {rid}")
             except subprocess.CalledProcessError as e:
                 print(f"  ✗ {rid}: 构建失败")
                 raise SystemExit(1) from e
@@ -214,9 +231,6 @@ class ReleaseManager:
             "-c", CONFIGURATION,
             "-r", rid,
             "--self-contained", "true",
-            "-p:PublishSingleFile=true",
-            "-p:IncludeNativeLibrariesForSelfExtract=true",
-            "-p:IncludeAllContentForSelfExtract=true",
             "-o", str(tmp_dir),
         ]
 
@@ -226,18 +240,9 @@ class ReleaseManager:
             print(f"    stderr: {result.stderr[-500:]}", file=sys.stderr)
             result.check_returncode()
 
-        # 查找输出可执行文件
-        exe_name = "SeatFlow.exe" if rid.startswith("win") else "SeatFlow"
-        exe_path = tmp_dir / exe_name
-        if not exe_path.exists():
-            # fallback: 搜索目录
-            candidates = list(tmp_dir.glob("SeatFlow*"))
-            if candidates:
-                exe_path = candidates[0]
-            else:
-                raise FileNotFoundError(f"构建产物未找到: {tmp_dir}")
 
-        return exe_path
+        # 返回发布目录
+        return tmp_dir
 
     # ── 步骤 1.5: vpk pack ────────────────────
 
@@ -249,6 +254,25 @@ class ReleaseManager:
         "osx-arm64": "[osx]",
     }
 
+    @staticmethod
+    def _check_vpk_deps() -> bool:
+        """检查 vpk 所需的系统依赖是否安装。"""
+        import platform
+        system = platform.system()
+        missing = []
+
+        if system == "Linux":
+            import shutil as _shutil
+            if _shutil.which("mksquashfs") is None:
+                missing.append("mksquashfs (sudo apt install squashfs-tools)")
+
+        if missing:
+            print("[3] vpk 系统依赖缺失:")
+            for m in missing:
+                print(f"    ! {m}")
+            return False
+        return True
+
     def vpk_pack_all(self, build_outputs: dict) -> list[dict]:
         """对各 RID 运行 vpk [os] pack，生成 .nupkg + 安装程序 + releases.{channel}.json。
 
@@ -259,17 +283,17 @@ class ReleaseManager:
         """
         if self.skip_velopack or self.dry_run:
             label = "跳过 (--skip-velopack)" if self.skip_velopack else "[dry-run] 跳过"
-            print(f"[vpk] {label} Velopack 打包")
+            print(f"[3] {label} Velopack 打包")
             return []
 
-        print("[vpk] 打包 Velopack 更新包...")
+        print("[3] 打包 Velopack 更新包...")
 
         vpk_artifacts: list[dict] = []
 
         for r in RIDS:
             rid = r["rid"]
-            exe_path = build_outputs.get(rid)
-            if exe_path is None:
+            publish_dir = build_outputs.get(rid)
+            if publish_dir is None:
                 print(f"  ! {rid}: 无构建产物，跳过")
                 continue
 
@@ -283,13 +307,13 @@ class ReleaseManager:
                 print(f"  ! {rid}: macOS 包仅限 macOS 主机构建，跳过")
                 continue
 
-            pack_dir = exe_path.parent
+            pack_dir = publish_dir
             output_dir = self.version_dist_dir / f"velopack_{rid}"
             output_dir.mkdir(parents=True, exist_ok=True)
 
             exe_name = "SeatFlow.exe" if rid.startswith("win") else "SeatFlow"
             cmd = [
-                "vpk", directive, "pack",
+                "dotnet", "vpk", directive, "pack",
                 "--packId", "SeatFlow",
                 "--packVersion", self.version,
                 "--packDir", str(pack_dir),
@@ -301,11 +325,15 @@ class ReleaseManager:
             result = subprocess.run(cmd, cwd=str(self.root),
                                     capture_output=True, text=True)
             if result.returncode != 0:
-                print(f"  ✗ {rid}: vpk pack 失败")
-                if result.stderr:
-                    lines = result.stderr.strip().split("\n")
-                    for line in lines[-8:]:
-                        print(f"    {line}")
+                output = (result.stderr or result.stdout)
+                if output and "equal or greater" in output:
+                    print(f"  ! {rid}: 版本 {self.version} 已存在，跳过（保留增量更新链）")
+                else:
+                    print(f"  ✗ {rid}: vpk pack 失败")
+                    if output:
+                        for line in output.strip().split("\n")[-6:]:
+                            if line.strip():
+                                print(f"    {line}")
                 continue
 
             print(f"  ✓ {rid}")
@@ -327,70 +355,11 @@ class ReleaseManager:
                     print(f"    {f.name} ({format_size(file_size)})")
 
         return vpk_artifacts
-
-    # ── 步骤 2: 打包 ──────────────────────────
-
-    def package_all(self, build_outputs: dict) -> list[dict]:
-        """打包各平台产物，计算 SHA256。返回文件信息列表。"""
-        print("[2/5] 打包平台产物...")
-
-        files: list[dict] = []
-
-        for r in RIDS:
-            rid = r["rid"]
-            platform = r["platform"]
-            ext = r["ext"]
-
-            exe_path = build_outputs.get(rid)
-            if exe_path is None:
-                print(f"  ! {rid}: 无构建产物，跳过")
-                continue
-
-            file_name = f"{APP_NAME}-{self.version}-{platform}{ext}"
-            archive_path = self.version_dist_dir / file_name
-
-            if ext == ".zip":
-                self._create_zip(exe_path, archive_path, rid)
-            else:
-                self._create_tar_gz(exe_path, archive_path, rid)
-
-            file_size = archive_path.stat().st_size
-            file_hash = sha256_file(archive_path)
-
-            files.append({
-                "platform": platform,
-                "fileName": file_name,
-                "size": file_size,
-                "sha256": file_hash,
-                "localPath": str(archive_path),
-            })
-
-            print(f"  {file_name} ({format_size(file_size)}, sha256: {file_hash[:12]}...)")
-
-        # 清理临时构建目录
-        for r in RIDS:
-            tmp_dir = self.version_dist_dir / f".tmp_{r['rid']}"
-            if tmp_dir.exists():
-                shutil.rmtree(tmp_dir)
-
-        return files
-
-    def _create_zip(self, exe_path: Path, archive_path: Path, rid: str) -> None:
-        """创建 .zip 包。"""
-        exe_name = f"{APP_NAME}.exe" if rid.startswith("win") else APP_NAME
-        with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as zf:
-            zf.write(exe_path, exe_name)
-
-    def _create_tar_gz(self, exe_path: Path, archive_path: Path, rid: str) -> None:
-        """创建 .tar.gz 包。"""
-        with tarfile.open(archive_path, "w:gz") as tf:
-            tf.add(exe_path, APP_NAME)
-
     # ── 步骤 3: 发布说明 ───────────────────────
 
     def build_release_notes(self) -> str:
         """读取 RELEASE.md，附加 SHA256 表格。"""
-        print("[3/5] 读取 RELEASE.md...")
+        print("[4] 读取 RELEASE.md...")
 
         if not self.release_md_path.exists():
             raise FileNotFoundError(
@@ -405,21 +374,17 @@ class ReleaseManager:
 
     # ── 步骤 5: OSS 上传 ───────────────────────
 
-    def upload_to_oss(self, files: list[dict], vpk_artifacts: list[dict], release_notes: str) -> None:
+    def upload_to_oss(self, vpk_artifacts: list[dict], release_notes: str) -> None:
         """上传 zip/tar.gz + Velopack 产物到阿里云 OSS（含 releases.json 索引更新）。"""
-        print("[5/5] 上传到阿里云 OSS...")
+        print("[6] 上传到阿里云 OSS...")
 
         if self.dry_run:
             print("  [dry-run] 跳过 OSS 上传。")
             return
 
-        try:
-            import oss2
-        except ImportError:
+        if oss2 is None:
             print("  ! oss2 库未安装。跳过 OSS 上传。")
-            print("    安装: pip install oss2")
             return
-
         oss_cfg = self.config["oss"]
         auth = oss2.Auth(oss_cfg["accessKeyId"], oss_cfg["accessKeySecret"])
         bucket = oss2.Bucket(auth, oss_cfg["endpoint"], oss_cfg["bucket"])
@@ -431,23 +396,27 @@ class ReleaseManager:
                       "text/markdown")
         print(f"  ✓ {prefix}/RELEASE.md")
 
-        # 上传各平台包
-        for f in files:
-            local_path = Path(f["localPath"])
-            oss_key = f"{prefix}/{f['fileName']}"
-            self._oss_put_file(bucket, oss_key, str(local_path))
-            print(f"  ✓ {oss_key} ({format_size(f['size'])})")
-
-        # 上传 Velopack 产物到 updates/ 目录
+        # 上传产物：安装包 → releases/{version}/，更新包 → updates/
         if vpk_artifacts:
-            print("  [Velopack 产物]")
-            for a in vpk_artifacts:
-                oss_key = f"updates/{a['fileName']}"
-                self._oss_put_file(bucket, oss_key, a["localPath"])
-                print(f"    ✓ {oss_key} ({format_size(a['size'])})")
+            installers = [a for a in vpk_artifacts if self._is_installer(a["fileName"])]
+            updates = [a for a in vpk_artifacts if not self._is_installer(a["fileName"])]
+
+            if installers:
+                print("  [安装包 → releases/{}/]", self.version)
+                for a in installers:
+                    oss_key = f"releases/{self.version}/{a['fileName']}"
+                    self._oss_put_file(bucket, oss_key, a["localPath"])
+                    print(f"    ✓ {oss_key} ({format_size(a['size'])})")
+
+            if updates:
+                print("  [更新包 → updates/]")
+                for a in updates:
+                    oss_key = f"updates/{a['fileName']}"
+                    self._oss_put_file(bucket, oss_key, a["localPath"])
+                    print(f"    ✓ {oss_key} ({format_size(a['size'])})")
 
         # 更新 releases.json 索引
-        self._update_releases_index(bucket, files, release_notes)
+        self._update_releases_index(bucket, vpk_artifacts, release_notes)
 
     def _oss_put(self, bucket, key: str, data: bytes, content_type: str) -> None:
         """上传数据到 OSS。"""
@@ -465,7 +434,7 @@ class ReleaseManager:
             print(f"  ✗ OSS 上传失败: {key} — {e}")
             raise
 
-    def _update_releases_index(self, bucket, files: list[dict],
+    def _update_releases_index(self, bucket, vpk_artifacts: list[dict],
                                release_notes: str) -> None:
         """更新 releases.json 版本索引（ETag 乐观锁防并发覆盖）。"""
         index_key = "releases/releases.json"
@@ -507,12 +476,13 @@ class ReleaseManager:
             "notes": release_notes.strip(),
             "files": [
                 {
-                    "platform": f["platform"],
-                    "fileName": f["fileName"],
-                    "size": f["size"],
-                    "sha256": f["sha256"],
+                    "platform": a["platform"],
+                    "fileName": a["fileName"],
+                    "size": a["size"],
+                    "sha256": a["sha256"],
                 }
-                for f in files
+                for a in vpk_artifacts
+                if self._is_installer(a["fileName"])  # 仅安装包
             ],
         }
 
@@ -539,21 +509,17 @@ class ReleaseManager:
 
     # ── 步骤 4: GitHub Release ────────────────
 
-    def create_github_release(self, files: list[dict], vpk_artifacts: list[dict], release_notes: str) -> None:
+    def create_github_release(self, vpk_artifacts: list[dict], release_notes: str) -> None:
         """通过 GitHub REST API 创建 Release，上传 zip/tar.gz + Velopack 产物。"""
-        print("[4/5] 创建 GitHub Release...")
+        print("[5] 创建 GitHub Release...")
 
         if self.dry_run:
             print("  [dry-run] 跳过 GitHub Release 创建。")
             return
 
-        try:
-            import requests
-        except ImportError:
+        if requests is None:
             print("  ! requests 库未安装。跳过 GitHub Release。")
-            print("    安装: pip install requests")
             return
-
         gh_cfg = self.config["github"]
         repo = gh_cfg["repo"]
         token = gh_cfg["token"]
@@ -566,8 +532,7 @@ class ReleaseManager:
         }
 
         # 1. 构建 body（RELEASE.md + SHA256 表格，含 Velopack 产物）
-        all_artifacts = files + vpk_artifacts
-        body = self._build_release_body(release_notes, all_artifacts)
+        body = self._build_release_body(release_notes, vpk_artifacts)
 
         # 2. 创建 Release
         release_url = f"{api_base}/releases"
@@ -593,7 +558,8 @@ class ReleaseManager:
         print(f"  ✓ Release 已创建: {release_data['html_url']}")
 
         # 3. 上传所有资产文件（zip/tar.gz + Velopack 产物）
-        for f in all_artifacts:
+        installers = [a for a in vpk_artifacts if self._is_installer(a["fileName"])]
+        for f in installers:
             local_path = Path(f["localPath"])
             asset_url = f"{api_base}/releases/{release_id}/assets"
             params = {"name": f["fileName"]}
@@ -620,10 +586,16 @@ class ReleaseManager:
         Worker 凭证与上传用的 oss.accessKeyId/Secret 是不同的子账号密钥：
         Worker 仅需 OSS 只读权限（回源下载），上传主密钥拥有写权限，不能混用。
         """
+        if self.skip_oss and self.skip_github:
+            print("[7] Worker Secret 轮换  → 跳过 (远程已全部禁用)")
+            return False
         if not self._has_cloudflare_config():
-            print("[6/6] Worker Secret 轮换  → 跳过 (cloudflare 配置不完整)")
+            print("[7] Worker Secret 轮换  → 跳过 (cloudflare 配置不完整)")
             return False
 
+        if requests is None:
+            print("[7] Worker Secret 轮换  → 跳过 (requests 未安装)")
+            return False
         cf = self.config["cloudflare"]
         account_id = cf["accountId"]
         script = cf["workerScript"]
@@ -632,7 +604,7 @@ class ReleaseManager:
         worker_key_id = cf.get("workerOssKeyId")
         worker_key_secret = cf.get("workerOssKeySecret")
         if not worker_key_id or not worker_key_secret:
-            print("[6/6] Worker Secret 轮换  → 跳过 (cloudflare.workerOssKeyId/Secret 未配置)")
+            print("[7] Worker Secret 轮换  → 跳过 (cloudflare.workerOssKeyId/Secret 未配置)")
             return False
 
         api_url = (
@@ -653,11 +625,15 @@ class ReleaseManager:
             },
         }
 
-        print(f"[6/6] Worker Secret 轮换: {script}...")
+        print(f"[7] Worker Secret 轮换: {script}...")
 
         if self.dry_run:
+            # 脱敏显示
+            masked = dict(payload)
+            for k in masked:
+                masked[k] = {**masked[k], "text": masked[k]["text"][:4] + "***"}
             print(f"  [dry-run] 将 PATCH {api_url}")
-            print(f"  [dry-run] payload: {json.dumps(payload, ensure_ascii=False, indent=2)}")
+            print(f"  [dry-run] payload: {json.dumps(masked, ensure_ascii=False, indent=2)}")
             return False
 
         resp = requests.patch(
@@ -683,14 +659,25 @@ class ReleaseManager:
             print(f"  ✗ CF API HTTP {resp.status_code}: {resp.text}")
             return False
 
-    def _build_release_body(self, release_notes: str, files: list[dict]) -> str:
-        """构建 Release body：RELEASE.md + SHA256 表格。"""
+    @staticmethod
+    def _is_installer(file_name: str) -> bool:
+        """判断是否为用户可下载的安装程序文件。"""
+        lower = file_name.lower()
+        return lower.endswith('.exe') or lower.endswith('.appimage') \
+            or lower.endswith('.pkg') or lower.endswith('.dmg')
+
+    def _build_release_body(self, release_notes: str, artifacts: list[dict]) -> str:
+        """构建 Release body：RELEASE.md + 安装程序 SHA256 表格。"""
+        installers = [a for a in artifacts if self._is_installer(a["fileName"])]
+        if not installers:
+            return release_notes.strip()
+
         lines = [release_notes.strip(), "", "### SHA256 Checksums", ""]
         lines.append("| File | SHA256 |")
         lines.append("|------|--------|")
 
-        for f in files:
-            lines.append(f"| {f['fileName']} | {f['sha256']} |")
+        for a in installers:
+            lines.append(f"| {a['fileName']} | {a['sha256']} |")
 
         return "\n".join(lines) + "\n"
 
@@ -710,12 +697,12 @@ class ReleaseManager:
         """确保当前在 main 分支。不在则自动切换。"""
         # CI 环境（分离 HEAD）跳过分支检查
         if self.skip_branch_check:
-            print("[0/5] 分支检查  → 跳过 (--skip-branch-check)")
+            print("[0] 分支检查  → 跳过 (--skip-branch-check)")
             return True
 
         # CI 环境变量检测
         if any(os.environ.get(v) for v in ("CI", "GITHUB_ACTIONS", "GITLAB_CI")):
-            print("[0/5] 分支检查  → 跳过 (CI 环境)")
+            print("[0] 分支检查  → 跳过 (CI 环境)")
             return True
 
         result = subprocess.run(
@@ -727,7 +714,7 @@ class ReleaseManager:
         current = result.stdout.strip()
 
         if current == "main":
-            print("[0/5] 分支检查  ✓ 已在 main 分支")
+            print("[0] 分支检查  ✓ 已在 main 分支")
             return True
 
         # 检查是否有未提交的改动
@@ -738,12 +725,12 @@ class ReleaseManager:
             text=True,
         )
         if status.stdout.strip():
-            print(f"[0/5] 分支检查  ✗ 当前在 '{current}' 分支，且有未提交的改动。")
+            print(f"[0] 分支检查  ✗ 当前在 '{current}' 分支，且有未提交的改动。")
             print("    请先 commit 或 stash 改动后再切换。")
             return False
 
         # 干净，切换到 main
-        print(f"[0/5] 分支检查  → 从 '{current}' 切换到 main...")
+        print(f"[0] 分支检查  → 从 '{current}' 切换到 main...")
         result = subprocess.run(
             ["git", "checkout", "main"],
             cwd=str(self.root),
@@ -766,12 +753,12 @@ class ReleaseManager:
             text=True,
         )
         if result.returncode != 0:
-            print("[0/5] 版本号一致性检查  ✗ 失败")
+            print("[0] 版本号一致性检查  ✗ 失败")
             print(result.stdout)
             if result.stderr:
                 print(result.stderr)
             return False
-        print("[0/5] 版本号一致性检查  ✓ 通过")
+        print("[0] 版本号一致性检查  ✓ 通过")
         return True
 
     # ── 编排 ───────────────────────────────────
@@ -781,54 +768,64 @@ class ReleaseManager:
         print(f"=== SeatFlow Release v{self.version} ===\n")
 
         try:
-            # 步骤 0: 确保在 main 分支
+            # [0] 确保在 main 分支
             if not self._check_main_branch():
                 return 1
 
-            # 步骤 0: 版本号一致性检查
+            # [0] 版本号一致性检查
             if not self._check_versions():
                 print("\n请先运行 python3 scripts/version.py check 查看详情，"
                       "再用 python3 scripts/version.py sync --force 修复同步问题。")
                 return 1
 
-            # 步骤 1: 构建
+            # [1] 清理 bin/obj
+            if self.clean:
+                self._clean_bin_obj()
+
+            # [2] 构建
             build_outputs = self.build_all()
 
-            if self.skip_build:
-                # 从已有 dist 目录恢复
-                build_outputs = self._find_existing_builds()
-
             if not build_outputs:
-                print("错误: 无可用构建产物。")
+                print("[!] 错误: 无可用构建产物。")
                 return 1
 
-            # 步骤 1.5: vpk pack（Velopack 更新包）
-            vpk_artifacts = self.vpk_pack_all(build_outputs)
+            # [3] vpk pack
+            if not self._check_vpk_deps():
+                print("[3] vpk pack  → 跳过 (系统依赖缺失)")
+                vpk_artifacts = []
+            else:
+                vpk_artifacts = self.vpk_pack_all(build_outputs)
 
-            # 步骤 2: 打包 + SHA256
-            files = self.package_all(build_outputs)
-            if not files:
-                print("错误: 无可用包文件。")
-                return 1
-
-            # 步骤 3: 发布说明
+            # [4] 发布说明
             release_notes = self.build_release_notes()
 
-            # 步骤 4: GitHub Release（先创建，失败则 OSS 保持干净）
-            self.create_github_release(files, vpk_artifacts, release_notes)
+            if not vpk_artifacts and not self.skip_velopack:
+                print("[!] vpk 未产生任何产物，跳过远程发布。")
+                self.skip_oss = True
+                self.skip_github = True
 
-            # 步骤 5: OSS 上传（含 releases.json 索引更新）
-            self.upload_to_oss(files, vpk_artifacts, release_notes)
+            # [5] GitHub Release
+            if self.skip_github:
+                print("[5] GitHub Release  → 跳过 (--skip-github)")
+            else:
+                self.create_github_release(vpk_artifacts, release_notes)
 
-            # 步骤 6: Cloudflare Worker Secret 轮换（可选，需配置 cloudflare 节）
+            # [6] OSS 上传
+            if self.skip_oss:
+                print("[6] OSS 上传       → 跳过 (--skip-oss)")
+            else:
+                self.upload_to_oss(vpk_artifacts, release_notes)
+
+            # [7] Cloudflare Worker Secret
             self.rotate_worker_secrets()
 
             print(f"\n=== Release v{self.version} 完成 ===")
 
             # 本地输出 SHA256 表格（zip/tar.gz + Velopack 产物）
-            all_artifacts = files + vpk_artifacts
-            print("\nSHA256 Checksums:")
-            print(self._build_sha256_table(all_artifacts))
+            installers = [a for a in vpk_artifacts if self._is_installer(a["fileName"])]
+            if installers:
+                print("\nSHA256 Checksums:")
+                print(self._build_sha256_table(installers))
 
             return 0
 
@@ -837,6 +834,25 @@ class ReleaseManager:
             return 1
         except SystemExit as e:
             return e.code if isinstance(e.code, int) else 1
+
+    def _clean_bin_obj(self) -> None:
+        """递归清理所有 bin/ 和 obj/ 目录，确保干净编译。"""
+        dirs = sorted(
+            [d for d in self.root.rglob("bin") if d.is_dir()] +
+            [d for d in self.root.rglob("obj") if d.is_dir()]
+        )
+        if not dirs:
+            print("[1] 没有可清理的 bin/obj 目录")
+            return
+        print(f"[1] 清理 {len(dirs)} 个 bin/obj 目录...")
+        if self.dry_run:
+            for d in dirs:
+                print(f"  [dry-run] 将删除: {d.relative_to(self.root)}")
+            print("[1] [dry-run] 跳过实际删除")
+            return
+        for d in dirs:
+            shutil.rmtree(d, ignore_errors=True)
+        print("[1] ✓ 已清理")
 
     def _find_existing_builds(self) -> dict:
         """从 dist 目录查找已有构建产物。"""
@@ -851,11 +867,11 @@ class ReleaseManager:
                 results[rid] = exe_path
         return results
 
-    def _build_sha256_table(self, files: list[dict]) -> str:
+    def _build_sha256_table(self, artifacts: list[dict]) -> str:
         """构建 SHA256 表格字符串。"""
         lines = ["| File | SHA256 |", "|------|--------|"]
-        for f in files:
-            lines.append(f"| {f['fileName']} | {f['sha256']} |")
+        for a in artifacts:
+            lines.append(f"| {a['fileName']} | {a['sha256']} |")
         return "\n".join(lines)
 
 
@@ -881,6 +897,9 @@ def main() -> int:
     parser.add_argument("--skip-build", action="store_true", help="跳过 dotnet publish，使用已有构建产物")
     parser.add_argument("--skip-velopack", action="store_true", help="跳过 Velopack vpk pack 步骤")
     parser.add_argument("--skip-branch-check", action="store_true", help="跳过 main 分支检查（CI 环境自动跳过）")
+    parser.add_argument("--no-clean", action="store_true", help="禁用编译前 bin/obj 清理")
+    parser.add_argument("--skip-oss", action="store_true", help="跳过阿里云 OSS 上传")
+    parser.add_argument("--skip-github", action="store_true", help="跳过 GitHub Release 创建")
 
     args = parser.parse_args()
 
@@ -894,6 +913,9 @@ def main() -> int:
         skip_build=args.skip_build,
         skip_velopack=args.skip_velopack,
         skip_branch_check=args.skip_branch_check,
+        clean=not args.no_clean,
+        skip_oss=args.skip_oss,
+        skip_github=args.skip_github,
     )
 
     return mgr.run()
