@@ -1,0 +1,261 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (must match version.json)'
+        required: true
+        type: string
+      skip-oss:
+        description: 'Skip Aliyun OSS upload'
+        type: boolean
+        default: false
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  DOTNET_NOLOGO: 1
+
+jobs:
+  # ── 多平台并行构建 + vpk 打包 ───────────────────
+  build:
+    name: ${{ matrix.rid }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: win-x64,   os: ubuntu-24.04, vpk: win,   exe: SeatFlow.exe }
+          - { rid: linux-x64, os: ubuntu-24.04, vpk: linux, exe: SeatFlow }
+          - { rid: osx-x64,   os: macos-14,     vpk: osx,   exe: SeatFlow }
+          - { rid: osx-arm64, os: macos-14,     vpk: osx,   exe: SeatFlow }
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install squashfs-tools (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y squashfs-tools
+
+      - name: Restore dotnet tools
+        run: dotnet tool restore
+
+      - name: Validate version.json
+        run: |
+          ACTUAL=$(python3 -c "import json; print(json.load(open('version.json'))['version'])")
+          EXPECTED="${{ github.event.inputs.version }}"
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "version.json ($ACTUAL) != input ($EXPECTED)"
+            exit 1
+          fi
+          echo "✓ Version $ACTUAL matches"
+
+      - name: dotnet publish
+        run: |
+          dotnet publish SeatFlow.Presentation.Avalonia \
+            -c Release \
+            -r ${{ matrix.rid }} \
+            --self-contained true \
+            -o publish/
+
+      - name: vpk pack
+        run: |
+          EXTRA=()
+          if [ -f RELEASE.md ]; then
+            EXTRA=(--releaseNotes RELEASE.md)
+          fi
+          dotnet vpk "[${{ matrix.vpk }}]" pack \
+            --packId SeatFlow \
+            --packVersion "${{ github.event.inputs.version }}" \
+            --packDir publish/ \
+            --mainExe "${{ matrix.exe }}" \
+            --channel "${{ matrix.rid }}" \
+            --outputDir artifacts/ \
+            --packTitle "SeatFlow" \
+            --packAuthors "Helio-RC" \
+            "${EXTRA[@]}"
+
+      - name: Filter distributable artifacts
+        run: |
+          mkdir -p staging
+          for f in artifacts/*; do
+            [ -f "$f" ] || continue
+            name=$(basename "$f")
+            case "$name" in
+              assets.*.json|*-portable.*) echo "  SKIP $name"; continue ;;
+            esac
+            cp "$f" "staging/$name"
+            echo "  KEEP $name"
+          done
+          ls -lh staging/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.rid }}
+          path: staging/
+
+  # ── 汇总产物 → GitHub Release + OSS 上传 ──────
+  release:
+    name: Release
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: '*'
+          path: all-artifacts/
+          merge-multiple: true
+
+      - name: Compute SHA256 checksums
+        run: |
+          {
+            echo "### SHA256 Checksums"
+            echo ""
+            echo "| File | SHA256 |"
+            echo "|------|--------|"
+            for f in all-artifacts/*; do
+              [ -f "$f" ] || continue
+              name=$(basename "$f")
+              hash=$(sha256sum "$f" | awk '{print $1}')
+              echo "| $name | $hash |"
+            done
+          } > sha256.md
+          cat sha256.md
+
+      - name: Build release body
+        run: |
+          {
+            if [ -f RELEASE.md ]; then
+              cat RELEASE.md
+            else
+              echo "# SeatFlow ${{ github.event.inputs.version }}"
+            fi
+            echo ""
+            cat sha256.md
+          } > release-body.md
+
+      - name: Read release tag
+        id: tag
+        run: |
+          TAG=$(python3 -c "import json; print(json.load(open('version.json'))['releaseTag'])")
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Tag: $TAG"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: SeatFlow ${{ github.event.inputs.version }}
+          body_path: release-body.md
+          files: |
+            all-artifacts/*.exe
+            all-artifacts/*.AppImage
+            all-artifacts/*.pkg
+            all-artifacts/*.dmg
+          fail_on_unmatched_files: false
+
+      # ── OSS 上传 ─────────────────────────────
+      - name: Install OSS dependencies
+        if: ${{ !github.event.inputs.skip-oss }}
+        run: pip install oss2 requests
+
+      - name: Upload to Aliyun OSS
+        if: ${{ !github.event.inputs.skip-oss }}
+        env:
+          OSS_KEY_ID: ${{ secrets.OSS_ACCESS_KEY_ID }}
+          OSS_KEY_SECRET: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
+          OSS_ENDPOINT: ${{ secrets.OSS_ENDPOINT }}
+          OSS_BUCKET: ${{ secrets.OSS_BUCKET }}
+        run: |
+          python3 scripts/release/ci_oss_upload.py \
+            --version "${{ github.event.inputs.version }}" \
+            --artifacts-dir all-artifacts/ \
+            --release-md RELEASE.md \
+            --commit-id "${{ github.sha }}"
+
+      # ── Cloudflare Worker Secret 轮换 ────────
+      - name: Rotate Cloudflare Worker secrets
+        if: ${{ !github.event.inputs.skip-oss }}
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_WORKER_SCRIPT: ${{ secrets.CF_WORKER_SCRIPT }}
+          CF_OSS_KEY_ID: ${{ secrets.CF_OSS_KEY_ID }}
+          CF_OSS_KEY_SECRET: ${{ secrets.CF_OSS_KEY_SECRET }}
+        run: |
+          # 检查所有必需的环境变量
+          MISSING=0
+          for v in CF_API_TOKEN CF_ACCOUNT_ID CF_WORKER_SCRIPT CF_OSS_KEY_ID CF_OSS_KEY_SECRET; do
+            if [ -z "${!v}" ]; then
+              echo "! $v 未配置"
+              MISSING=1
+            fi
+          done
+          if [ "$MISSING" = "1" ]; then
+            echo "→ 跳过: Cloudflare 凭证不完整"
+            exit 0
+          fi
+
+          python3 -c "
+          import json, os
+          payload = {
+              'OSS_ACCESS_KEY_ID':     {'name': 'OSS_ACCESS_KEY_ID',     'text': os.environ['CF_OSS_KEY_ID'],     'type': 'secret_text'},
+              'OSS_ACCESS_KEY_SECRET': {'name': 'OSS_ACCESS_KEY_SECRET', 'text': os.environ['CF_OSS_KEY_SECRET'], 'type': 'secret_text'},
+          }
+          with open('/tmp/cf_payload.json', 'w') as f:
+              json.dump(payload, f)
+          "
+
+          HTTP_CODE=$(curl -s -o /tmp/cf_response.json -w '%{http_code}' -X PATCH \
+            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/workers/scripts/$CF_WORKER_SCRIPT/secrets-bulk" \
+            -H "Authorization: Bearer $CF_API_TOKEN" \
+            -H "Content-Type: application/merge-patch+json" \
+            -d @/tmp/cf_payload.json)
+
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✓ Worker secrets rotated"
+          else
+            echo "✗ CF API returned HTTP $HTTP_CODE"
+            cat /tmp/cf_response.json
+          fi
+
+  # ── 结果汇总 ──────────────────────────────────
+  summary:
+    name: Summary
+    needs: [build, release]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Print summary
+        run: |
+          echo "=== SeatFlow Release v${{ github.event.inputs.version }} ==="
+          echo ""
+          echo "Build matrix:"
+          echo "  win-x64    → ubuntu-24.04"
+          echo "  linux-x64  → ubuntu-24.04"
+          echo "  osx-x64    → macos-14"
+          echo "  osx-arm64  → macos-14"
+          echo ""
+          if [ "${{ needs.build.result }}" = "success" ]; then
+            echo "✓ Build: ${{ needs.build.result }}"
+          else
+            echo "✗ Build: ${{ needs.build.result }}"
+          fi
+          if [ "${{ needs.release.result }}" = "success" ]; then
+            echo "✓ Release: ${{ needs.release.result }}"
+          else
+            echo "✗ Release: ${{ needs.release.result }}"
+          fi
