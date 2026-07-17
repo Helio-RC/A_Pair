@@ -10,21 +10,45 @@
     <vm:HomeViewModel />
   </Design.DataContext>
 
-  <DockPanel>
-    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="16">
-      <svg:Svg Path="/Assets/icon_with_background.svg"
-               Width="240" Height="240"
-               HorizontalAlignment="Center"
-               Stretch="Uniform" />
-      <TextBlock Text="{Binding Greeting}" Classes="hero"
-                 HorizontalAlignment="Center" />
-      <TextBlock Text="{Binding Subtitle}" FontSize="16"
+  <Grid>
+    <!-- Atmospheric accent glow (top-right, very subtle) -->
+    <Border IsHitTestVisible="False" Opacity="0.03"
+            HorizontalAlignment="Right" VerticalAlignment="Top"
+            Width="320" Height="320" CornerRadius="160"
+            Margin="0,0,24,0">
+      <Border.Background>
+        <SolidColorBrush Color="{DynamicResource SystemAccentColor}" />
+      </Border.Background>
+    </Border>
+
+    <DockPanel>
+      <!-- Bottom: Version label (discreet) -->
+      <Border DockPanel.Dock="Bottom" HorizontalAlignment="Center" Margin="0,0,0,16">
+        <TextBlock Text="{Binding VersionLabel}" Classes="micro"
+                   Foreground="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                   Opacity="0.5" />
+      </Border>
+
+      <!-- Center: Hero content -->
+      <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
+        <svg:Svg Path="/Assets/icon_with_background.svg"
+                 Width="120" Height="120"
                  HorizontalAlignment="Center"
-                 Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
-      <Separator Width="200" Margin="0,8" />
-      <TextBlock Text="{x:Static lang:Resources.Home_Hint}" Classes="body"
-                 HorizontalAlignment="Center"
-                 Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
-    </StackPanel>
-  </DockPanel>
+                 Stretch="Uniform" />
+        <TextBlock Text="{Binding TimeBasedGreeting}" Classes="bodySmall"
+                   HorizontalAlignment="Center"
+                   Foreground="{DynamicResource SystemAccentColor}"
+                   Margin="0,12,0,0" />
+        <TextBlock Text="{Binding Greeting}" Classes="hero"
+                   HorizontalAlignment="Center" Margin="0,0,0,2" />
+        <TextBlock Text="{Binding Subtitle}" Classes="bodyLarge"
+                   HorizontalAlignment="Center"
+                   Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+        <Separator Width="80" Margin="0,10,0,6" Opacity="0.4" />
+        <TextBlock Text="{x:Static lang:Resources.Home_Hint}" Classes="caption"
+                   HorizontalAlignment="Center"
+                   Foreground="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+      </StackPanel>
+    </DockPanel>
+  </Grid>
 </UserControl>

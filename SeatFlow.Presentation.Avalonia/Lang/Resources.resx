@@ -221,6 +221,18 @@
   <data name="Guide_Seating_Select_Title" xml:space="preserve">
     <value>选择数据</value>
   </data>
+  <data name="Home_Greeting_Afternoon" xml:space="preserve">
+    <value>下午好</value>
+  </data>
+  <data name="Home_Greeting_Evening" xml:space="preserve">
+    <value>晚上好</value>
+  </data>
+  <data name="Home_Greeting_Morning" xml:space="preserve">
+    <value>早上好</value>
+  </data>
+  <data name="Home_Version" xml:space="preserve">
+    <value>版本 {0}</value>
+  </data>
   <data name="Member_AddedRowFmt" xml:space="preserve">
     <value>已添加第 {0} 名学生</value>
   </data>
