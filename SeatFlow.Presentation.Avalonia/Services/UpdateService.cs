@@ -22,7 +22,7 @@ internal sealed class UpdateService : IUpdateService, IDisposable
     private readonly ILogger<UpdateService> _logger;
     private readonly HttpClient _httpClient;
 
-    private const string UpdateApiBase = "https://api.seatflow.work";
+    private const string UpdateApiBase = "https://download.seatflow.work";
     private const string GitHubRepoUrl = "https://github.com/SeatFlow/SeatFlow";
 
     private UpdateInfo? _lastUpdateInfo;
