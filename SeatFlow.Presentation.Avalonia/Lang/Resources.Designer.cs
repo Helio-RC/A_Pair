@@ -26,10 +26,15 @@ public class Resources
     [global::System.ComponentModel.EditorBrowsable(global::System.ComponentModel.EditorBrowsableState.Advanced)]
     public static global::System.Globalization.CultureInfo Culture { get; set; } = global::System.Globalization.CultureInfo.CurrentUICulture;
 
+    public static string About_Commit => ResourceManager.GetString("About_Commit", Culture)!;
     public static string About_Dependencies => ResourceManager.GetString("About_Dependencies", Culture)!;
+    public static string About_Documentation => ResourceManager.GetString("About_Documentation", Culture)!;
     public static string About_Framework => ResourceManager.GetString("About_Framework", Culture)!;
+    public static string About_GitHub => ResourceManager.GetString("About_GitHub", Culture)!;
+    public static string About_Issues => ResourceManager.GetString("About_Issues", Culture)!;
     public static string About_License => ResourceManager.GetString("About_License", Culture)!;
     public static string About_MITLicenseWarning => ResourceManager.GetString("About_MITLicenseWarning", Culture)!;
+    public static string About_OfficialSite => ResourceManager.GetString("About_OfficialSite", Culture)!;
     public static string About_OpenLink => ResourceManager.GetString("About_OpenLink", Culture)!;
     public static string About_Runtime => ResourceManager.GetString("About_Runtime", Culture)!;
     public static string About_Title => ResourceManager.GetString("About_Title", Culture)!;

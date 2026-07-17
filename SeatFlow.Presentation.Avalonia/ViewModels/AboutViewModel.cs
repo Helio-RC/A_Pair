@@ -1,9 +1,12 @@
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading.Tasks;
+using Avalonia.Controls;
 using SeatFlow.Presentation.Avalonia.Lang;
 using CommunityToolkit.Mvvm.Input;
 using AvaloniaApplication = Avalonia.Application;
@@ -19,6 +22,12 @@ public partial class AboutViewModel : ViewModelBase
     public string RuntimeVersion { get; }
     public string AvaloniaVersion { get; }
     public string ProjectUrl { get; }
+    public string OfficialSiteUrl { get; }
+    public string DocsUrl { get; }
+    public string GitHubUrl { get; }
+    public string IssuesUrl { get; }
+    public string CommitId { get; }
+    public string BuildDate { get; }
     public string License { get; }
     public string Copyright { get; }
 
@@ -36,6 +45,14 @@ public partial class AboutViewModel : ViewModelBase
 
         Description = data.Description;
         ProjectUrl = data.ProjectUrl;
+        OfficialSiteUrl = data.OfficialSiteUrl;
+        DocsUrl = data.DocsUrl;
+        GitHubUrl = data.GitHubUrl;
+        IssuesUrl = data.IssuesUrl;
+        CommitId = VersionInfo.CommitId;
+        BuildDate = DateTime.TryParse(VersionInfo.BuildDate, out var dt)
+            ? dt.ToString("yyyy-MM-dd")
+            : VersionInfo.BuildDate;
         License = data.License;
         Copyright = data.Copyright;
         Dependencies = data.Dependencies
@@ -49,10 +66,26 @@ public partial class AboutViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private static void OpenUrl (string url)
+    private static async Task OpenUrl (string url)
     {
-        if (!string.IsNullOrWhiteSpace(url))
-            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        if (string.IsNullOrWhiteSpace(url))
+            return;
+
+        // 优先使用 Avalonia 原生 URI 启动器（通过平台 API，避免杀软误报）
+        if (AvaloniaApplication.Current?.ApplicationLifetime is
+            global::Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
+            && desktop.MainWindow is { } mainWindow)
+        {
+            var launcher = TopLevel.GetTopLevel(mainWindow)?.Launcher;
+            if (launcher is not null)
+            {
+                await launcher.LaunchUriAsync(new Uri(url));
+                return;
+            }
+        }
+
+        // 回退：无头环境 / 测试场景
+        Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
     }
 
     private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
@@ -81,6 +114,10 @@ public partial class AboutViewModel : ViewModelBase
     {
         public string Description { get; set; } = "";
         public string ProjectUrl { get; set; } = "";
+        public string OfficialSiteUrl { get; set; } = "";
+        public string DocsUrl { get; set; } = "";
+        public string GitHubUrl { get; set; } = "";
+        public string IssuesUrl { get; set; } = "";
         public string License { get; set; } = "";
         public string Copyright { get; set; } = "";
         public List<DepEntry> Dependencies { get; set; } = [];
