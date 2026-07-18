@@ -22,6 +22,8 @@
     <EmbeddedResource Include="Data\about.json" />
     <EmbeddedResource Include="Data\page_navigation.json" />
     <EmbeddedResource Include="Data\onboarding_config.json" />
+    <EmbeddedResource Include="..\RELEASE.md"
+                      LogicalName="SeatFlow.Presentation.Avalonia.Data.release.md" />
   </ItemGroup>
 
   <ItemGroup>

@@ -80,9 +80,13 @@ public class Resources
     public static string Guide_Members_Update_Title => ResourceManager.GetString("Guide_Members_Update_Title", Culture)!;
     public static string Guide_Seating_Select_Desc => ResourceManager.GetString("Guide_Seating_Select_Desc", Culture)!;
     public static string Guide_Seating_Select_Title => ResourceManager.GetString("Guide_Seating_Select_Title", Culture)!;
+    public static string Home_Docs => ResourceManager.GetString("Home_Docs", Culture)!;
+    public static string Home_FAQ => ResourceManager.GetString("Home_FAQ", Culture)!;
     public static string Home_Greeting_Afternoon => ResourceManager.GetString("Home_Greeting_Afternoon", Culture)!;
     public static string Home_Greeting_Evening => ResourceManager.GetString("Home_Greeting_Evening", Culture)!;
     public static string Home_Greeting_Morning => ResourceManager.GetString("Home_Greeting_Morning", Culture)!;
+    public static string Home_Installation => ResourceManager.GetString("Home_Installation", Culture)!;
+    public static string Home_QuickStart => ResourceManager.GetString("Home_QuickStart", Culture)!;
     public static string Home_Version => ResourceManager.GetString("Home_Version", Culture)!;
     public static string Member_AddedRowFmt => ResourceManager.GetString("Member_AddedRowFmt", Culture)!;
     public static string Member_AddRow => ResourceManager.GetString("Member_AddRow", Culture)!;

@@ -6,6 +6,8 @@
     "docsUrl": "https://seatflow.work/Docs",
     "githubUrl": "https://github.com/Helio-RC/Seatflow",
     "issuesUrl": "https://github.com/Helio-RC/Seatflow/issues",
+    "quickStartUrl": "https://seatflow.work/Docs/quick-start",
+    "faqUrl": "https://seatflow.work/Docs/faq",
     "license": "MIT License",
     "copyright": "© 2026 SeatFlow Contributors",
     "dependencies": [
@@ -26,6 +28,8 @@
     "docsUrl": "https://seatflow.work/Docs",
     "githubUrl": "https://github.com/Helio-RC/Seatflow",
     "issuesUrl": "https://github.com/Helio-RC/Seatflow/issues",
+    "quickStartUrl": "https://seatflow.work/Docs/quick-start",
+    "faqUrl": "https://seatflow.work/Docs/faq",
     "license": "MIT License",
     "copyright": "© 2026 SeatFlow Contributors",
     "dependencies": [

@@ -221,6 +221,12 @@
   <data name="Guide_Seating_Select_Title" xml:space="preserve">
     <value>Select Data</value>
   </data>
+  <data name="Home_Docs" xml:space="preserve">
+    <value>Documentation</value>
+  </data>
+  <data name="Home_FAQ" xml:space="preserve">
+    <value>FAQ</value>
+  </data>
   <data name="Home_Greeting_Afternoon" xml:space="preserve">
     <value>Good afternoon, {0}</value>
   </data>
@@ -229,6 +235,12 @@
   </data>
   <data name="Home_Greeting_Morning" xml:space="preserve">
     <value>Good morning, {0}</value>
+  </data>
+  <data name="Home_Installation" xml:space="preserve">
+    <value>Installation</value>
+  </data>
+  <data name="Home_QuickStart" xml:space="preserve">
+    <value>Quick Start</value>
   </data>
   <data name="Home_Version" xml:space="preserve">
     <value>Version {0}</value>

@@ -38,15 +38,27 @@ except ImportError:
 # ──────────────────────────────────────────────
 
 def _should_distribute(file_name: str) -> bool:
-    """过滤不应分发的文件（vpk 内部元数据、便携版等）。"""
+    """过滤不应分发的文件（vpk 内部元数据）。"""
     lower = file_name.lower()
     # assets.*.json — vpk 内部构建元数据
     if lower.startswith("assets.") and lower.endswith(".json"):
         return False
-    # *-portable.zip — 便携版，不发布
-    if "-portable." in lower:
-        return False
     return True
+
+
+def _versioned_name(filename: str, version: str) -> str:
+    """确保安装程序文件名包含版本号。
+
+    SeatFlow Setup.exe          → SeatFlow-1.4.2-Setup.exe
+    SeatFlow-1.4.2-osx-x64.pkg  → (不变，已有版本号)
+    """
+    if "." not in filename:
+        return f"{filename}-{version}"
+    stem, ext = filename.rsplit(".", 1)
+    if f"-{version}" in stem or f"_{version}" in stem:
+        return filename
+    return f"{stem}-{version}.{ext}"
+
 
 APP_NAME = "SeatFlow"
 PROJECT = "SeatFlow.Presentation.Avalonia"
@@ -117,7 +129,8 @@ class ReleaseManager:
                  skip_build: bool = False, skip_velopack: bool = False,
                  skip_branch_check: bool = False,
                  clean: bool = True,
-                 skip_oss: bool = False, skip_github: bool = False):
+                 skip_oss: bool = False, skip_github: bool = False,
+                 retransmit: bool = False, rewrite_metadata: bool = False):
         self.root = root
         self.dry_run = dry_run
         self.skip_build = skip_build
@@ -126,6 +139,8 @@ class ReleaseManager:
         self.clean = clean
         self.skip_oss = skip_oss
         self.skip_github = skip_github
+        self.retransmit = retransmit
+        self.rewrite_metadata = rewrite_metadata
 
         # 路径
         self.version_json_path = root / "version.json"
@@ -141,7 +156,7 @@ class ReleaseManager:
         self.version = self.version_info["version"]
 
         # dist 子目录
-        self.version_dist_dir = self.dist_dir / self.version
+        self.version_dist_dir = self.dist_dir
 
     # ── 配置 ──────────────────────────────────
 
@@ -210,6 +225,10 @@ class ReleaseManager:
         # 串行构建避免 obj/ 目录冲突
         for r in RIDS:
             rid = r["rid"]
+            # macOS 包仅限 macOS 主机构建
+            if rid.startswith("osx") and sys.platform != "darwin":
+                print(f"    ! {rid}: macOS 包仅限 macOS 主机构建，跳过")
+                continue
             try:
                 publish_dir = self._build_one(r)
                 results[rid] = publish_dir
@@ -328,6 +347,10 @@ class ReleaseManager:
             if self.release_md_path.exists():
                 cmd.extend(["--releaseNotes", str(self.release_md_path)])
 
+            # Windows: 不生成 portable zip
+            if directive == "[win]":
+                cmd.append("--noPortable")
+
             result = subprocess.run(cmd, cwd=str(self.root),
                                     capture_output=True, text=True)
             if result.returncode != 0:
@@ -409,18 +432,59 @@ class ReleaseManager:
             updates = [a for a in vpk_artifacts if not self._is_installer(a["fileName"])]
 
             if installers:
-                print("  [安装包 → releases/{}/]", self.version)
+                print(f"  [安装包 → {prefix}/]")
                 for a in installers:
-                    oss_key = f"releases/{self.version}/{a['fileName']}"
-                    self._oss_put_file(bucket, oss_key, a["localPath"])
-                    print(f"    ✓ {oss_key} ({format_size(a['size'])})")
+                    oss_key = f"{prefix}/{a['fileName']}"
+                    if self._oss_put_file_if_new(bucket, oss_key, a["localPath"]):
+                        print(f"    ✓ {oss_key} ({format_size(a['size'])})")
 
             if updates:
                 print("  [更新包 → updates/]")
                 for a in updates:
                     oss_key = f"updates/{a['fileName']}"
-                    self._oss_put_file(bucket, oss_key, a["localPath"])
-                    print(f"    ✓ {oss_key} ({format_size(a['size'])})")
+                    name = a["fileName"].lower()
+                    # nupkg 包内容不变，可跳过；通道元数据每次覆盖
+                    if name.endswith(".nupkg"):
+                        if self._oss_put_file_if_new(bucket, oss_key, a["localPath"]):
+                            print(f"    ✓ {oss_key} ({format_size(a['size'])})")
+                    else:
+                        self._oss_put_file(bucket, oss_key, a["localPath"])
+                        print(f"    ✓ {oss_key} ({format_size(a['size'])})")
+
+        elif self.rewrite_metadata:
+            # 无 vpk 产物但 --rewrite-metadata：重传通道元数据 + 重建 files 列表
+            print("  [--rewrite-metadata] 重传通道元数据...")
+            rebuilt: list[dict] = []
+            for r in RIDS:
+                rid = r["rid"]
+                vdir = self.version_dist_dir / f"velopack_{rid}"
+                # 通道元数据
+                for fname in (f"releases.{rid}.json", f"RELEASES-{rid}"):
+                    fpath = vdir / fname
+                    if fpath.exists():
+                        self._oss_put_file(bucket, f"updates/{fname}", str(fpath))
+                        print(f"    ✓ updates/{fname}")
+                # 扫描安装程序（installer/ 子目录或根目录），仅匹配当前版本
+                for pattern in ("installer/*", "*"):
+                    for fpath in vdir.glob(pattern):
+                        if not fpath.is_file():
+                            continue
+                        name = fpath.name.lower()
+                        if not name.endswith((".exe", ".appimage", ".pkg", ".dmg")):
+                            continue
+                        if f"-{self.version}" not in name:
+                            continue
+                        rebuilt.append({
+                            "rid": rid,
+                            "platform": r["platform"],
+                            "fileName": fpath.name,
+                            "localPath": str(fpath),
+                            "size": fpath.stat().st_size,
+                            "sha256": sha256_file(fpath),
+                        })
+            vpk_artifacts = rebuilt
+            if rebuilt:
+                print(f"  ✓ 从本地重建 {len(rebuilt)} 个安装程序条目")
 
         # 更新 releases.json 索引
         self._update_releases_index(bucket, vpk_artifacts, release_notes)
@@ -441,36 +505,46 @@ class ReleaseManager:
             print(f"  ✗ OSS 上传失败: {key} — {e}")
             raise
 
+    def _oss_put_file_if_new(self, bucket, key: str, local_path: str) -> bool:
+        """上传文件到 OSS，若已存在则跳过。返回 True 表示已上传。"""
+        if bucket.object_exists(key):
+            print(f"    - {key} (已存在，跳过)")
+            return False
+        self._oss_put_file(bucket, key, local_path)
+        return True
+
     def _update_releases_index(self, bucket, vpk_artifacts: list[dict],
                                release_notes: str) -> None:
-        """更新 releases.json 版本索引（ETag 乐观锁防并发覆盖）。"""
+        """更新 releases.json 版本索引。"""
         index_key = "releases/releases.json"
         existing = None
-        etag = None
 
         try:
             result = bucket.get_object(index_key)
             existing = json.loads(result.read())
-            etag = result.headers.get("ETag")  # 保存 ETag 用于条件写入
-            # oss2 返回的 ETag 可能包含或不包含引号；If-Match 要求带引号
-            if etag and not etag.startswith('"'):
-                etag = f'"{etag}"'
         except Exception:
             # releases.json 不存在 → 首次发布
             print("  releases.json 不存在，将创建新的版本索引。")
 
         if existing is None:
             existing = {"latest": self.version, "versions": []}
-        else:
-            # 检查版本是否已存在
-            for v in existing.get("versions", []):
-                if v["version"] == self.version:
+
+        # 检查版本是否已存在
+        existing_entry = None
+        for v in existing.get("versions", []):
+            if v["version"] == self.version:
+                existing_entry = v
+                break
+        if existing_entry is not None:
+                if self.rewrite_metadata:
+                    print(f"  ! 版本 {self.version} 已存在，--rewrite-metadata 将覆盖其元数据。")
+                else:
                     raise ValueError(
                         f"版本 {self.version} 已存在于 releases.json 中。"
-                        f"禁止覆盖已发布版本。"
+                        f"禁止覆盖已发布版本。如需覆盖，请使用 --rewrite-metadata。"
                     )
 
-        # 构建新条目（插入到头部）
+        # 构建新条目（如已存在则替换，否则插入到头部）
         release_date = datetime.now(timezone.utc).astimezone().isoformat()
 
         # 从 git 获取真实 commit ID，而非 version.json 中的静态值
@@ -493,30 +567,409 @@ class ReleaseManager:
             ],
         }
 
-        existing["versions"].insert(0, entry)
+        if existing_entry is not None and self.rewrite_metadata:
+            # 原地替换已有条目
+            idx = existing["versions"].index(existing_entry)
+            existing["versions"][idx] = entry
+        else:
+            existing["versions"].insert(0, entry)
         existing["latest"] = self.version
 
-        # 上传（使用 ETag 条件写入，防止并发覆盖）
+        # 上传
         data = json.dumps(existing, ensure_ascii=False, indent=2).encode("utf-8")
         headers = {"Content-Type": "application/json"}
-        if etag:
-            headers["If-Match"] = etag
+
+        bucket.put_object(index_key, data, headers=headers)
+        print(f"  ✓ {index_key} (latest: {self.version})")
+
+    def _save_oss_manifest(self, vpk_artifacts: list[dict],
+                           release_notes: str) -> None:
+        """保存本次上传的 OSS 文件清单（供 --retransmit 使用）。"""
+        prefix = f"releases/{self.version}"
+        manifest: dict[str, object] = {
+            "version": self.version,
+            "releaseNotes": release_notes.strip(),
+            "files": [],
+        }
+        files: list[dict] = manifest["files"]  # type: ignore[assignment]
+
+        # RELEASE.md
+        files.append({
+            "key": f"{prefix}/RELEASE.md",
+            "type": "text",
+        })
+
+        # 安装包 + 更新包
+        for a in vpk_artifacts:
+            if self._is_installer(a["fileName"]):
+                key = f"{prefix}/{a['fileName']}"
+                ftype = "binary"
+            else:
+                key = f"updates/{a['fileName']}"
+                name = a["fileName"].lower()
+                # 通道元数据标记为 text，retransmit 时比对 SHA
+                ftype = "text" if (
+                    name.startswith("releases.") or name.startswith("releases-")
+                ) else "binary"
+            files.append({
+                "key": key,
+                "type": ftype,
+                "localPath": a["localPath"],
+            })
+
+        # releases.json 索引
+        files.append({
+            "key": "releases/releases.json",
+            "type": "text",
+        })
+
+        manifest_path = self.version_dist_dir / ".oss_manifest.json"
+        write_json(manifest_path, manifest)
+        print(f"  ✓ OSS manifest → {manifest_path.relative_to(self.root)}")
+
+    def retransmit_to_oss(self) -> None:
+        """检查 OSS 上各文件状态，自动补传缺失或内容错误者。
+
+        优先读取 .oss_manifest.json；若不存在则扫描本地产物目录重建文件清单。
+
+        校验策略：
+        - .exe / .nupkg → HEAD 检查是否存在；本地缺失则跳过
+        - .json / .md   → GET 下载后与本地内容比对
+        """
+        manifest_path = self.version_dist_dir / ".oss_manifest.json"
+        if manifest_path.exists():
+            manifest = read_json(manifest_path)
+            print(f"[retransmit] 从 manifest 加载: {manifest_path.relative_to(self.root)}")
+        else:
+            print("[retransmit] manifest 不存在，从本地产物目录扫描...")
+            manifest = self._scan_local_manifest()
+
+        oss_cfg = self.config["oss"]
+        auth = oss2.Auth(oss_cfg["accessKeyId"], oss_cfg["accessKeySecret"])
+        bucket = oss2.Bucket(auth, oss_cfg["endpoint"], oss_cfg["bucket"])
+
+        # 预加载本地参照物
+        local_release_md = self.release_md_path.read_text(encoding="utf-8").strip()
+        local_release_sha = hashlib.sha256(local_release_md.encode("utf-8")).hexdigest()
+
+        # 构建预期的 releases.json（从 manifest/files 重建 vpk 信息）
+        vpk_artifacts = self._rebuild_vpk_from_manifest(manifest)
+
+        expected_index = self._build_releases_index(bucket, vpk_artifacts,
+                                                     manifest.get("releaseNotes", ""))
+        expected_index_str = json.dumps(expected_index, ensure_ascii=False, indent=2)
+
+        files: list[dict] = manifest.get("files", [])
+
+        # --rewrite-metadata: 确保通道元数据文件在清单中
+        if self.rewrite_metadata:
+            known_keys = {f["key"] for f in files}
+            for r in RIDS:
+                rid = r["rid"]
+                for tmpl in (f"updates/releases.{rid}.json", f"updates/RELEASES-{rid}"):
+                    if tmpl not in known_keys:
+                        # 尝试找本地文件
+                        local_file = self.version_dist_dir / f"velopack_{rid}" / tmpl.split("/")[-1]
+                        if local_file.exists():
+                            files.append({
+                                "key": tmpl,
+                                "type": "text",
+                                "localPath": str(local_file),
+                            })
+                            print(f"  + 补充清单  text   | {tmpl}")
+
+        total = len(files)
+        missing: list[dict] = []
+        mismatch: list[dict] = []
+        ok_count = 0
+        skipped_count = 0
+
+        print(f"\n[OSS 校验] 共 {total} 个文件，正在逐项检查...\n")
+
+        for f in files:
+            key: str = f["key"]
+            ftype: str = f["type"]
+            label = f"{ftype:6s} | {key}"
+
+            if ftype == "binary":
+                local_path = f.get("localPath", "")
+                if not local_path or not Path(local_path).exists():
+                    print(f"  - 本地缺失   {label}")
+                    skipped_count += 1
+                    continue
+
+                if bucket.object_exists(key):
+                    print(f"  ✓           {label}")
+                    ok_count += 1
+                else:
+                    print(f"  ✗ 远端缺失  {label}")
+                    missing.append(f)
+
+            elif ftype == "text":
+                is_channel = key.startswith("updates/") and (
+                    key.endswith(".json") or key.startswith("updates/RELEASES-")
+                )
+                # --rewrite-metadata: 通道元数据强制重传
+                if is_channel and self.rewrite_metadata:
+                    print(f"  ⚠ 强制重传   {label}")
+                    mismatch.append(f)
+                    continue
+
+                try:
+                    result = bucket.get_object(key)
+                    remote_data = result.read()
+                    remote_sha = hashlib.sha256(remote_data).hexdigest()
+
+                    if key.endswith("RELEASE.md"):
+                        local_sha = local_release_sha
+                    elif key.endswith("releases.json") and not key.startswith("updates/"):
+                        local_sha = hashlib.sha256(
+                            expected_index_str.encode("utf-8")).hexdigest()
+                    elif is_channel:
+                        # Velopack 频道文件：本地存在则重算 SHA
+                        local_path = f.get("localPath", "")
+                        if local_path and Path(local_path).exists():
+                            local_sha = sha256_file(Path(local_path))
+                        else:
+                            local_sha = None
+                    else:
+                        local_sha = None
+
+                    if local_sha and remote_sha == local_sha:
+                        print(f"  ✓           {label}")
+                        ok_count += 1
+                    else:
+                        print(f"  ⚠ 内容差异  {label}")
+                        mismatch.append(f)
+
+                except oss2.exceptions.NoSuchKey:
+                    print(f"  ✗ 远端缺失  {label}")
+                    missing.append(f)
+                except Exception as e:
+                    print(f"  ✗ 检查失败  {label}  — {e}")
+
+        # ── 汇总 ──
+        print(f"\n{'─' * 50}")
+        parts = [f"✓ {ok_count}"]
+        if missing:
+            parts.append(f"✗ 缺失 {len(missing)}")
+        if mismatch:
+            parts.append(f"⚠ 差异 {len(mismatch)}")
+        if skipped_count:
+            parts.append(f"- 跳过 {skipped_count}")
+        print(f"  校验完成: {'  '.join(parts)}")
+
+        if not missing and not mismatch:
+            print("  所有文件已就绪，无需重传。")
+            return
+
+        # ── 补传缺失文件 ──
+        if missing:
+            print(f"\n[补传] 缺失文件 ({len(missing)} 个)...")
+            for f in missing:
+                key = f["key"]
+                ftype = f["type"]
+                try:
+                    if ftype == "binary":
+                        local_path = f.get("localPath", "")
+                        if not local_path:
+                            continue
+                        bucket.put_object_from_file(key, local_path)
+                        print(f"  ✓ {key}  (from {Path(local_path).name})")
+                    elif ftype == "text":
+                        if key.endswith("RELEASE.md"):
+                            data = local_release_md.encode("utf-8")
+                            ct = "text/markdown"
+                        elif key.endswith("releases.json"):
+                            data = expected_index_str.encode("utf-8")
+                            ct = "application/json"
+                        else:
+                            continue
+                        bucket.put_object(key, data, headers={"Content-Type": ct})
+                        print(f"  ✓ {key}")
+                except Exception as e:
+                    print(f"  ✗ 补传失败: {key} — {e}")
+
+        # ── 修复内容差异 ──
+        if mismatch:
+            print(f"\n[修复] 内容差异 ({len(mismatch)} 个)...")
+            for f in mismatch:
+                key = f["key"]
+                try:
+                    if key.endswith("RELEASE.md"):
+                        data = local_release_md.encode("utf-8")
+                        ct = "text/markdown"
+                    elif key.endswith("releases.json"):
+                        data = expected_index_str.encode("utf-8")
+                        ct = "application/json"
+                    else:
+                        continue
+                    bucket.put_object(key, data, headers={"Content-Type": ct})
+                    print(f"  ✓ {key}")
+                except Exception as e:
+                    print(f"  ✗ 修复失败: {key} — {e}")
+
+        # ── 如果 releases.json 需要重建 ──
+        if any(f["key"] == "releases/releases.json" for f in missing + mismatch):
+            print("\n[修复] 重建 releases.json 索引...")
+            self._update_releases_index(bucket, vpk_artifacts,
+                                        manifest.get("releaseNotes", ""))
+
+        print("\n  OSS 重传完成。")
+
+    def _scan_local_manifest(self) -> dict:
+        """扫描本地产物目录，重建 OSS 文件清单（无需事先 manifest）。"""
+        files: list[dict] = []
+        prefix = f"releases/{self.version}"
+        ver_dir = self.version_dist_dir
+
+        if not ver_dir.exists():
+            raise FileNotFoundError(
+                f"产物目录不存在: {ver_dir}\n"
+                f"请先运行构建流程 (dotnet publish + vpk pack)。"
+            )
+
+        # 扫描所有产物文件（递归，跳过 .tmp_* 临时目录）
+        for path in ver_dir.rglob("*"):
+            if not path.is_file() or ".tmp_" in str(path):
+                continue
+            name = path.name.lower()
+            rel = path.relative_to(ver_dir)
+
+            # Velopack 频道元数据
+            if (name.startswith("releases.") and name.endswith(".json")) \
+               or name.startswith("releases-"):
+                files.append({
+                    "key": f"updates/{path.name}",
+                    "type": "text",
+                    "localPath": str(path),
+                })
+            # 安装程序
+            elif name.endswith((".exe", ".appimage", ".pkg", ".dmg")):
+                files.append({
+                    "key": f"{prefix}/{path.name}",
+                    "type": "binary",
+                    "localPath": str(path),
+                })
+            # 更新包
+            elif name.endswith(".nupkg"):
+                files.append({
+                    "key": f"updates/{path.name}",
+                    "type": "binary",
+                    "localPath": str(path),
+                })
+
+        # 文本类文件
+        files.append({"key": f"{prefix}/RELEASE.md", "type": "text"})
+        files.append({"key": "releases/releases.json", "type": "text"})
+
+        # 读入 RELEASE.md 作为 releaseNotes
+        release_notes = ""
+        if self.release_md_path.exists():
+            release_notes = self.release_md_path.read_text(encoding="utf-8").strip()
+
+        return {"version": self.version, "releaseNotes": release_notes, "files": files}
+
+    @staticmethod
+    def _rebuild_vpk_from_manifest(manifest: dict) -> list[dict]:
+        """从 manifest 重建 vpk_artifacts（用于 releases.json 条目构建）。"""
+        files: list[dict] = manifest.get("files", [])
+        vpk: list[dict] = []
+        for f in files:
+            if f["type"] != "binary":
+                continue
+            fname = f["key"].rsplit("/", 1)[-1]
+            local_path = f.get("localPath", "")
+            sha = ""
+            size = 0
+            if local_path:
+                lp = Path(local_path)
+                if lp.exists():
+                    sha = sha256_file(lp)
+                    size = lp.stat().st_size
+            # 推断平台
+            platform = ""
+            for rid_info in RIDS:
+                if rid_info["rid"].replace("-", "") in fname.lower().replace("-", ""):
+                    platform = rid_info["platform"]
+                    break
+            vpk.append({
+                "fileName": fname,
+                "localPath": local_path,
+                "platform": platform,
+                "size": size,
+                "sha256": sha,
+            })
+        return vpk
+
+    def _build_releases_index(self, bucket, vpk_artifacts: list[dict],
+                              release_notes: str) -> dict:
+        """仅构建 releases.json 内容（不上传），供重传校验使用。"""
+        index_key = "releases/releases.json"
+        existing: dict = {"latest": self.version, "versions": []}
 
         try:
-            bucket.put_object(index_key, data, headers=headers)
-            print(f"  ✓ {index_key} (latest: {self.version})")
-        except Exception as e:
-            # oss2 412 PreconditionFailed → ETag 不匹配（并发写入冲突）
-            if etag and getattr(e, "status", None) == 412:
-                raise RuntimeError(
-                    f"并发冲突: releases.json 已被其他进程修改。"
-                    f"请重新运行发布脚本。"
-                ) from e
-            raise
+            result = bucket.get_object(index_key)
+            existing = json.loads(result.read())
+        except Exception:
+            pass
+
+        # 检查版本是否已存在
+        existing_entry = None
+        for v in existing.get("versions", []):
+            if v["version"] == self.version:
+                existing_entry = v
+                break
+
+        # 非 rewrite 模式下，版本已存在则直接返回（幂等）
+        if existing_entry is not None and not self.rewrite_metadata:
+            return existing
+
+        # 构建新条目（与 _update_releases_index 一致的逻辑）
+        release_date = datetime.now(timezone.utc).astimezone().isoformat()
+        commit_id = self._get_git_commit_id()
+
+        entry = {
+            "version": self.version,
+            "commitId": commit_id,
+            "releaseDate": release_date,
+            "notes": release_notes.strip(),
+            "files": [],
+        }
+
+        # 将 vpk_artifacts 转回文件列表
+        for f in vpk_artifacts:
+            entry["files"].append({
+                "platform": f.get("platform", ""),
+                "fileName": f["fileName"],
+                "size": f.get("size", 0),
+                "sha256": f.get("sha256", ""),
+            })
+
+        if existing_entry is not None and self.rewrite_metadata:
+            idx = existing["versions"].index(existing_entry)
+            existing["versions"][idx] = entry
+        else:
+            existing["versions"].insert(0, entry)
+        existing["latest"] = self.version
+
+        # 重新计算 size/sha256 — 从远端取真实值（如果存在）
+        for ef in entry["files"]:
+            fname = ef["fileName"]
+            if "/updates/" not in str(fname):
+                oss_key = f"releases/{self.version}/{fname}"
+            else:
+                oss_key = f"updates/{fname}"
+
+            # 找到对应的 vpk_artifact 获取 sha256
+            matched = [a for a in vpk_artifacts if a["fileName"] == fname]
+            if matched:
+                ef["sha256"] = matched[0].get("sha256", "")
+                ef["size"] = matched[0].get("size", 0)
+
+        return existing
 
     # ── 步骤 4: GitHub Release ────────────────
-
-    def create_github_release(self, vpk_artifacts: list[dict], release_notes: str) -> None:
         """通过 GitHub REST API 创建 Release，上传 zip/tar.gz + Velopack 产物。"""
         print("[5] 创建 GitHub Release...")
 
@@ -775,6 +1228,15 @@ class ReleaseManager:
         print(f"=== SeatFlow Release v{self.version} ===\n")
 
         try:
+            # Retransmit 模式 — 仅校验 OSS 文件完整性并补传
+            if self.retransmit:
+                if self.dry_run:
+                    print("[retransmit] dry-run 模式暂不支持，请直接运行。")
+                    return 0
+                self.retransmit_to_oss()
+                print(f"\n=== OSS 重传 v{self.version} 完成 ===")
+                return 0
+
             # [0] 确保在 main 分支
             if not self._check_main_branch():
                 return 1
@@ -807,9 +1269,12 @@ class ReleaseManager:
             release_notes = self.build_release_notes()
 
             if not vpk_artifacts and not self.skip_velopack:
-                print("[!] vpk 未产生任何产物，跳过远程发布。")
-                self.skip_oss = True
-                self.skip_github = True
+                if self.rewrite_metadata:
+                    print("[!] vpk 未产生产物，但 --rewrite-metadata 将继续上传通道元数据。")
+                else:
+                    print("[!] vpk 未产生任何产物，跳过远程发布。")
+                    self.skip_oss = True
+                    self.skip_github = True
 
             # [5] GitHub Release
             if self.skip_github:
@@ -825,6 +1290,12 @@ class ReleaseManager:
 
             # [7] Cloudflare Worker Secret
             self.rotate_worker_secrets()
+
+            # [8] 重组产物目录（上传完成后）
+            if vpk_artifacts:
+                self._organize_artifacts(vpk_artifacts)
+                # 重组后保存 manifest（路径已更新）
+                self._save_oss_manifest(vpk_artifacts, release_notes)
 
             print(f"\n=== Release v{self.version} 完成 ===")
 
@@ -874,6 +1345,46 @@ class ReleaseManager:
                 results[rid] = exe_path
         return results
 
+    # ── 步骤 8: 重组产物目录 ─────────────────
+
+    def _organize_artifacts(self, vpk_artifacts: list[dict]) -> None:
+        """上传完成后，将安装程序归档到 {rid}/installer/，文件名补齐版本号。"""
+        print("[8] 归档安装程序...")
+
+        if self.dry_run:
+            print("  [dry-run] 跳过归档。")
+            return
+
+        moved = 0
+        for r in RIDS:
+            rid = r["rid"]
+
+            rid_installers = [
+                a for a in vpk_artifacts
+                if a["rid"] == rid
+                and self._is_installer(a["fileName"])
+            ]
+            if not rid_installers:
+                continue
+
+            inst_dir = self.version_dist_dir / f"velopack_{rid}" / "installer"
+            inst_dir.mkdir(parents=True, exist_ok=True)
+
+            for a in rid_installers:
+                src = Path(a["localPath"])
+                if not src.exists():
+                    continue
+
+                dst_name = _versioned_name(src.name, self.version)
+                dst = inst_dir / dst_name
+                shutil.move(str(src), str(dst))
+                a["fileName"] = dst_name   # OSS / releases.json / manifest 全部用版本化名称
+                a["localPath"] = str(dst)
+                moved += 1
+                print(f"    {rid}/installer/{dst_name}")
+
+        print(f"  ✓ 已归档 {moved} 个安装程序")
+
     def _build_sha256_table(self, artifacts: list[dict]) -> str:
         """构建 SHA256 表格字符串。"""
         lines = ["| File | SHA256 |", "|------|--------|"]
@@ -907,6 +1418,10 @@ def main() -> int:
     parser.add_argument("--no-clean", action="store_true", help="禁用编译前 bin/obj 清理")
     parser.add_argument("--skip-oss", action="store_true", help="跳过阿里云 OSS 上传")
     parser.add_argument("--skip-github", action="store_true", help="跳过 GitHub Release 创建")
+    parser.add_argument("--retransmit", action="store_true",
+                        help="OSS 重传模式：检查各文件完整性，自动补传缺失或内容错误的文件")
+    parser.add_argument("--rewrite-metadata", action="store_true",
+                        help="允许覆盖 releases.json 中已存在的版本条目（默认禁止）")
 
     args = parser.parse_args()
 
@@ -923,6 +1438,8 @@ def main() -> int:
         clean=not args.no_clean,
         skip_oss=args.skip_oss,
         skip_github=args.skip_github,
+        retransmit=args.retransmit,
+        rewrite_metadata=args.rewrite_metadata,
     )
 
     return mgr.run()
