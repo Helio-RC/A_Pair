@@ -22,7 +22,7 @@ internal sealed class UpdateService : IUpdateService, IDisposable
     private readonly ILogger<UpdateService> _logger;
     private readonly HttpClient _httpClient;
 
-    private const string UpdateApiBase = "https://download.seatflow.work";
+    private const string UpdateApiBase = "https://download.seatflow.work/";
     private const string GitHubRepoUrl = "https://github.com/SeatFlow/SeatFlow";
 
     private UpdateInfo? _lastUpdateInfo;
@@ -49,7 +49,9 @@ internal sealed class UpdateService : IUpdateService, IDisposable
             BaseAddress = new Uri(UpdateApiBase),
             Timeout = TimeSpan.FromSeconds(10),
         };
-        _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("SeatFlow");
+        _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(
+            $"SeatFlow/{GetCurrentVersion()} ({RuntimeInformation.OSDescription})");
+        _httpClient.DefaultRequestHeaders.Accept.ParseAdd("application/json");
     }
 
     private static string GetChannel()
@@ -263,7 +265,7 @@ internal sealed class UpdateService : IUpdateService, IDisposable
 
     private UpdateManager CreateApiManager()
     {
-        var url = $"{UpdateApiBase}/updates/";
+        var url = $"{UpdateApiBase}updates/";
         var options = new UpdateOptions { ExplicitChannel = GetChannel() };
         _logger.LogDebug("创建 API UpdateManager: {Url}, Channel={Channel}", url, GetChannel());
         return new UpdateManager(url, options);
