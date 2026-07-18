@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Runtime.InteropServices;
@@ -322,8 +323,10 @@ internal sealed class UpdateService : IUpdateService, IDisposable
     private UpdateManager CreateApiManager()
     {
         var url = $"{UpdateApiBase}updates/";
+        var downloader = new LoggingFileDownloader(_logger);
+        var source = new SimpleWebSource(url, downloader);
         _logger.LogDebug("创建 API UpdateManager: {Url}", url);
-        return new UpdateManager(url);
+        return new UpdateManager(source);
     }
 
     /// <summary>
@@ -336,6 +339,76 @@ internal sealed class UpdateService : IUpdateService, IDisposable
         _logger.LogDebug("创建 GitHub UpdateManager: {Repo}", GitHubRepoUrl);
         return new UpdateManager(
             new GithubSource(GitHubRepoUrl, accessToken: null, prerelease: false));
+    }
+
+    // ── 日志下载器（用于调试 Velopack 内部 HTTP 请求）──
+
+    /// <summary>
+    /// 包装 <see cref="HttpClientFileDownloader"/>，将每次 HTTP 请求的
+    /// URL、状态码和响应内容前缀输出到 Debug 日志。
+    /// </summary>
+    private sealed class LoggingFileDownloader : HttpClientFileDownloader
+    {
+        private readonly ILogger _logger;
+
+        public LoggingFileDownloader(ILogger logger)
+        {
+            _logger = logger;
+        }
+
+        public override async Task<string> DownloadString(
+            string url, IDictionary<string, string>? headers, double timeout)
+        {
+            _logger.LogDebug("[Velopack] DownloadString: {Url}", url);
+            try
+            {
+                var result = await base.DownloadString(url, headers, timeout);
+                var preview = result.Length > 500 ? result[..500] + "..." : result;
+                _logger.LogDebug("[Velopack] DownloadString OK: {Url}, Length={Len}, Body={Body}",
+                    url, result.Length, preview);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[Velopack] DownloadString FAIL: {Url}", url);
+                throw;
+            }
+        }
+
+        public override async Task<byte[]> DownloadBytes(
+            string url, IDictionary<string, string>? headers, double timeout)
+        {
+            _logger.LogDebug("[Velopack] DownloadBytes: {Url}", url);
+            try
+            {
+                var result = await base.DownloadBytes(url, headers, timeout);
+                _logger.LogDebug("[Velopack] DownloadBytes OK: {Url}, Length={Len}", url, result.Length);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[Velopack] DownloadBytes FAIL: {Url}", url);
+                throw;
+            }
+        }
+
+        public override async Task DownloadFile(
+            string url, string targetFile, Action<int>? progress,
+            IDictionary<string, string>? headers, double timeout,
+            CancellationToken cancelToken)
+        {
+            _logger.LogDebug("[Velopack] DownloadFile: {Url} -> {File}", url, targetFile);
+            try
+            {
+                await base.DownloadFile(url, targetFile, progress!, headers, timeout, cancelToken);
+                _logger.LogDebug("[Velopack] DownloadFile OK: {Url}", url);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[Velopack] DownloadFile FAIL: {Url}", url);
+                throw;
+            }
+        }
     }
 
     public void Dispose()
