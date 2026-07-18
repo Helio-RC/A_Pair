@@ -130,7 +130,8 @@ class ReleaseManager:
                  skip_branch_check: bool = False,
                  clean: bool = True,
                  skip_oss: bool = False, skip_github: bool = False,
-                 retransmit: bool = False, rewrite_metadata: bool = False):
+                 retransmit: bool = False, rewrite_metadata: bool = False,
+                 rotate_worker_only: bool = False):
         self.root = root
         self.dry_run = dry_run
         self.skip_build = skip_build
@@ -141,6 +142,7 @@ class ReleaseManager:
         self.skip_github = skip_github
         self.retransmit = retransmit
         self.rewrite_metadata = rewrite_metadata
+        self.rotate_worker_only = rotate_worker_only
 
         # 路径
         self.version_json_path = root / "version.json"
@@ -1040,15 +1042,18 @@ class ReleaseManager:
 
     # ── 步骤 6: Cloudflare Worker Secret 轮换 ──
 
-    def rotate_worker_secrets(self) -> bool:
+    def rotate_worker_secrets(self, force: bool = False) -> bool:
         """将 Worker 专用 OSS 只读凭证通过 Cloudflare API 下发到 Worker Secret。
 
         Worker 凭证与上传用的 oss.accessKeyId/Secret 是不同的子账号密钥：
         Worker 仅需 OSS 只读权限（回源下载），上传主密钥拥有写权限，不能混用。
+
+        当 force=True 时跳过所有前置条件检查（供 --rotate-worker-secrets 专用模式使用）。
         """
-        if self.skip_oss and self.skip_github:
-            print("[7] Worker Secret 轮换  → 跳过 (远程已全部禁用)")
-            return False
+        if not force:
+            if self.skip_oss and self.skip_github:
+                print("[7] Worker Secret 轮换  → 跳过 (远程已全部禁用)")
+                return False
         if not self._has_cloudflare_config():
             print("[7] Worker Secret 轮换  → 跳过 (cloudflare 配置不完整)")
             return False
@@ -1228,6 +1233,15 @@ class ReleaseManager:
         print(f"=== SeatFlow Release v{self.version} ===\n")
 
         try:
+            # Worker Secret 轮换模式 — 仅推送密钥到 Cloudflare Worker
+            if self.rotate_worker_only:
+                if not self._has_cloudflare_config():
+                    print("错误: cloudflare 配置不完整（需 accountId/workerScript/apiToken）")
+                    return 1
+                ok = self.rotate_worker_secrets(force=True)
+                print(f"\n=== Worker Secret 轮换 {'完成' if ok else '失败'} ===")
+                return 0 if ok else 1
+
             # Retransmit 模式 — 仅校验 OSS 文件完整性并补传
             if self.retransmit:
                 if self.dry_run:
@@ -1422,6 +1436,8 @@ def main() -> int:
                         help="OSS 重传模式：检查各文件完整性，自动补传缺失或内容错误的文件")
     parser.add_argument("--rewrite-metadata", action="store_true",
                         help="允许覆盖 releases.json 中已存在的版本条目（默认禁止）")
+    parser.add_argument("--rotate-worker-secrets", action="store_true",
+                        help="仅推送 OSS 密钥到 Cloudflare Worker（跳过构建/打包/上传/发布）")
 
     args = parser.parse_args()
 
@@ -1440,6 +1456,7 @@ def main() -> int:
         skip_github=args.skip_github,
         retransmit=args.retransmit,
         rewrite_metadata=args.rewrite_metadata,
+        rotate_worker_only=args.rotate_worker_secrets,
     )
 
     return mgr.run()
