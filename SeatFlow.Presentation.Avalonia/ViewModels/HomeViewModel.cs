@@ -10,6 +10,7 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.Input;
 using SeatFlow.Presentation.Avalonia.Lang;
+using SeatFlow.Presentation.Avalonia.Services;
 using AvaloniaApplication = Avalonia.Application;
 
 namespace SeatFlow.Presentation.Avalonia.ViewModels;
@@ -30,7 +31,7 @@ public partial class HomeViewModel : ViewModelBase
     public string QuickStartUrl { get; }
     public string FaqUrl { get; }
 
-    public List<ReleaseLine> ReleaseSections { get; }
+    public List<Control> ReleaseControls { get; } = [];
 
     public HomeViewModel ()
     {
@@ -43,10 +44,9 @@ public partial class HomeViewModel : ViewModelBase
         if (avatarPath is not null)
         {
             try { UserAvatar = new Bitmap(avatarPath); }
-            catch { /* 加载失败则回退到首字符头像 */ }
+            catch { }
         }
 
-        // 问候语：时段 + 用户名 + 品牌欢迎语合并一行
         var hour = DateTime.Now.Hour;
         var template = hour switch
         {
@@ -64,14 +64,14 @@ public partial class HomeViewModel : ViewModelBase
         QuickStartUrl = data.QuickStartUrl;
         FaqUrl = data.FaqUrl;
 
-        ReleaseSections = LoadReleaseNotes();
+        ReleaseControls = LoadReleaseNotes();
     }
 
     // ═══════════════════════════════════════════════
-    //  RELEASE.md 嵌入资源读取 + 逐行解析
+    //  RELEASE.md 读取 + Markdig 渲染
     // ═══════════════════════════════════════════════
 
-    private static List<ReleaseLine> LoadReleaseNotes ()
+    private static List<Control> LoadReleaseNotes ()
     {
         var assembly = typeof(HomeViewModel).Assembly;
         const string resourceName = "SeatFlow.Presentation.Avalonia.Data.release.md";
@@ -80,67 +80,49 @@ public partial class HomeViewModel : ViewModelBase
         {
             using var stream = assembly.GetManifestResourceStream(resourceName);
             if (stream is null)
-                return [new ReleaseLine("RELEASE.md not found", ReleaseLineKind.Paragraph)];
+                return [];
 
             using var reader = new StreamReader(stream);
-            return ParseReleaseNotes(reader.ReadToEnd());
+            return MarkdownRenderer.Render(reader.ReadToEnd());
         }
         catch
         {
-            return [new ReleaseLine("无法加载发布说明", ReleaseLineKind.Paragraph)];
+            return [];
         }
-    }
-
-    private static List<ReleaseLine> ParseReleaseNotes (string markdown)
-    {
-        var lines = new List<ReleaseLine>();
-        foreach (var raw in markdown.Split('\n'))
-        {
-            var line = raw.TrimEnd();
-            var kind = Classify(line, out var text);
-            lines.Add(new ReleaseLine(text, kind));
-        }
-        return lines;
-    }
-
-    private static ReleaseLineKind Classify (string line, out string text)
-    {
-        if (line.Length == 0)
-        {
-            text = "";
-            return ReleaseLineKind.Empty;
-        }
-        if (line.StartsWith("### "))
-        {
-            text = line[4..];
-            return ReleaseLineKind.SubHeading;
-        }
-        if (line.StartsWith("## "))
-        {
-            text = line[3..];
-            return ReleaseLineKind.Heading;
-        }
-        if (line.StartsWith("# "))
-        {
-            text = line[2..];
-            return ReleaseLineKind.Title;
-        }
-        if (line.StartsWith("- "))
-        {
-            text = line[2..];
-            return ReleaseLineKind.ListItem;
-        }
-        text = line;
-        return ReleaseLineKind.Paragraph;
     }
 
     // ═══════════════════════════════════════════════
-    //  about.json 读取（复用现有模式）
+    //  打开链接
+    // ═══════════════════════════════════════════════
+
+    [RelayCommand]
+    private static async Task OpenUrl (string url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            return;
+
+        if (AvaloniaApplication.Current?.ApplicationLifetime is
+            global::Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
+            && desktop.MainWindow is { } mainWindow)
+        {
+            var launcher = TopLevel.GetTopLevel(mainWindow)?.Launcher;
+            if (launcher is not null)
+            {
+                await launcher.LaunchUriAsync(new Uri(url));
+                return;
+            }
+        }
+
+        Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+    }
+
+    // ═══════════════════════════════════════════════
+    //  about.json 读取
     // ═══════════════════════════════════════════════
 
     private static AboutPageData LoadAboutData ()
     {
-        var assembly = typeof(AboutViewModel).Assembly; // about.json 属于 About 页
+        var assembly = typeof(AboutViewModel).Assembly;
         const string resourceName = "SeatFlow.Presentation.Avalonia.Data.about.json";
         using var stream = assembly.GetManifestResourceStream(resourceName)
             ?? throw new InvalidDataException($"Embedded resource not found: {resourceName}");
@@ -246,31 +228,6 @@ public partial class HomeViewModel : ViewModelBase
     }
 
     // ═══════════════════════════════════════════════
-    //  打开链接
-    // ═══════════════════════════════════════════════
-
-    [RelayCommand]
-    private static async Task OpenUrl (string url)
-    {
-        if (string.IsNullOrWhiteSpace(url))
-            return;
-
-        if (AvaloniaApplication.Current?.ApplicationLifetime is
-            global::Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
-            && desktop.MainWindow is { } mainWindow)
-        {
-            var launcher = TopLevel.GetTopLevel(mainWindow)?.Launcher;
-            if (launcher is not null)
-            {
-                await launcher.LaunchUriAsync(new Uri(url));
-                return;
-            }
-        }
-
-        Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
-    }
-
-    // ═══════════════════════════════════════════════
     //  装饰 Unicode 首字符
     // ═══════════════════════════════════════════════
 
@@ -283,20 +240,4 @@ public partial class HomeViewModel : ViewModelBase
             _                  => c.ToString()
         };
     }
-}
-
-// ═══════════════════════════════════════════════
-//  发布说明行模型
-// ═══════════════════════════════════════════════
-
-public enum ReleaseLineKind { Title, Heading, SubHeading, ListItem, Paragraph, Empty }
-
-public record ReleaseLine (string Text, ReleaseLineKind Kind)
-{
-    public bool IsTitle      => Kind == ReleaseLineKind.Title;
-    public bool IsHeading    => Kind == ReleaseLineKind.Heading;
-    public bool IsSubHeading => Kind == ReleaseLineKind.SubHeading;
-    public bool IsListItem   => Kind == ReleaseLineKind.ListItem;
-    public bool IsParagraph  => Kind == ReleaseLineKind.Paragraph;
-    public bool IsEmpty      => Kind == ReleaseLineKind.Empty;
 }

@@ -22,8 +22,7 @@
     <EmbeddedResource Include="Data\about.json" />
     <EmbeddedResource Include="Data\page_navigation.json" />
     <EmbeddedResource Include="Data\onboarding_config.json" />
-    <EmbeddedResource Include="..\RELEASE.md"
-                      LogicalName="SeatFlow.Presentation.Avalonia.Data.release.md" />
+    <EmbeddedResource Include="..\RELEASE.md" LogicalName="SeatFlow.Presentation.Avalonia.Data.release.md" />
   </ItemGroup>
 
   <ItemGroup>
@@ -49,6 +48,7 @@
     </PackageReference>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="FluentIcons.Avalonia" Version="2.1.331" />
+    <PackageReference Include="Markdig" Version="1.3.2" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.9" />
     <PackageReference Include="Svg.Controls.Skia.Avalonia" Version="12.0.0.13" />
