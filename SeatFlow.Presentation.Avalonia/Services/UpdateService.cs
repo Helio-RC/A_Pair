@@ -52,6 +52,10 @@ internal sealed class UpdateService : IUpdateService, IDisposable
         _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(
             $"SeatFlow/{GetCurrentVersion()} ({RuntimeInformation.OSDescription})");
         _httpClient.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+
+        _logger.LogDebug(
+            "UpdateService 已初始化: BaseUrl={BaseUrl}, Channel={Channel}, Version={Version}, OS={OS}",
+            UpdateApiBase, GetChannel(), GetCurrentVersion(), RuntimeInformation.OSDescription);
     }
 
     private static string GetChannel()
@@ -81,21 +85,33 @@ internal sealed class UpdateService : IUpdateService, IDisposable
 
     public async Task<UpdateCheckResult> CheckForUpdatesAsync(CancellationToken ct = default)
     {
+        _logger.LogInformation("开始检查更新 (当前版本: {Version})", GetCurrentVersion());
+
         MetadataResponse? metadata = null;
         try
         {
             metadata = await FetchMetadataAsync(ct);
+            if (metadata is not null)
+            {
+                _logger.LogDebug(
+                    "元数据获取成功: IsFallback={IsFallback}, RecommendedSource={RecommendedSource}, IsChinaRegion={IsChinaRegion}, Message={Message}",
+                    metadata.IsFallback, metadata.RecommendedSource, metadata.IsChinaRegion, metadata.Message);
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "无法获取更新源元数据");
+            _logger.LogWarning(ex, "无法获取更新源元数据 (Type={ExceptionType})", ex.GetType().Name);
         }
 
         // 检测是否通过 Velopack 安装（首次调用的副作用：标记安装状态）
         if (!_isInstalled)
         {
             try { CheckInstalled(); }
-            catch { _isInstalled = false; }
+            catch (Exception ex)
+            {
+                _isInstalled = false;
+                _logger.LogDebug(ex, "Velopack 安装检测失败");
+            }
         }
 
         if (!_isInstalled)
@@ -128,6 +144,7 @@ internal sealed class UpdateService : IUpdateService, IDisposable
                 continue;
             }
 
+            _logger.LogDebug("尝试从源 {Source} 检查更新", sourceKey);
             try
             {
                 var manager = createManager();
@@ -159,17 +176,21 @@ internal sealed class UpdateService : IUpdateService, IDisposable
                         Message = metadata?.Message,
                     };
 
+                _logger.LogInformation(
+                    "源 {Source} 检查完成: HasUpdate={HasUpdate}, NewVersion={NewVersion}, Status={Status}",
+                    sourceKey, result.HasUpdate, result.NewVersion ?? "N/A", Status);
+
                 return result;
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "源 {Source} 检查更新失败，尝试下一个", sourceKey);
+                _logger.LogWarning(ex, "源 {Source} 检查更新失败 (Type={ExceptionType})", sourceKey, ex.GetType().Name);
                 lock (_updateLock)
                     _currentManager = null;
             }
         }
 
-        _logger.LogError("所有更新源均不可用");
+        _logger.LogError("所有更新源均不可用 (Channel={Channel})", GetChannel());
         Status = UpdateServiceStatus.Unavailable;
         return new UpdateCheckResult
         {
@@ -252,12 +273,47 @@ internal sealed class UpdateService : IUpdateService, IDisposable
 
     private async Task<MetadataResponse?> FetchMetadataAsync(CancellationToken ct)
     {
-        var response = await _httpClient.GetAsync("/updates/metadata", ct);
+        var requestUrl = "/updates/metadata";
+        _logger.LogDebug("请求元数据: URL={Url}", requestUrl);
+
+        HttpResponseMessage response;
+        try
+        {
+            response = await _httpClient.GetAsync(requestUrl, ct);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex,
+                "元数据 HTTP 请求失败: URL={Url}, StatusCode={StatusCode}, HResult=0x{HResult:X}",
+                requestUrl, ex.StatusCode, ex.HResult);
+            throw;
+        }
+
         if (!response.IsSuccessStatusCode)
         {
-            _logger.LogWarning("元数据端点返回 {StatusCode}", (int)response.StatusCode);
+            _logger.LogWarning(
+                "元数据端点返回 {StatusCode} ({ReasonPhrase}): URL={Url}, Server={Server}, ContentType={ContentType}",
+                (int)response.StatusCode, response.ReasonPhrase, requestUrl,
+                response.Headers.Server?.ToString() ?? "N/A",
+                response.Content.Headers.ContentType?.ToString() ?? "N/A");
+
+            // 403/5xx 时读取响应体（前 500 字符）帮助定位
+            if ((int)response.StatusCode is 403 or >= 500)
+            {
+                try
+                {
+                    var body = await response.Content.ReadAsStringAsync(ct);
+                    var truncated = body.Length > 500 ? body[..500] + "..." : body;
+                    _logger.LogWarning("元数据端点响应体 (前500字符): {Body}", truncated);
+                }
+                catch { /* 读取失败不影响主流程 */ }
+            }
+
             return null;
         }
+
+        _logger.LogDebug("元数据响应 200 OK: ContentType={ContentType}",
+            response.Content.Headers.ContentType?.ToString() ?? "N/A");
 
         return await response.Content.ReadFromJsonAsync(
             MetadataResponseJsonContext.Default.MetadataResponse, ct);
