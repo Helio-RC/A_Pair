@@ -322,9 +322,8 @@ internal sealed class UpdateService : IUpdateService, IDisposable
     private UpdateManager CreateApiManager()
     {
         var url = $"{UpdateApiBase}updates/";
-        var options = new UpdateOptions { ExplicitChannel = GetChannel() };
-        _logger.LogDebug("创建 API UpdateManager: {Url}, Channel={Channel}", url, GetChannel());
-        return new UpdateManager(url, options);
+        _logger.LogDebug("创建 API UpdateManager: {Url}", url);
+        return new UpdateManager(url);
     }
 
     /// <summary>
