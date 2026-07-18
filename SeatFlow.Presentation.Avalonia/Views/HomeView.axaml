@@ -10,44 +10,63 @@
     <vm:HomeViewModel />
   </Design.DataContext>
 
-  <Grid>
-    <!-- Atmospheric accent glow (top-right, very subtle) -->
-    <Border IsHitTestVisible="False" Opacity="0.03"
-            HorizontalAlignment="Right" VerticalAlignment="Top"
-            Width="320" Height="320" CornerRadius="160"
-            Margin="0,0,24,0">
-      <Border.Background>
-        <SolidColorBrush Color="{DynamicResource SystemAccentColor}" />
-      </Border.Background>
-    </Border>
-
+  <Grid Margin="48,48">
     <DockPanel>
-      <!-- Bottom: Version label (discreet) -->
-      <Border DockPanel.Dock="Bottom" HorizontalAlignment="Center" Margin="0,0,0,16">
+      <!-- Bottom-right: Version footnote -->
+      <Border DockPanel.Dock="Bottom" HorizontalAlignment="Right">
         <TextBlock Text="{Binding VersionLabel}" Classes="micro"
                    Foreground="{DynamicResource SystemControlForegroundBaseLowBrush}"
-                   Opacity="0.5" />
+                   Opacity="0.4" />
       </Border>
 
-      <!-- Center: Hero content -->
-      <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
+      <!-- Main content: left-aligned -->
+      <StackPanel VerticalAlignment="Center" Spacing="0">
+
+        <!-- Avatar + personalized greeting -->
+        <StackPanel Orientation="Horizontal" Spacing="16">
+          <!-- Real avatar image -->
+          <Border IsVisible="{Binding HasUserAvatar}"
+                  Width="48" Height="48" CornerRadius="24" ClipToBounds="True">
+            <Image Source="{Binding UserAvatar}" Width="48" Height="48"
+                   Stretch="UniformToFill" />
+          </Border>
+          <!-- Initial avatar fallback -->
+          <Border IsVisible="{Binding !HasUserAvatar}"
+                  Width="48" Height="48" CornerRadius="24"
+                  Background="{DynamicResource SystemAccentColor}"
+                  Opacity="0.18">
+            <TextBlock Text="{Binding UserInitialChar}" FontSize="22"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Foreground="{DynamicResource SystemAccentColor}" />
+          </Border>
+
+          <TextBlock Text="{Binding PersonalizedGreeting}"
+                     FontSize="24" FontWeight="SemiBold"
+                     VerticalAlignment="Center" />
+        </StackPanel>
+
+        <!-- Logo -->
         <svg:Svg Path="/Assets/icon_with_background.svg"
-                 Width="120" Height="120"
-                 HorizontalAlignment="Center"
-                 Stretch="Uniform" />
-        <TextBlock Text="{Binding TimeBasedGreeting}" Classes="bodySmall"
-                   HorizontalAlignment="Center"
-                   Foreground="{DynamicResource SystemAccentColor}"
-                   Margin="0,12,0,0" />
+                 Width="80" Height="80" Stretch="Uniform"
+                 Margin="0,32,0,0" />
+
+        <!-- Brand greeting -->
         <TextBlock Text="{Binding Greeting}" Classes="hero"
-                   HorizontalAlignment="Center" Margin="0,0,0,2" />
+                   Margin="0,24,0,0" />
+
+        <!-- Subtitle -->
         <TextBlock Text="{Binding Subtitle}" Classes="bodyLarge"
-                   HorizontalAlignment="Center"
-                   Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
-        <Separator Width="80" Margin="0,10,0,6" Opacity="0.4" />
+                   Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                   Margin="0,4,0,0" />
+
+        <!-- Accent divider -->
+        <Border Width="60" Height="1" Margin="0,20,0,0" Opacity="0.5"
+                Background="{DynamicResource SystemAccentColor}" />
+
+        <!-- Hint -->
         <TextBlock Text="{x:Static lang:Resources.Home_Hint}" Classes="caption"
-                   HorizontalAlignment="Center"
-                   Foreground="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+                   Foreground="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                   Margin="0,8,0,0" />
       </StackPanel>
     </DockPanel>
   </Grid>

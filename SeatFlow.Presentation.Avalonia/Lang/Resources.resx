@@ -222,13 +222,13 @@
     <value>选择数据</value>
   </data>
   <data name="Home_Greeting_Afternoon" xml:space="preserve">
-    <value>下午好</value>
+    <value>下午好，{0}</value>
   </data>
   <data name="Home_Greeting_Evening" xml:space="preserve">
-    <value>晚上好</value>
+    <value>晚上好，{0}</value>
   </data>
   <data name="Home_Greeting_Morning" xml:space="preserve">
-    <value>早上好</value>
+    <value>早上好，{0}</value>
   </data>
   <data name="Home_Version" xml:space="preserve">
     <value>版本 {0}</value>

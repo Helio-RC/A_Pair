@@ -222,13 +222,13 @@
     <value>Select Data</value>
   </data>
   <data name="Home_Greeting_Afternoon" xml:space="preserve">
-    <value>Good afternoon</value>
+    <value>Good afternoon, {0}</value>
   </data>
   <data name="Home_Greeting_Evening" xml:space="preserve">
-    <value>Good evening</value>
+    <value>Good evening, {0}</value>
   </data>
   <data name="Home_Greeting_Morning" xml:space="preserve">
-    <value>Good morning</value>
+    <value>Good morning, {0}</value>
   </data>
   <data name="Home_Version" xml:space="preserve">
     <value>Version {0}</value>
