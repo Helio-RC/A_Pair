@@ -31,7 +31,7 @@ public partial class HomeViewModel : ViewModelBase
     public string QuickStartUrl { get; }
     public string FaqUrl { get; }
 
-    public List<Control> ReleaseControls { get; } = [];
+    public List<MdBlock> ReleaseBlocks { get; } = [];
 
     public HomeViewModel ()
     {
@@ -64,14 +64,14 @@ public partial class HomeViewModel : ViewModelBase
         QuickStartUrl = data.QuickStartUrl;
         FaqUrl = data.FaqUrl;
 
-        ReleaseControls = LoadReleaseNotes();
+        ReleaseBlocks = LoadReleaseNotes();
     }
 
     // ═══════════════════════════════════════════════
     //  RELEASE.md 读取 + Markdig 渲染
     // ═══════════════════════════════════════════════
 
-    private static List<Control> LoadReleaseNotes ()
+    private static List<MdBlock> LoadReleaseNotes ()
     {
         var assembly = typeof(HomeViewModel).Assembly;
         const string resourceName = "SeatFlow.Presentation.Avalonia.Data.release.md";
