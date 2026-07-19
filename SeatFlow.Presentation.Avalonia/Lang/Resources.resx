@@ -1221,11 +1221,35 @@
   <data name="Settings_LoadFailed" xml:space="preserve">
     <value>加载设置失败，将使用默认值</value>
   </data>
+  <data name="Settings_LogLevel" xml:space="preserve">
+    <value>日志级别</value>
+  </data>
+  <data name="Settings_LogLevelHint" xml:space="preserve">
+    <value>更详细的日志有助于排查问题，但会增加磁盘占用</value>
+  </data>
+  <data name="Settings_LogLevel_Debug" xml:space="preserve">
+    <value>调试</value>
+  </data>
+  <data name="Settings_LogLevel_Error" xml:space="preserve">
+    <value>错误</value>
+  </data>
+  <data name="Settings_LogLevel_Info" xml:space="preserve">
+    <value>信息</value>
+  </data>
+  <data name="Settings_LogLevel_Warning" xml:space="preserve">
+    <value>警告</value>
+  </data>
+  <data name="Settings_Logging" xml:space="preserve">
+    <value>日志</value>
+  </data>
   <data name="Settings_OpenDataDir" xml:space="preserve">
     <value>打开当前数据目录</value>
   </data>
   <data name="Settings_OpenDirFailed" xml:space="preserve">
     <value>打开目录失败</value>
+  </data>
+  <data name="Settings_Privacy" xml:space="preserve">
+    <value>隐私</value>
   </data>
   <data name="Settings_ResetConfirm" xml:space="preserve">
     <value>确定要恢复所有设置为默认值吗？</value>
@@ -1254,6 +1278,12 @@
   <data name="Settings_Storage" xml:space="preserve">
     <value>存储</value>
   </data>
+  <data name="Settings_SuppressEnvWarning" xml:space="preserve">
+    <value>不再显示运行环境警告</value>
+  </data>
+  <data name="Settings_SuppressEnvWarningHint" xml:space="preserve">
+    <value>环境不满足最低要求时不再弹出警告对话框</value>
+  </data>
   <data name="Settings_Telemetry" xml:space="preserve">
     <value>遥测</value>
   </data>
@@ -1268,6 +1298,9 @@
   </data>
   <data name="Settings_Title" xml:space="preserve">
     <value>设置</value>
+  </data>
+  <data name="Settings_Tools" xml:space="preserve">
+    <value>工具</value>
   </data>
   <data name="Settings_Update" xml:space="preserve">
     <value>更新</value>

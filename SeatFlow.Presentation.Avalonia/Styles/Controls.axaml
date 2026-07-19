@@ -20,6 +20,23 @@
     <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundListLowBrush}" />
   </Style>
 
+  <!-- ═══ 设置卡片 ═══ -->
+
+  <Style Selector="Border.settingsCard">
+    <Setter Property="Background" Value="{DynamicResource SurfaceCardBrush}" />
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="BoxShadow" Value="{DynamicResource CardShadowSmall}" />
+    <Setter Property="Padding" Value="20" />
+  </Style>
+
+  <!-- 卡片内部设置行（轻量分隔线） -->
+
+  <Style Selector="Border.settingRowInner">
+    <Setter Property="Padding" Value="0,10" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+    <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundChromeHighBrush}" />
+  </Style>
+
   <!-- ═══ 链接按钮 ═══ -->
 
   <Style Selector="Button.linkButton">

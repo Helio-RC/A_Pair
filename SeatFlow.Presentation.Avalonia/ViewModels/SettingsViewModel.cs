@@ -87,6 +87,19 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     public partial bool TelemetryEnabled { get; set; }
 
+    [ObservableProperty]
+    public partial bool SuppressEnvironmentWarning { get; set; }
+
+    [ObservableProperty]
+    public partial int LogLevelIndex { get; set; } = 1;
+    public List<string> LogLevelOptions { get; } =
+    [
+        Resources.Settings_LogLevel_Debug,
+        Resources.Settings_LogLevel_Info,
+        Resources.Settings_LogLevel_Warning,
+        Resources.Settings_LogLevel_Error
+    ];
+
     // ---- 更新相关属性 ----
 
     [ObservableProperty]
@@ -148,6 +161,10 @@ public partial class SettingsViewModel : ViewModelBase
 
             TelemetryEnabled = settings.Telemetry.Enabled;
 
+            SuppressEnvironmentWarning = settings.SuppressEnvironmentWarning;
+            var logLevel = settings.Logging.MinimumLevel;
+            LogLevelIndex = logLevel switch { "Debug" => 0 , "Warning" => 2 , "Error" => 3 , _ => 1 };
+
             // 检查是否有已下载但未应用的更新
             RefreshPendingUpdateState();
 
@@ -192,6 +209,8 @@ public partial class SettingsViewModel : ViewModelBase
         _defaultZoomLevel = zoom;
     }
 
+    partial void OnLogLevelIndexChanged (int value) { }
+
     [RelayCommand]
     private async Task SaveSettingsAsync (CancellationToken ct)
     {
@@ -210,6 +229,8 @@ public partial class SettingsViewModel : ViewModelBase
             settings.DefaultZoomLevel = _defaultZoomLevel;
             settings.MaxSnapshotsPerVenue = MaxSnapshotsPerVenue;
             settings.Telemetry.Enabled = TelemetryEnabled;
+            settings.SuppressEnvironmentWarning = SuppressEnvironmentWarning;
+            settings.Logging.MinimumLevel = LogLevelIndex switch { 0 => "Debug", 2 => "Warning", 3 => "Error", _ => "Information" };
 
             await _facade.SaveAppSettingsAsync(settings , ct);
 
@@ -259,6 +280,8 @@ public partial class SettingsViewModel : ViewModelBase
         DataDirectory = string.Empty;
         ConfirmBeforeClear = true;
         ZoomIndex = 1;
+        SuppressEnvironmentWarning = false;
+        LogLevelIndex = 1;
         StatusMessage = Resources.Settings_ResetDone;
     }
 
