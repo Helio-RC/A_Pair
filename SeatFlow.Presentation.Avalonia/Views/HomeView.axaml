@@ -70,8 +70,10 @@
         </StackPanel>
 
         <!-- ═══ Row 3: RELEASE.md Card ═══ -->
-        <Border Classes="surfaceCard elevationSm radiusMd"
-                Padding="20" Margin="0,24,0,0">
+        <Border Classes="surfaceCard elevationMd radiusMd"
+                Padding="20" Margin="0,24,0,0"
+                BorderBrush="{DynamicResource SystemControlForegroundChromeHighBrush}"
+                BorderThickness="1">
           <ItemsControl ItemsSource="{Binding ReleaseBlocks}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="services:MdBlock">
