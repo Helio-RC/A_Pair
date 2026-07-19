@@ -349,6 +349,16 @@ class ReleaseManager:
             if self.release_md_path.exists():
                 cmd.extend(["--releaseNotes", str(self.release_md_path)])
 
+            # 安装包图标
+            if directive == "[win]":
+                icon = self.root / "Assets" / "installer.ico"
+                if icon.exists():
+                    cmd.extend(["--icon", str(icon)])
+            elif directive == "[linux]":
+                icon = self.root / "Assets" / "SF_icon_mini_background.png"
+                if icon.exists():
+                    cmd.extend(["--icon", str(icon)])
+
             # Windows: 不生成 portable zip
             if directive == "[win]":
                 cmd.append("--noPortable")
