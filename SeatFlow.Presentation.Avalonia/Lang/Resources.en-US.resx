@@ -1165,6 +1165,21 @@ Place plugins in the Plugins directory</value>
   <data name="Settings_Appearance" xml:space="preserve">
     <value>Appearance</value>
   </data>
+  <data name="Settings_AutoUpdate" xml:space="preserve">
+    <value>Auto Update</value>
+  </data>
+  <data name="Settings_AutoUpdateHint" xml:space="preserve">
+    <value>Automatically check for updates at startup. &quot;Check Only&quot; notifies without downloading, &quot;Auto Update&quot; prompts to download.</value>
+  </data>
+  <data name="Settings_AutoUpdate_Auto" xml:space="preserve">
+    <value>Auto Update</value>
+  </data>
+  <data name="Settings_AutoUpdate_CheckOnly" xml:space="preserve">
+    <value>Check Only</value>
+  </data>
+  <data name="Settings_AutoUpdate_Off" xml:space="preserve">
+    <value>Off</value>
+  </data>
   <data name="Settings_Behavior" xml:space="preserve">
     <value>Behavior</value>
   </data>
@@ -1721,6 +1736,24 @@ You can disable telemetry at any time on the Settings page.</value>
   </data>
   <data name="Theme_System" xml:space="preserve">
     <value>System</value>
+  </data>
+  <data name="Update_DownloadLater" xml:space="preserve">
+    <value>Later</value>
+  </data>
+  <data name="Update_InstallAndRestart" xml:space="preserve">
+    <value>Install &amp; Restart</value>
+  </data>
+  <data name="Update_NewVersionTitle" xml:space="preserve">
+    <value>New Version {0} Available</value>
+  </data>
+  <data name="Update_NoReleaseNotes" xml:space="preserve">
+    <value>No release notes available</value>
+  </data>
+  <data name="Update_ReleaseNotes" xml:space="preserve">
+    <value>Release Notes</value>
+  </data>
+  <data name="Update_UpdateNow" xml:space="preserve">
+    <value>Update Now</value>
   </data>
   <data name="Venue_AddDoor" xml:space="preserve">
     <value>Add door</value>

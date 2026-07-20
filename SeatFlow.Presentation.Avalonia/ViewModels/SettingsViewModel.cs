@@ -30,6 +30,7 @@ public partial class SettingsViewModel : ViewModelBase
     private readonly IFileService _fileService;
     private readonly ITelemetryService _telemetry;
     private readonly IUpdateService _updateService;
+    private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<SettingsViewModel> _logger;
 
     [ObservableProperty]
@@ -100,6 +101,21 @@ public partial class SettingsViewModel : ViewModelBase
         Resources.Settings_LogLevel_Error
     ];
 
+    // ---- 自动更新模式 ----
+
+    [ObservableProperty]
+    public partial AutoUpdateMode AutoUpdate { get; set; }
+
+    [ObservableProperty]
+    public partial int AutoUpdateIndex { get; set; }
+
+    public List<string> AutoUpdateOptions { get; } =
+    [
+        Resources.Settings_AutoUpdate_Off,
+        Resources.Settings_AutoUpdate_CheckOnly,
+        Resources.Settings_AutoUpdate_Auto,
+    ];
+
     // ---- 更新相关属性 ----
 
     [ObservableProperty]
@@ -124,7 +140,7 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     public partial bool HasPendingUpdate { get; set; }
 
-    public SettingsViewModel (IApplicationFacade facade , IDialogService dialog , IOnboardingService onboarding , IFileService fileService , ITelemetryService telemetry , IUpdateService updateService , ILogger<SettingsViewModel>? logger = null)
+    public SettingsViewModel (IApplicationFacade facade , IDialogService dialog , IOnboardingService onboarding , IFileService fileService , ITelemetryService telemetry , IUpdateService updateService , IServiceProvider serviceProvider , ILogger<SettingsViewModel>? logger = null)
     {
         _facade = facade;
         _dialog = dialog;
@@ -132,6 +148,7 @@ public partial class SettingsViewModel : ViewModelBase
         _fileService = fileService;
         _telemetry = telemetry;
         _updateService = updateService;
+        _serviceProvider = serviceProvider;
         _logger = logger ?? NullLogger<SettingsViewModel>.Instance;
         _ = LoadAsync(CancellationToken.None);
     }
@@ -164,6 +181,15 @@ public partial class SettingsViewModel : ViewModelBase
             SuppressEnvironmentWarning = settings.SuppressEnvironmentWarning;
             var logLevel = settings.Logging.MinimumLevel;
             LogLevelIndex = logLevel switch { "Debug" => 0 , "Warning" => 2 , "Error" => 3 , _ => 1 };
+
+            AutoUpdate = settings.AutoUpdate;
+            AutoUpdateIndex = AutoUpdate switch
+            {
+                AutoUpdateMode.Off => 0,
+                AutoUpdateMode.CheckOnly => 1,
+                AutoUpdateMode.AutoUpdate => 2,
+                _ => 1,
+            };
 
             // 检查是否有已下载但未应用的更新
             RefreshPendingUpdateState();
@@ -211,6 +237,17 @@ public partial class SettingsViewModel : ViewModelBase
 
     partial void OnLogLevelIndexChanged (int value) { }
 
+    partial void OnAutoUpdateIndexChanged (int value)
+    {
+        AutoUpdate = value switch
+        {
+            0 => AutoUpdateMode.Off,
+            1 => AutoUpdateMode.CheckOnly,
+            2 => AutoUpdateMode.AutoUpdate,
+            _ => AutoUpdateMode.CheckOnly,
+        };
+    }
+
     [RelayCommand]
     private async Task SaveSettingsAsync (CancellationToken ct)
     {
@@ -231,6 +268,7 @@ public partial class SettingsViewModel : ViewModelBase
             settings.Telemetry.Enabled = TelemetryEnabled;
             settings.SuppressEnvironmentWarning = SuppressEnvironmentWarning;
             settings.Logging.MinimumLevel = LogLevelIndex switch { 0 => "Debug", 2 => "Warning", 3 => "Error", _ => "Information" };
+            settings.AutoUpdate = AutoUpdate;
 
             await _facade.SaveAppSettingsAsync(settings , ct);
 
@@ -560,6 +598,9 @@ public partial class SettingsViewModel : ViewModelBase
                 IsUpdateAvailable = true;
                 UpdateVersionText = result.NewVersion;
                 UpdateStatusMessage = string.Format(Resources.Settings_UpdateAvailable, result.NewVersion ?? "");
+
+                // 弹出 release notes 对话框，让用户决定是否下载更新
+                await ShowUpdateDialogAsync(result.NewVersion!);
             }
             else if (result.ServiceStatus != UpdateServiceStatus.Fallback)
             {
@@ -574,6 +615,39 @@ public partial class SettingsViewModel : ViewModelBase
         finally
         {
             IsCheckingUpdate = false;
+        }
+    }
+
+    /// <summary>
+    /// 弹出发布说明对话框，让用户决定是否下载/安装更新。
+    /// </summary>
+    private async Task ShowUpdateDialogAsync (string newVersion)
+    {
+        try
+        {
+            if (AvaloniaApplication.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop)
+                return;
+            if (desktop.MainWindow is not { } mainWindow)
+                return;
+
+            var dialog = await Views.UpdateDialogWindow.CreateAsync(
+                _serviceProvider, newVersion, allowDownload: true);
+
+            await dialog.ShowDialog<bool>(mainWindow);
+
+            if (dialog.Confirmed)
+            {
+                _updateService.ApplyUpdatesAndRestart();
+            }
+            else if (dialog.Downloaded)
+            {
+                // 下载完成但用户选了"稍后再说"——刷新待重启状态
+                RefreshPendingUpdateState();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "发布说明对话框异常");
         }
     }
 

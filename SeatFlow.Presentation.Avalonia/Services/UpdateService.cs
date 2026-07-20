@@ -25,6 +25,7 @@ internal sealed class UpdateService : IUpdateService, IDisposable
 
     private const string UpdateApiBase = "https://download.seatflow.work/";
     private const string GitHubRepoUrl = "https://github.com/SeatFlow/SeatFlow";
+    private const string ReleaseNotesApiBase = "https://seatflow.work/api/app/releases/";
 
     private UpdateInfo? _lastUpdateInfo;
     private UpdateManager? _currentManager;
@@ -258,6 +259,44 @@ internal sealed class UpdateService : IUpdateService, IDisposable
         mgr.ApplyUpdatesAndRestart(info.TargetFullRelease);
     }
 
+    public async Task<string?> FetchReleaseNotesAsync(string? version = null, CancellationToken ct = default)
+    {
+        var targetVersion = version ?? _lastUpdateInfo?.TargetFullRelease.Version.ToString();
+        if (string.IsNullOrEmpty(targetVersion))
+        {
+            _logger.LogDebug("FetchReleaseNotesAsync: 未指定版本且没有待处理的更新信息");
+            return null;
+        }
+
+        var url = $"{ReleaseNotesApiBase}{targetVersion}/notes";
+        _logger.LogInformation("获取发布说明: {Url}", url);
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.UserAgent.ParseAdd(
+                $"SeatFlow/{GetCurrentVersion()} ({RuntimeInformation.OSDescription})");
+            request.Headers.Accept.ParseAdd("application/json");
+
+            using var response = await _httpClient.SendAsync(request, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("发布说明端点返回 {StatusCode} ({ReasonPhrase}): {Url}",
+                    (int)response.StatusCode, response.ReasonPhrase, url);
+                return null;
+            }
+
+            var doc = await response.Content.ReadFromJsonAsync<ReleaseNotesResponse>(
+                UpdateServiceJsonContext.Default.ReleaseNotesResponse, ct);
+            return doc?.Content;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "获取发布说明失败: {Url}", url);
+            return null;
+        }
+    }
+
     // ============================================================
     // 私有方法
     // ============================================================
@@ -415,4 +454,21 @@ internal sealed class UpdateService : IUpdateService, IDisposable
     {
         _httpClient.Dispose();
     }
+}
+
+/// <summary>
+/// API 端点 /api/app/releases/{version}/notes 的响应 DTO。
+/// </summary>
+internal sealed class ReleaseNotesResponse
+{
+    [System.Text.Json.Serialization.JsonPropertyName("content")]
+    public string? Content { get; set; }
+}
+
+/// <summary>
+/// UpdateService 内部使用的 JSON 源生成上下文。
+/// </summary>
+[System.Text.Json.Serialization.JsonSerializable(typeof(ReleaseNotesResponse))]
+internal sealed partial class UpdateServiceJsonContext : System.Text.Json.Serialization.JsonSerializerContext
+{
 }

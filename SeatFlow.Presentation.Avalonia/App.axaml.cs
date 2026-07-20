@@ -32,6 +32,7 @@ namespace SeatFlow.Presentation.Avalonia
     {
         private readonly IServiceProvider _serviceProvider = serviceProvider;
         private readonly bool _isFirstInstance = isFirstInstance;
+        private bool _needsOnboarding;
 
         /// <summary>命令行传入的 .seatsets 文件路径（双击打开或命令行导入）。</summary>
         internal static string? PendingSeatSetsFilePath { get; set; }
@@ -374,7 +375,7 @@ namespace SeatFlow.Presentation.Avalonia
             await CheckSeatSetsAutoImportAsync();
 
             // 1. 检测首次启动（必须在 RestoreSettings 之前，因为后者会创建 AppSettings.json）
-            var needsOnboarding = await DetectAndMarkFirstLaunchAsync();
+            _needsOnboarding = await DetectAndMarkFirstLaunchAsync();
 
             await RestoreSettingsAsync();
 
@@ -382,11 +383,14 @@ namespace SeatFlow.Presentation.Avalonia
             await ShowTelemetryConsentIfNeededAsync();
 
             // 3. 启动引导（在遥测弹窗之后，避免 Popup 覆盖）
-            if (needsOnboarding)
+            if (_needsOnboarding)
                 StartOnboardingDeferred();
 
             // 记录应用启动遥测
             RecordAppStartTelemetry();
+
+            // 4. 自动更新检查（延迟到 Background 优先级，确保 UI 完全就绪）
+            ScheduleAutoUpdateCheck();
         }
 
         /// <summary>
@@ -489,6 +493,83 @@ namespace SeatFlow.Presentation.Avalonia
             {
                 var logger = _serviceProvider.GetRequiredService<ILogger<App>>();
                 logger.LogDebug(ex, "遥测同意弹窗异常");
+            }
+        }
+
+        /// <summary>
+        /// 将自动更新检查推迟到 UI 完全启动后（Background 优先级）。
+        /// 此时 DI 完全就绪，可以正常创建对话框。
+        /// </summary>
+        private void ScheduleAutoUpdateCheck()
+        {
+            Dispatcher.UIThread.Post(async () =>
+            {
+                // 额外延迟，确保主窗口已完全渲染
+                await Task.Delay(500);
+                await CheckAutoUpdateAsync();
+            }, DispatcherPriority.Background);
+        }
+
+        /// <summary>
+        /// 根据 AutoUpdateMode 设置执行自动更新检查。
+        /// Off → 跳过；CheckOnly → 检查并展示 release notes（仅查看）；
+        /// AutoUpdate → 检查并展示 release notes（含下载选项），确认后应用并重启。
+        /// </summary>
+        private async Task CheckAutoUpdateAsync()
+        {
+            // 引导进行中时跳过（避免弹窗冲突）
+            if (_needsOnboarding)
+                return;
+
+            try
+            {
+                var facade = _serviceProvider.GetRequiredService<IApplicationFacade>();
+                var settings = await facade.LoadAppSettingsAsync();
+
+                if (settings.AutoUpdate == AutoUpdateMode.Off)
+                    return;
+
+                var updateService = _serviceProvider.GetRequiredService<IUpdateService>();
+                var logger = _serviceProvider.GetRequiredService<ILogger<App>>();
+
+                // 开发模式跳过（NotInstalled）
+                if (updateService.Status == UpdateServiceStatus.NotInstalled)
+                    return;
+
+                logger.LogInformation("启动时自动检查更新 (Mode={Mode}, Version={Version})",
+                    settings.AutoUpdate, VersionInfo.Version);
+
+                var result = await updateService.CheckForUpdatesAsync();
+
+                if (!result.HasUpdate)
+                {
+                    logger.LogDebug("启动检查：已是最新版本");
+                    return;
+                }
+
+                logger.LogInformation("启动检查发现新版本: {Version}", result.NewVersion);
+
+                if (AvaloniaApplication.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop)
+                    return;
+                if (desktop.MainWindow is not { } mainWindow)
+                    return;
+
+                var dialog = await Views.UpdateDialogWindow.CreateAsync(
+                    _serviceProvider,
+                    result.NewVersion!,
+                    allowDownload: settings.AutoUpdate == AutoUpdateMode.AutoUpdate);
+
+                await dialog.ShowDialog<bool>(mainWindow);
+
+                if (dialog.Confirmed)
+                {
+                    updateService.ApplyUpdatesAndRestart();
+                }
+            }
+            catch (Exception ex)
+            {
+                var logger = _serviceProvider.GetRequiredService<ILogger<App>>();
+                logger.LogWarning(ex, "启动时自动更新检查失败");
             }
         }
 

@@ -109,6 +109,9 @@ namespace SeatFlow.Presentation.Avalonia
             // 声明式策略配置子组件
             services.AddTransient<ConfigBlockEditorViewModel>();
 
+            // 更新对话框（每次手动创建，通过 ActivatorUtilities 动态解析）
+            services.AddTransient<UpdateDialogViewModel>();
+
             var serviceProvider = services.BuildServiceProvider();
 
             // 将命令行中的 .seatsets 文件路径传递给 App（用于双击打开导入）

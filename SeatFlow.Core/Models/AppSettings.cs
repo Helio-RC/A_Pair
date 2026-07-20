@@ -55,6 +55,9 @@ namespace SeatFlow.Core.Models
         /// <summary>遥测配置。</summary>
         public TelemetryConfig Telemetry { get; set; } = new();
 
+        /// <summary>自动更新模式（默认：仅检查）。</summary>
+        public AutoUpdateMode AutoUpdate { get; set; } = AutoUpdateMode.CheckOnly;
+
     }
 
     /// <summary>
@@ -136,6 +139,19 @@ namespace SeatFlow.Core.Models
         Light,
         /// <summary>深色主题。</summary>
         Dark
+    }
+
+    /// <summary>
+    /// 自动更新模式。
+    /// </summary>
+    public enum AutoUpdateMode
+    {
+        /// <summary>关闭自动更新检查。</summary>
+        Off,
+        /// <summary>启动时仅检查更新，不下載。</summary>
+        CheckOnly,
+        /// <summary>检查更新并在确认后下载。</summary>
+        AutoUpdate,
     }
 
 }

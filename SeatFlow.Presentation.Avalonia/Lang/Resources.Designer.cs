@@ -393,6 +393,11 @@ public class Resources
     public static string Seating_VenueDatasetDesc => ResourceManager.GetString("Seating_VenueDatasetDesc", Culture)!;
     public static string Seating_VenueLoadedFmt => ResourceManager.GetString("Seating_VenueLoadedFmt", Culture)!;
     public static string Settings_Appearance => ResourceManager.GetString("Settings_Appearance", Culture)!;
+    public static string Settings_AutoUpdate => ResourceManager.GetString("Settings_AutoUpdate", Culture)!;
+    public static string Settings_AutoUpdateHint => ResourceManager.GetString("Settings_AutoUpdateHint", Culture)!;
+    public static string Settings_AutoUpdate_Auto => ResourceManager.GetString("Settings_AutoUpdate_Auto", Culture)!;
+    public static string Settings_AutoUpdate_CheckOnly => ResourceManager.GetString("Settings_AutoUpdate_CheckOnly", Culture)!;
+    public static string Settings_AutoUpdate_Off => ResourceManager.GetString("Settings_AutoUpdate_Off", Culture)!;
     public static string Settings_Behavior => ResourceManager.GetString("Settings_Behavior", Culture)!;
     public static string Settings_BrowseDataDir => ResourceManager.GetString("Settings_BrowseDataDir", Culture)!;
     public static string Settings_ConfirmClear => ResourceManager.GetString("Settings_ConfirmClear", Culture)!;
@@ -573,6 +578,12 @@ public class Resources
     public static string Theme_Dark => ResourceManager.GetString("Theme_Dark", Culture)!;
     public static string Theme_Light => ResourceManager.GetString("Theme_Light", Culture)!;
     public static string Theme_System => ResourceManager.GetString("Theme_System", Culture)!;
+    public static string Update_DownloadLater => ResourceManager.GetString("Update_DownloadLater", Culture)!;
+    public static string Update_InstallAndRestart => ResourceManager.GetString("Update_InstallAndRestart", Culture)!;
+    public static string Update_NewVersionTitle => ResourceManager.GetString("Update_NewVersionTitle", Culture)!;
+    public static string Update_NoReleaseNotes => ResourceManager.GetString("Update_NoReleaseNotes", Culture)!;
+    public static string Update_ReleaseNotes => ResourceManager.GetString("Update_ReleaseNotes", Culture)!;
+    public static string Update_UpdateNow => ResourceManager.GetString("Update_UpdateNow", Culture)!;
     public static string Venue_AddDoor => ResourceManager.GetString("Venue_AddDoor", Culture)!;
     public static string Venue_AddDoorTooltip => ResourceManager.GetString("Venue_AddDoorTooltip", Culture)!;
     public static string Venue_AisleCheckTooltip => ResourceManager.GetString("Venue_AisleCheckTooltip", Culture)!;

@@ -250,6 +250,21 @@
               <TextBlock Text="{x:Static lang:Resources.Settings_Update}" Classes="sectionTitle" />
             </StackPanel>
 
+            <!-- 自动更新模式选择器 -->
+            <Border Classes="settingRowInner">
+              <DockPanel>
+                <StackPanel DockPanel.Dock="Left" Spacing="2">
+                  <TextBlock Text="{x:Static lang:Resources.Settings_AutoUpdate}" Classes="body" />
+                  <TextBlock Text="{x:Static lang:Resources.Settings_AutoUpdateHint}" Classes="caption"
+                             Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" TextWrapping="Wrap" MaxWidth="440" />
+                </StackPanel>
+                <ComboBox ItemsSource="{Binding AutoUpdateOptions}"
+                          SelectedIndex="{Binding AutoUpdateIndex, Mode=TwoWay}"
+                          AutomationProperties.Name="{x:Static lang:Resources.Settings_AutoUpdate}"
+                          MinWidth="160" HorizontalAlignment="Right" FontSize="14" />
+              </DockPanel>
+            </Border>
+
             <Border Classes="settingRowInner">
               <DockPanel>
                 <StackPanel DockPanel.Dock="Left" Spacing="2">

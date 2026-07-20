@@ -67,4 +67,12 @@ public interface IUpdateService
     /// 应用更新并重启应用。调用后进程退出。
     /// </summary>
     void ApplyUpdatesAndRestart();
+
+    /// <summary>
+    /// 从 API 获取指定版本的 release notes（Markdown 格式）。
+    /// </summary>
+    /// <param name="version">目标版本号。为 null 时获取已检查到的最新更新版本。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>Markdown 内容，失败时返回 null。</returns>
+    Task<string?> FetchReleaseNotesAsync(string? version = null, CancellationToken ct = default);
 }
