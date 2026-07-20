@@ -55,7 +55,7 @@
     <PackageReference Include="CodeWF.AvaloniaControls" Version="12.1.0.1" />
     <PackageReference Include="OpenTelemetry" Version="1.17.0" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.10" />
-    <PackageReference Include="Velopack" Version="1.2.0" />
+    <PackageReference Include="Velopack" Version="1.2.110-ge826545" />
   </ItemGroup>
 
   <ItemGroup>

@@ -117,6 +117,67 @@ def format_size(bytes_count: int) -> str:
     return f"{bytes_count:.1f} TiB"
 
 
+def run_command(
+    cmd: list[str],
+    cwd: Optional[str] = None,
+    check: bool = False,
+) -> subprocess.CompletedProcess:
+    """执行命令，实时流式输出到控制台，带时间戳和执行标记。
+
+    所有 stdout/stderr 的行前都会加上 [HH:MM:SS] 前缀。
+
+    Args:
+        cmd: 命令和参数列表。
+        cwd: 工作目录。
+        check: 如果为 True，非零退出时抛出 CalledProcessError。
+
+    Returns:
+        subprocess.CompletedProcess，包含 args、returncode、stdout（完整输出）、stderr（空）。
+    """
+    cmd_str = ' '.join(cmd)
+    ts = datetime.now().strftime('%H:%M:%S')
+    print(f"[{ts}] ▶ {cmd_str}")
+
+    stdout_lines: list[str] = []
+    start = datetime.now()
+
+    proc = subprocess.Popen(
+        cmd,
+        cwd=cwd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
+    try:
+        for line in proc.stdout:
+            stdout_lines.append(line)
+            ts = datetime.now().strftime('%H:%M:%S')
+            print(f"[{ts}]   │ {line}", end='')
+    finally:
+        proc.wait()
+
+    returncode = proc.returncode
+    elapsed = datetime.now() - start
+    elapsed_str = f"{elapsed.total_seconds():.1f}s"
+    ts = datetime.now().strftime('%H:%M:%S')
+    stdout_str = ''.join(stdout_lines)
+
+    if returncode == 0:
+        print(f"[{ts}] ✓ {cmd_str} ({elapsed_str})")
+    else:
+        print(f"[{ts}] ✗ {cmd_str} (exit: {returncode}) ({elapsed_str})")
+        if check:
+            raise subprocess.CalledProcessError(returncode, cmd, output=stdout_str)
+
+    return subprocess.CompletedProcess(
+        args=cmd,
+        returncode=returncode,
+        stdout=stdout_str,
+        stderr='',
+    )
+
+
 # ──────────────────────────────────────────────
 # ReleaseManager
 # ──────────────────────────────────────────────
@@ -255,10 +316,8 @@ class ReleaseManager:
             "-o", str(tmp_dir),
         ]
 
-        result = subprocess.run(cmd, cwd=str(self.root),
-                                capture_output=True, text=True)
+        result = run_command(cmd, cwd=str(self.root))
         if result.returncode != 0:
-            print(f"    stderr: {result.stderr[-500:]}", file=sys.stderr)
             result.check_returncode()
 
 
@@ -286,6 +345,13 @@ class ReleaseManager:
             import shutil as _shutil
             if _shutil.which("mksquashfs") is None:
                 missing.append("mksquashfs (sudo apt install squashfs-tools)")
+            if _shutil.which("zstd") is None:
+                missing.append("zstd (sudo apt install zstd)")
+
+        if system == "Darwin":
+            import shutil as _shutil
+            if _shutil.which("zstd") is None:
+                missing.append("zstd (brew install zstd)")
 
         if missing:
             print("[3] vpk 系统依赖缺失:")
@@ -367,18 +433,12 @@ class ReleaseManager:
             # 与客户端 Update.exe 不兼容（Unsupported patch format: .bsdiff）
             cmd.extend(["--delta", "BestSpeed"])
 
-            result = subprocess.run(cmd, cwd=str(self.root),
-                                    capture_output=True, text=True)
+            result = run_command(cmd, cwd=str(self.root))
             if result.returncode != 0:
-                output = (result.stderr or result.stdout)
-                if output and "equal or greater" in output:
+                if "equal or greater" in result.stdout:
                     print(f"  ! {rid}: 版本 {self.version} 已存在，跳过（保留增量更新链）")
                 else:
                     print(f"  ✗ {rid}: vpk pack 失败")
-                    if output:
-                        for line in output.strip().split("\n")[-6:]:
-                            if line.strip():
-                                print(f"    {line}")
                 continue
 
             print(f"  ✓ {rid}")
@@ -1164,11 +1224,9 @@ class ReleaseManager:
 
     def _get_git_commit_id(self) -> str:
         """从 git 获取当前 HEAD 的短 commit ID。"""
-        result = subprocess.run(
+        result = run_command(
             ["git", "rev-parse", "--short", "HEAD"],
             cwd=str(self.root),
-            capture_output=True,
-            text=True,
         )
         return result.stdout.strip() if result.returncode == 0 else "unknown"
 
@@ -1184,11 +1242,9 @@ class ReleaseManager:
             print("[0] 分支检查  → 跳过 (CI 环境)")
             return True
 
-        result = subprocess.run(
+        result = run_command(
             ["git", "branch", "--show-current"],
             cwd=str(self.root),
-            capture_output=True,
-            text=True,
         )
         current = result.stdout.strip()
 
@@ -1197,11 +1253,9 @@ class ReleaseManager:
             return True
 
         # 检查是否有未提交的改动
-        status = subprocess.run(
+        status = run_command(
             ["git", "status", "--porcelain"],
             cwd=str(self.root),
-            capture_output=True,
-            text=True,
         )
         if status.stdout.strip():
             print(f"[0] 分支检查  ✗ 当前在 '{current}' 分支，且有未提交的改动。")
@@ -1210,14 +1264,12 @@ class ReleaseManager:
 
         # 干净，切换到 main
         print(f"[0] 分支检查  → 从 '{current}' 切换到 main...")
-        result = subprocess.run(
+        result = run_command(
             ["git", "checkout", "main"],
             cwd=str(self.root),
-            capture_output=True,
-            text=True,
         )
         if result.returncode != 0:
-            print(f"[0/5] 分支检查  ✗ 切换失败: {result.stderr.strip()}")
+            print(f"[0/5] 分支检查  ✗ 切换失败")
             return False
         print("[0/5] 分支检查  ✓ 已切换到 main")
         return True
@@ -1225,17 +1277,12 @@ class ReleaseManager:
     def _check_versions(self) -> bool:
         """运行 version.py check，确保版本号一致性。"""
         version_py = self.root / "scripts" / "version.py"
-        result = subprocess.run(
+        result = run_command(
             ["python3", str(version_py), "check"],
             cwd=str(self.root),
-            capture_output=True,
-            text=True,
         )
         if result.returncode != 0:
             print("[0] 版本号一致性检查  ✗ 失败")
-            print(result.stdout)
-            if result.stderr:
-                print(result.stderr)
             return False
         print("[0] 版本号一致性检查  ✓ 通过")
         return True
