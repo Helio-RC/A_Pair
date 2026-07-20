@@ -25,7 +25,7 @@ internal sealed class UpdateService : IUpdateService, IDisposable
 
     private const string UpdateApiBase = "https://download.seatflow.work/";
     private const string GitHubRepoUrl = "https://github.com/SeatFlow/SeatFlow";
-    private const string ReleaseNotesApiBase = "https://seatflow.work/api/app/releases/";
+    private const string ReleaseNotesApiBase = "https://seatflow.work/api/app/note/";
 
     private UpdateInfo? _lastUpdateInfo;
     private UpdateManager? _currentManager;
@@ -268,7 +268,7 @@ internal sealed class UpdateService : IUpdateService, IDisposable
             return null;
         }
 
-        var url = $"{ReleaseNotesApiBase}{targetVersion}/notes";
+        var url = $"{ReleaseNotesApiBase}{targetVersion}";
         _logger.LogInformation("获取发布说明: {Url}", url);
 
         try

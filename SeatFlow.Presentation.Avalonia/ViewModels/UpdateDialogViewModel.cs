@@ -142,6 +142,7 @@ internal partial class UpdateDialogViewModel : ObservableObject
             await _updateService.DownloadUpdatesAsync(progress);
 
             Downloaded = true;
+            OnPropertyChanged(nameof(Downloaded));
             IsDownloading = false;
             IsInstallReady = true;
             IsUpdateButtonEnabled = true;
@@ -161,6 +162,7 @@ internal partial class UpdateDialogViewModel : ObservableObject
     private void Install()
     {
         Confirmed = true;
+        OnPropertyChanged(nameof(Confirmed));
     }
 
     /// <summary>
