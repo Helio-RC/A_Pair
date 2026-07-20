@@ -363,6 +363,10 @@ class ReleaseManager:
             if directive == "[win]":
                 cmd.append("--noPortable")
 
+            # 锁定 delta 格式为 BestSpeed (Zstandard)，避免 BestSize (bsdiff)
+            # 与客户端 Update.exe 不兼容（Unsupported patch format: .bsdiff）
+            cmd.extend(["--delta", "BestSpeed"])
+
             result = subprocess.run(cmd, cwd=str(self.root),
                                     capture_output=True, text=True)
             if result.returncode != 0:
