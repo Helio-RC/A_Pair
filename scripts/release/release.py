@@ -405,6 +405,7 @@ class ReleaseManager:
                 "--packVersion", self.version,
                 "--packDir", str(pack_dir),
                 "--mainExe", exe_name,
+                "--runtime", rid,
                 "--channel", rid,
                 "--outputDir", str(output_dir),
                 "--packTitle", "SeatFlow",
@@ -478,11 +479,11 @@ class ReleaseManager:
         print(f"  RELEASE.md 已读取 ({len(content)} 字符)")
         return content
 
-    # ── 步骤 5: OSS 上传 ───────────────────────
+    # ── 步骤 7: OSS 上传 ───────────────────────
 
     def upload_to_oss(self, vpk_artifacts: list[dict], release_notes: str) -> None:
         """上传 zip/tar.gz + Velopack 产物到阿里云 OSS（含 releases.json 索引更新）。"""
-        print("[6] 上传到阿里云 OSS...")
+        print("[7] 上传到阿里云 OSS...")
 
         if self.dry_run:
             print("  [dry-run] 跳过 OSS 上传。")
@@ -1045,9 +1046,9 @@ class ReleaseManager:
 
         return existing
 
-    # ── 步骤 4: GitHub Release ────────────────
+    # ── 步骤 6: GitHub Release ────────────────
         """通过 GitHub REST API 创建 Release，上传 zip/tar.gz + Velopack 产物。"""
-        print("[5] 创建 GitHub Release...")
+        print("[6] 创建 GitHub Release...")
 
         if self.dry_run:
             print("  [dry-run] 跳过 GitHub Release 创建。")
@@ -1114,7 +1115,7 @@ class ReleaseManager:
             else:
                 print(f"  ✗ 上传失败: {f['fileName']} — {asset_resp.status_code}")
 
-    # ── 步骤 6: Cloudflare Worker Secret 轮换 ──
+    # ── 步骤 8: Cloudflare Worker Secret 轮换 ──
 
     def rotate_worker_secrets(self, force: bool = False) -> bool:
         """将 Worker 专用 OSS 只读凭证通过 Cloudflare API 下发到 Worker Secret。
@@ -1126,14 +1127,14 @@ class ReleaseManager:
         """
         if not force:
             if self.skip_oss and self.skip_github:
-                print("[7] Worker Secret 轮换  → 跳过 (远程已全部禁用)")
+                print("[8] Worker Secret 轮换  → 跳过 (远程已全部禁用)")
                 return False
         if not self._has_cloudflare_config():
-            print("[7] Worker Secret 轮换  → 跳过 (cloudflare 配置不完整)")
+            print("[8] Worker Secret 轮换  → 跳过 (cloudflare 配置不完整)")
             return False
 
         if requests is None:
-            print("[7] Worker Secret 轮换  → 跳过 (requests 未安装)")
+            print("[8] Worker Secret 轮换  → 跳过 (requests 未安装)")
             return False
         cf = self.config["cloudflare"]
         account_id = cf["accountId"]
@@ -1143,7 +1144,7 @@ class ReleaseManager:
         worker_key_id = cf.get("workerOssKeyId")
         worker_key_secret = cf.get("workerOssKeySecret")
         if not worker_key_id or not worker_key_secret:
-            print("[7] Worker Secret 轮换  → 跳过 (cloudflare.workerOssKeyId/Secret 未配置)")
+            print("[8] Worker Secret 轮换  → 跳过 (cloudflare.workerOssKeyId/Secret 未配置)")
             return False
 
         api_url = (
@@ -1164,7 +1165,7 @@ class ReleaseManager:
             },
         }
 
-        print(f"[7] Worker Secret 轮换: {script}...")
+        print(f"[8] Worker Secret 轮换: {script}...")
 
         if self.dry_run:
             # 脱敏显示
@@ -1351,25 +1352,27 @@ class ReleaseManager:
                     self.skip_oss = True
                     self.skip_github = True
 
-            # [5] GitHub Release
+            # [5] 归档安装程序（版本化文件名，先于上传）
+            if vpk_artifacts:
+                self._organize_artifacts(vpk_artifacts)
+
+            # [6] GitHub Release
             if self.skip_github:
-                print("[5] GitHub Release  → 跳过 (--skip-github)")
+                print("[6] GitHub Release  → 跳过 (--skip-github)")
             else:
                 self.create_github_release(vpk_artifacts, release_notes)
 
-            # [6] OSS 上传
+            # [7] OSS 上传
             if self.skip_oss:
-                print("[6] OSS 上传       → 跳过 (--skip-oss)")
+                print("[7] OSS 上传       → 跳过 (--skip-oss)")
             else:
                 self.upload_to_oss(vpk_artifacts, release_notes)
 
-            # [7] Cloudflare Worker Secret
+            # [8] Cloudflare Worker Secret
             self.rotate_worker_secrets()
 
-            # [8] 重组产物目录（上传完成后）
+            # 保存 OSS manifest（路径已在归档步骤中更新为版本化名称）
             if vpk_artifacts:
-                self._organize_artifacts(vpk_artifacts)
-                # 重组后保存 manifest（路径已更新）
                 self._save_oss_manifest(vpk_artifacts, release_notes)
 
             print(f"\n=== Release v{self.version} 完成 ===")
@@ -1420,11 +1423,11 @@ class ReleaseManager:
                 results[rid] = exe_path
         return results
 
-    # ── 步骤 8: 重组产物目录 ─────────────────
+    # ── 步骤 5: 归档安装程序 ─────────────────
 
     def _organize_artifacts(self, vpk_artifacts: list[dict]) -> None:
-        """上传完成后，将安装程序归档到 {rid}/installer/，文件名补齐版本号。"""
-        print("[8] 归档安装程序...")
+        """将安装程序归档到 {rid}/installer/，文件名补齐版本号。"""
+        print("[5] 归档安装程序...")
 
         if self.dry_run:
             print("  [dry-run] 跳过归档。")
