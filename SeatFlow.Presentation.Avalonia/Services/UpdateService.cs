@@ -128,71 +128,63 @@ internal sealed class UpdateService : IUpdateService, IDisposable
             };
         }
 
-        // 源优先级：API 网关 → GitHub 兜底
-        var sourcePriority = new (string, Func<UpdateManager>)[]
+        // API 源不可达时直接报告不可用（无自动 GitHub 兜底）
+        if (metadata is null || metadata.IsFallback)
         {
-            ("oss_api", CreateApiManager),
-            ("github", CreateGitHubManager),
-        };
-
-        // metadata 为 null（API 不可达）或 IsFallback 为 true 时跳过 API 源
-        bool primaryHealthy = metadata is not null && !metadata.IsFallback;
-
-        foreach (var (sourceKey, createManager) in sourcePriority)
-        {
-            if (!primaryHealthy && sourceKey != "github")
+            _logger.LogWarning("API 更新源不可达 (IsFallback={IsFallback})", metadata?.IsFallback);
+            Status = UpdateServiceStatus.Unavailable;
+            return new UpdateCheckResult
             {
-                _logger.LogDebug("主源不健康，跳过 {Source}", sourceKey);
-                continue;
-            }
-
-            _logger.LogDebug("尝试从源 {Source} 检查更新", sourceKey);
-            try
-            {
-                var manager = createManager();
-                var updateInfo = await manager.CheckForUpdatesAsync();
-                lock (_updateLock)
-                {
-                    _lastUpdateInfo = updateInfo;
-                    _currentManager = manager;
-                }
-
-                Status = sourceKey == "github"
-                    ? UpdateServiceStatus.Fallback
-                    : UpdateServiceStatus.Healthy;
-
-                var result = updateInfo is null
-                    ? new UpdateCheckResult
-                    {
-                        HasUpdate = false,
-                        CurrentVersion = GetCurrentVersion(),
-                        ServiceStatus = Status,
-                        Message = metadata?.Message,
-                    }
-                    : new UpdateCheckResult
-                    {
-                        HasUpdate = true,
-                        NewVersion = updateInfo.TargetFullRelease.Version.ToString(),
-                        CurrentVersion = GetCurrentVersion(),
-                        ServiceStatus = Status,
-                        Message = metadata?.Message,
-                    };
-
-                _logger.LogInformation(
-                    "源 {Source} 检查完成: HasUpdate={HasUpdate}, NewVersion={NewVersion}, Status={Status}",
-                    sourceKey, result.HasUpdate, result.NewVersion ?? "N/A", Status);
-
-                return result;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "源 {Source} 检查更新失败 (Type={ExceptionType})", sourceKey, ex.GetType().Name);
-                lock (_updateLock)
-                    _currentManager = null;
-            }
+                HasUpdate = false,
+                CurrentVersion = GetCurrentVersion(),
+                ServiceStatus = UpdateServiceStatus.Unavailable,
+            };
         }
 
-        _logger.LogError("所有更新源均不可用 (Channel={Channel})", GetChannel());
+        _logger.LogDebug("尝试从 API 源检查更新");
+        try
+        {
+            var manager = CreateApiManager();
+            var updateInfo = await manager.CheckForUpdatesAsync();
+            lock (_updateLock)
+            {
+                _lastUpdateInfo = updateInfo;
+                _currentManager = manager;
+            }
+
+            Status = UpdateServiceStatus.Healthy;
+
+            var result = updateInfo is null
+                ? new UpdateCheckResult
+                {
+                    HasUpdate = false,
+                    CurrentVersion = GetCurrentVersion(),
+                    ServiceStatus = Status,
+                    Message = metadata.Message,
+                }
+                : new UpdateCheckResult
+                {
+                    HasUpdate = true,
+                    NewVersion = updateInfo.TargetFullRelease.Version.ToString(),
+                    CurrentVersion = GetCurrentVersion(),
+                    ServiceStatus = Status,
+                    Message = metadata.Message,
+                };
+
+            _logger.LogInformation(
+                "API 源检查完成: HasUpdate={HasUpdate}, NewVersion={NewVersion}, Status={Status}",
+                result.HasUpdate, result.NewVersion ?? "N/A", Status);
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "API 源检查更新失败 (Type={ExceptionType})", ex.GetType().Name);
+            lock (_updateLock)
+                _currentManager = null;
+        }
+
+        _logger.LogError("API 更新源不可用 (Channel={Channel})", GetChannel());
         Status = UpdateServiceStatus.Unavailable;
         return new UpdateCheckResult
         {
@@ -368,16 +360,11 @@ internal sealed class UpdateService : IUpdateService, IDisposable
         return new UpdateManager(source);
     }
 
-    /// <summary>
-    /// 创建基于 GitHub Releases 的 UpdateManager（兜底源）。
-    /// 注意：未认证的 GitHub API 限制为 60 req/h/IP。
-    /// 桌面应用的更新检查频率较低（手动触发），通常不会达到此限制。
-    /// </summary>
-    private UpdateManager CreateGitHubManager()
+    public string GetGitHubReleasesUrl(string? version = null)
     {
-        _logger.LogDebug("创建 GitHub UpdateManager: {Repo}", GitHubRepoUrl);
-        return new UpdateManager(
-            new GithubSource(GitHubRepoUrl, accessToken: null, prerelease: false));
+        if (!string.IsNullOrEmpty(version))
+            return $"{GitHubRepoUrl}/releases/tag/v{version}";
+        return $"{GitHubRepoUrl}/releases";
     }
 
     // ── 日志下载器（用于调试 Velopack 内部 HTTP 请求）──

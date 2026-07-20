@@ -75,4 +75,10 @@ public interface IUpdateService
     /// <param name="ct">取消令牌。</param>
     /// <returns>Markdown 内容，失败时返回 null。</returns>
     Task<string?> FetchReleaseNotesAsync(string? version = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// 获取 GitHub Releases 页面 URL（用于手动下载兜底）。
+    /// </summary>
+    /// <param name="version">版本号。为 null 时返回 Release 列表页。</param>
+    string GetGitHubReleasesUrl(string? version = null);
 }

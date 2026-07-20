@@ -1746,8 +1746,17 @@
   <data name="Theme_System" xml:space="preserve">
     <value>跟随系统</value>
   </data>
+  <data name="Update_CheckFailed" xml:space="preserve">
+    <value>更新检查失败</value>
+  </data>
+  <data name="Update_CheckOnlyHint" xml:space="preserve">
+    <value>请前往&quot;设置 → 更新&quot;页面下载并安装此版本。</value>
+  </data>
   <data name="Update_DownloadLater" xml:space="preserve">
     <value>稍后再说</value>
+  </data>
+  <data name="Update_GoToGitHub" xml:space="preserve">
+    <value>自动更新服务暂时不可用。是否前往 GitHub Releases 页面手动下载？</value>
   </data>
   <data name="Update_InstallAndRestart" xml:space="preserve">
     <value>安装并重启</value>

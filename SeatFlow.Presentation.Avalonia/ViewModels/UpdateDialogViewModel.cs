@@ -92,6 +92,7 @@ internal partial class UpdateDialogViewModel : ObservableObject
         {
             IsUpdateButtonVisible = false;
             CloseButtonText = Resources.Common_Close;
+            Subtitle = Resources.Update_CheckOnlyHint;
         }
 
         await LoadReleaseNotesAsync(ct);

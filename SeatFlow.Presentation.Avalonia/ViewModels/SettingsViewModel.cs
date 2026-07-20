@@ -590,8 +590,12 @@ public partial class SettingsViewModel : ViewModelBase
                 return;
             }
 
-            if (result.ServiceStatus == UpdateServiceStatus.Fallback)
-                UpdateStatusMessage = Resources.Settings_UpdateFallback;
+            if (result.ServiceStatus == UpdateServiceStatus.Unavailable)
+            {
+                UpdateStatusMessage = Resources.Settings_UpdateFailed;
+                await ShowGitHubFallbackDialogAsync();
+                return;
+            }
 
             if (result.HasUpdate)
             {
@@ -602,7 +606,7 @@ public partial class SettingsViewModel : ViewModelBase
                 // 弹出 release notes 对话框，让用户决定是否下载更新
                 await ShowUpdateDialogAsync(result.NewVersion!);
             }
-            else if (result.ServiceStatus != UpdateServiceStatus.Fallback)
+            else
             {
                 UpdateStatusMessage = Resources.Settings_UpdateLatest;
             }
@@ -648,6 +652,27 @@ public partial class SettingsViewModel : ViewModelBase
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "发布说明对话框异常");
+        }
+    }
+
+    /// <summary>
+    /// 更新源不可达时弹窗，询问是否前往 GitHub Releases 页面手动下载。
+    /// </summary>
+    private async Task ShowGitHubFallbackDialogAsync()
+    {
+        try
+        {
+            var goToGitHub = await _dialog.ShowConfirmAsync(
+                Resources.Update_CheckFailed,
+                Resources.Update_GoToGitHub);
+            if (!goToGitHub) return;
+
+            var url = _updateService.GetGitHubReleasesUrl(VersionInfo.Version);
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "GitHub 兜底对话框异常");
         }
     }
 

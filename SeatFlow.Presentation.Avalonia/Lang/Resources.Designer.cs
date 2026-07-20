@@ -578,7 +578,10 @@ public class Resources
     public static string Theme_Dark => ResourceManager.GetString("Theme_Dark", Culture)!;
     public static string Theme_Light => ResourceManager.GetString("Theme_Light", Culture)!;
     public static string Theme_System => ResourceManager.GetString("Theme_System", Culture)!;
+    public static string Update_CheckFailed => ResourceManager.GetString("Update_CheckFailed", Culture)!;
+    public static string Update_CheckOnlyHint => ResourceManager.GetString("Update_CheckOnlyHint", Culture)!;
     public static string Update_DownloadLater => ResourceManager.GetString("Update_DownloadLater", Culture)!;
+    public static string Update_GoToGitHub => ResourceManager.GetString("Update_GoToGitHub", Culture)!;
     public static string Update_InstallAndRestart => ResourceManager.GetString("Update_InstallAndRestart", Culture)!;
     public static string Update_NewVersionTitle => ResourceManager.GetString("Update_NewVersionTitle", Culture)!;
     public static string Update_NoReleaseNotes => ResourceManager.GetString("Update_NoReleaseNotes", Culture)!;

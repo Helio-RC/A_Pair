@@ -541,6 +541,13 @@ namespace SeatFlow.Presentation.Avalonia
 
                 var result = await updateService.CheckForUpdatesAsync();
 
+                if (result.ServiceStatus == UpdateServiceStatus.Unavailable)
+                {
+                    logger.LogWarning("启动检查：更新服务不可达");
+                    await ShowGitHubFallbackInStartupAsync(updateService);
+                    return;
+                }
+
                 if (!result.HasUpdate)
                 {
                     logger.LogDebug("启动检查：已是最新版本");
@@ -570,6 +577,30 @@ namespace SeatFlow.Presentation.Avalonia
             {
                 var logger = _serviceProvider.GetRequiredService<ILogger<App>>();
                 logger.LogWarning(ex, "启动时自动更新检查失败");
+            }
+        }
+
+        /// <summary>
+        /// 记录应用启动遥测事件（仅在遥测启用时）。
+        /// </summary>
+        private async Task ShowGitHubFallbackInStartupAsync(IUpdateService updateService)
+        {
+            try
+            {
+                var dialog = _serviceProvider.GetRequiredService<IDialogService>();
+                var goToGitHub = await dialog.ShowConfirmAsync(
+                    Lang.Resources.Update_CheckFailed,
+                    Lang.Resources.Update_GoToGitHub);
+                if (!goToGitHub) return;
+
+                var url = updateService.GetGitHubReleasesUrl(VersionInfo.Version);
+                System.Diagnostics.Process.Start(
+                    new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                var logger = _serviceProvider.GetRequiredService<ILogger<App>>();
+                logger.LogWarning(ex, "GitHub 兜底对话框异常");
             }
         }
 
