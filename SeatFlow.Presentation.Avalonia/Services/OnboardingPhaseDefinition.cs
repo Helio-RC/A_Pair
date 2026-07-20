@@ -16,6 +16,13 @@ public sealed class OnboardingConfig
     /// <summary>页面独立引导块（PageKey 名称 → 引导阶段定义）。首次访问时触发。</summary>
     [JsonPropertyName("pageGuides")]
     public Dictionary<string , OnboardingPhaseDefinition> PageGuides { get; set; } = [];
+
+    /// <summary>
+    /// 启动引导完成后导航到的目标页面（<see cref="PageKey"/> 枚举名称）。
+    /// 默认 <c>"Home"</c>。设为 <c>null</c> 或空字符串等同于 <c>"Home"</c>。
+    /// </summary>
+    [JsonPropertyName("completeAction")]
+    public string CompleteAction { get; set; } = "Home";
 }
 
 /// <summary>引导的一个阶段（对应一个页面）。</summary>

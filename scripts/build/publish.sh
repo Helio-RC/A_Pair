@@ -7,7 +7,7 @@
 # ============================================================
 set -euo pipefail
 OLDPWD="$PWD"; trap 'cd "$OLDPWD"' EXIT
-cd ..
+cd ../..
 
 APP_NAME="SeatFlow"; PROJECT="SeatFlow.Presentation.Avalonia"; CONFIG="Release"
 RIDS=("win-x64" "linux-x64" "osx-x64" "osx-arm64")
@@ -39,13 +39,22 @@ publish_one(){
         local ta=()
         [ "$TRIM_SEL" = "1" ] && [ "$sc" = "true" ] && ta=(-p:PublishTrimmed=true -p:TrimMode=partial -p:SuppressTrimAnalysisWarnings=true)
         [ "$AOT" = "1" ] && [ "$sc" = "true" ] && ta+=(-p:PublishAot=true)
-        dotnet publish "$PROJECT" -c "$CONFIG" -r "$rid" --self-contained "$sc_flag" -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:IncludeAllContentForSelfExtract=true "${ta[@]}" -o "$tmp"
+        dotnet publish "$PROJECT" -c "$CONFIG" -r "$rid" --self-contained "$sc_flag" "${ta[@]}" -o "$tmp"
         exe="$APP_NAME$sf"
-        if [ -f "$tmp/$exe" ]; then mv "$tmp/$exe" "$base/$fn"; rm -rf "$tmp"; s=$(du -h "$base/$fn"|cut -f1); step "完成 → $label/$fn ($s)" 32
-        else fb=$(find "$tmp" -maxdepth 1 -type f -name "$APP_NAME*"|head -1)
-            if [ -n "$fb" ]; then mv "$fb" "$base/$fn"; rm -rf "$tmp"; s=$(du -h "$base/$fn"|cut -f1); step "完成 → $label/$fn ($s)" 32
-            else step "未找到可执行文件: $tmp" 31; fi
-        fi
+        if [ -f "$tmp/$exe" ]; then
+            # 标准发布：打包整个输出目录
+            fn="${fn%.exe}"  # 移除 .exe 后缀（Windows）
+            local ext=".tar.gz"
+            [ "${rid:0:3}" = "win" ] && ext=".zip"
+            fn="$fn$ext"
+            if [ "$ext" = ".zip" ]; then
+                (cd "$tmp" && zip -qr "$OLDPWD/$base/$fn" .) && rm -rf "$tmp"
+            else
+                tar -czf "$base/$fn" -C "$tmp" . && rm -rf "$tmp"
+            fi
+            s=$(du -h "$base/$fn"|cut -f1); step "完成 → $label/$fn ($s)" 32
+        else
+            step "未找到可执行文件: $tmp/$exe" 31; fi
     done
 }
 

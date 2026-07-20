@@ -10,10 +10,12 @@ using SeatFlow.Application.Services;
 using SeatFlow.Core.Models.SeatSets;
 using SeatFlow.Core.Utilities;
 using SeatFlow.Presentation.Avalonia.Services;
+using SeatFlow.Presentation.Avalonia.Telemetry;
 using SeatFlow.Presentation.Avalonia.ViewModels;
 using SeatFlow.Presentation.Avalonia.Views;
 using Avalonia;
 using Microsoft.Extensions.DependencyInjection;
+using Velopack;
 
 [assembly: System.Resources.NeutralResourcesLanguage("zh-CN")]
 
@@ -27,9 +29,19 @@ namespace SeatFlow.Presentation.Avalonia
         [STAThread]
         public static void Main (string[] args)
         {
-#if !DEBUG
-            CheckCleanDirectory();
-#endif
+            // Velopack 钩子：必须在 Main() 最开头调用。
+            // 正常启动时 Run() 立即返回；安装/更新/卸载钩子模式下，钩子执行完毕从 Run() 内部退出。
+            VelopackApp.Build()
+                .OnFirstRun(_ => App.IsFirstRunAfterInstall = true)
+                .Run();
+
+            // 安装时 hook：复制安装程序同目录下的 .seatsets 文件到应用根目录
+            if (args.Any(a => a.StartsWith("--veloapp-install")))
+            {
+                CopySeatSetsFromInstallerDir();
+                return; // hook 模式静默退出
+            }
+
             // 检测命令行参数中的 .seatsets 文件路径（双击打开或命令行导入）
             string? seatsetsFilePath = null;
             if (args.Length > 0)
@@ -57,16 +69,26 @@ namespace SeatFlow.Presentation.Avalonia
             using var mutex = new Mutex(true , @"Global\SeatFlow_SeatingArrangement" , out bool isFirstInstance);
 
             var services = new ServiceCollection();
-            // 使用 exe 所在目录而非 AppContext.BaseDirectory（单文件发布时后者指向临时解压目录）
+            // 使用 OS 标准数据目录（而非 exe 同目录）
+            var pluginsDir = GetPluginsDirectory();
             services.AddSeatFlowApplication(
-                Path.Combine(AppEnvironment.ExeDirectory , "AppData") ,
-                Path.Combine(AppEnvironment.ExeDirectory , "Plugins"));
+                AppEnvironment.DefaultDataDirectory ,
+                pluginsDir);
+
+            // 注册 OpenTelemetry 遥测（必须在 AddSeatFlowApplication 之后，依赖 IAppSettingsRepository）
+            services.AddSeatFlowTelemetry();
 
             // 注册导航服务
             services.AddSingleton<INavigationService , NavigationService>();
             services.AddSingleton<IFileService , FileService>();
             services.AddSingleton<IDialogService , DialogService>();
             services.AddSingleton<WatchdogService>();
+
+            // 注册更新服务（Velopack 自动更新）
+            services.AddSingleton<IUpdateService , UpdateService>();
+
+            // 注册排座次数计数器
+            services.AddSingleton<IArrangementCounterService , ArrangementCounterService>();
 
             // 注册 ViewModels
             services.AddSingleton<MainWindow>();
@@ -86,6 +108,9 @@ namespace SeatFlow.Presentation.Avalonia
 
             // 声明式策略配置子组件
             services.AddTransient<ConfigBlockEditorViewModel>();
+
+            // 更新对话框（每次手动创建，通过 ActivatorUtilities 动态解析）
+            services.AddTransient<UpdateDialogViewModel>();
 
             var serviceProvider = services.BuildServiceProvider();
 
@@ -108,33 +133,65 @@ namespace SeatFlow.Presentation.Avalonia
                 .WithInterFont()
                 .LogToTrace();
 
-        private static void CheckCleanDirectory ()
+        /// <summary>
+        /// 获取插件目录。Velopack 安装时使用 RootAppDir/Plugins（更新时保留），
+        /// 开发/便携模式 fallback 到 exe 同目录。
+        /// </summary>
+        private static string GetPluginsDirectory ()
         {
-            var exeDir = Path.GetDirectoryName(Environment.ProcessPath)!;
-            if (!Directory.Exists(exeDir)) return;
+            var root = GetInstallRootDirectory();
+            return root is not null ? Path.Combine(root , "Plugins") : Path.Combine(AppEnvironment.ExeDirectory , "Plugins");
+        }
 
-            var exeName = Path.GetFileName(Environment.ProcessPath);
-            var extra = Directory.GetFileSystemEntries(exeDir)
-                .Select(p => Path.GetFileName(p))
-                .Where(n => !string.Equals(n , exeName , StringComparison.OrdinalIgnoreCase)
-                         && !string.Equals(n , "AppData" , StringComparison.OrdinalIgnoreCase)
-                         && !string.Equals(n , "Plugins" , StringComparison.OrdinalIgnoreCase)
-                         && !n.EndsWith(".seatsets" , StringComparison.OrdinalIgnoreCase))
-                .ToArray();
+        /// <summary>
+        /// 获取 Velopack 安装根目录，非安装模式返回 null。
+        /// </summary>
+        private static string? GetInstallRootDirectory ()
+        {
+            try
+            {
+                if (Velopack.Locators.VelopackLocator.IsCurrentSet
+                    && Velopack.Locators.VelopackLocator.Current.RootAppDir is { Length: > 0 } root)
+                {
+                    return root;
+                }
+            }
+            catch
+            {
+                // VelopackLocator 不可用时返回 null
+            }
+            return null;
+        }
 
-            if (extra.Length == 0) return;
+        /// <summary>
+        /// 安装时 hook：将安装程序同目录下的 .seatsets 文件复制到应用安装根目录。
+        /// 由 --veloapp-install CLI 参数触发，必须在 30 秒内完成。
+        /// </summary>
+        private static void CopySeatSetsFromInstallerDir ()
+        {
+            try
+            {
+                var currentDir = Environment.CurrentDirectory;
+                if (string.IsNullOrEmpty(currentDir) || !Directory.Exists(currentDir))
+                    return;
 
-            const int maxShow = 5;
-            var display = extra.Take(maxShow).ToArray();
-            var message = "程序所在目录不应有其他文件或文件夹。\n\n" +
-                $"请将 {exeName} 单独放入一个空目录后再运行。\n\n" +
-                $"当前目录多余项：\n{string.Join('\n' , display)}";
+                var root = GetInstallRootDirectory();
+                if (root is null)
+                    return;
 
-            if (extra.Length > maxShow)
-                message += $"\n（还有 {extra.Length - maxShow} 项未显示）";
+                Directory.CreateDirectory(root);
 
-            ShowFatalDialog("运行环境错误" , message);
-            Environment.Exit(1);
+                var seatSetsFiles = Directory.GetFiles(currentDir , "*.seatsets" , SearchOption.TopDirectoryOnly);
+                foreach (var file in seatSetsFiles)
+                {
+                    var dest = Path.Combine(root , Path.GetFileName(file));
+                    File.Copy(file , dest , overwrite: true);
+                }
+            }
+            catch
+            {
+                // 安装 hook 中静默处理，不影响安装流程
+            }
         }
 
         [DllImport("user32.dll" , CharSet = CharSet.Unicode)]
@@ -191,7 +248,7 @@ namespace SeatFlow.Presentation.Avalonia
                     return;
 
                 var progId = "SeatFlow.seatsets";
-                var appDataExists = Directory.Exists(Path.Combine(AppEnvironment.ExeDirectory , "AppData"));
+                var appDataExists = Directory.Exists(AppEnvironment.DefaultDataDirectory);
                 var iconValue = $"\"{exePath}\",0";
                 var cmdValue = $"\"{exePath}\" \"%1\"";
                 bool changed = false;
@@ -251,11 +308,13 @@ namespace SeatFlow.Presentation.Avalonia
         {
             try
             {
-                var appDataPath = Path.Combine(AppEnvironment.ExeDirectory , "AppData");
+                var appDataPath = AppEnvironment.DefaultDataDirectory;
                 if (Directory.Exists(appDataPath))
                     return null;
 
-                var files = Directory.GetFiles(AppEnvironment.ExeDirectory , "*.seatsets" , SearchOption.TopDirectoryOnly);
+                // 确定扫描目录：Velopack 安装时扫描 RootAppDir，开发/便携模式扫描 ExeDirectory
+                var scanDir = GetInstallRootDirectory() ?? AppEnvironment.ExeDirectory;
+                var files = Directory.GetFiles(scanDir , "*.seatsets" , SearchOption.TopDirectoryOnly);
                 if (files.Length == 0)
                     return null;
 

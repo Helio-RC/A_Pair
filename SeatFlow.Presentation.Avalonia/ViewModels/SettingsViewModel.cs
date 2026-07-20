@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using SeatFlow.Application.Interfaces;
 using SeatFlow.Core.Models;
+using SeatFlow.Core.Telemetry;
 using SeatFlow.Core.Utilities;
 using SeatFlow.Presentation.Avalonia.Lang;
 using SeatFlow.Presentation.Avalonia.Services;
@@ -27,6 +28,9 @@ public partial class SettingsViewModel : ViewModelBase
     private readonly IDialogService _dialog;
     private readonly IOnboardingService _onboarding;
     private readonly IFileService _fileService;
+    private readonly ITelemetryService _telemetry;
+    private readonly IUpdateService _updateService;
+    private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<SettingsViewModel> _logger;
 
     [ObservableProperty]
@@ -81,12 +85,70 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     public partial bool IsSaving { get; set; }
 
-    public SettingsViewModel (IApplicationFacade facade , IDialogService dialog , IOnboardingService onboarding , IFileService fileService , ILogger<SettingsViewModel>? logger = null)
+    [ObservableProperty]
+    public partial bool TelemetryEnabled { get; set; }
+
+    [ObservableProperty]
+    public partial bool SuppressEnvironmentWarning { get; set; }
+
+    [ObservableProperty]
+    public partial int LogLevelIndex { get; set; } = 1;
+    public List<string> LogLevelOptions { get; } =
+    [
+        Resources.Settings_LogLevel_Debug,
+        Resources.Settings_LogLevel_Info,
+        Resources.Settings_LogLevel_Warning,
+        Resources.Settings_LogLevel_Error
+    ];
+
+    // ---- 自动更新模式 ----
+
+    [ObservableProperty]
+    public partial AutoUpdateMode AutoUpdate { get; set; }
+
+    [ObservableProperty]
+    public partial int AutoUpdateIndex { get; set; }
+
+    public List<string> AutoUpdateOptions { get; } =
+    [
+        Resources.Settings_AutoUpdate_Off,
+        Resources.Settings_AutoUpdate_CheckOnly,
+        Resources.Settings_AutoUpdate_Auto,
+    ];
+
+    // ---- 更新相关属性 ----
+
+    [ObservableProperty]
+    public partial string UpdateStatusMessage { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial bool IsCheckingUpdate { get; set; }
+
+    [ObservableProperty]
+    public partial bool IsUpdateAvailable { get; set; }
+
+    [ObservableProperty]
+    public partial string? UpdateVersionText { get; set; }
+
+    [ObservableProperty]
+    public partial int UpdateDownloadProgress { get; set; }
+
+    [ObservableProperty]
+    public partial bool IsDownloading { get; set; }
+
+    /// <summary>是否有已下载但未应用的更新（重启即可应用）。</summary>
+    [ObservableProperty]
+    public partial bool HasPendingUpdate { get; set; }
+
+    public SettingsViewModel (IApplicationFacade facade , IDialogService dialog , IOnboardingService onboarding , IFileService fileService , ITelemetryService telemetry , IUpdateService updateService , IServiceProvider serviceProvider , ILogger<SettingsViewModel>? logger = null)
     {
         _facade = facade;
         _dialog = dialog;
         _onboarding = onboarding;
         _fileService = fileService;
+        _telemetry = telemetry;
+        _updateService = updateService;
+        _serviceProvider = serviceProvider;
         _logger = logger ?? NullLogger<SettingsViewModel>.Instance;
         _ = LoadAsync(CancellationToken.None);
     }
@@ -113,6 +175,24 @@ public partial class SettingsViewModel : ViewModelBase
             ZoomIndex = _defaultZoomLevel switch { 0.75 => 0, 1.0 => 1, 1.25 => 2, 1.5 => 3, _ => 1 };
 
             MaxSnapshotsPerVenue = settings.MaxSnapshotsPerVenue;
+
+            TelemetryEnabled = settings.Telemetry.Enabled;
+
+            SuppressEnvironmentWarning = settings.SuppressEnvironmentWarning;
+            var logLevel = settings.Logging.MinimumLevel;
+            LogLevelIndex = logLevel switch { "Debug" => 0 , "Warning" => 2 , "Error" => 3 , _ => 1 };
+
+            AutoUpdate = settings.AutoUpdate;
+            AutoUpdateIndex = AutoUpdate switch
+            {
+                AutoUpdateMode.Off => 0,
+                AutoUpdateMode.CheckOnly => 1,
+                AutoUpdateMode.AutoUpdate => 2,
+                _ => 1,
+            };
+
+            // 检查是否有已下载但未应用的更新
+            RefreshPendingUpdateState();
 
         }
         catch (Exception ex)
@@ -155,6 +235,19 @@ public partial class SettingsViewModel : ViewModelBase
         _defaultZoomLevel = zoom;
     }
 
+    partial void OnLogLevelIndexChanged (int value) { }
+
+    partial void OnAutoUpdateIndexChanged (int value)
+    {
+        AutoUpdate = value switch
+        {
+            0 => AutoUpdateMode.Off,
+            1 => AutoUpdateMode.CheckOnly,
+            2 => AutoUpdateMode.AutoUpdate,
+            _ => AutoUpdateMode.CheckOnly,
+        };
+    }
+
     [RelayCommand]
     private async Task SaveSettingsAsync (CancellationToken ct)
     {
@@ -163,20 +256,24 @@ public partial class SettingsViewModel : ViewModelBase
             IsSaving = true;
             StatusMessage = Resources.Settings_Saving;
 
-            var existing = await _facade.LoadAppSettingsAsync(ct);
+            var settings = await _facade.LoadAppSettingsAsync(ct);
 
-            var settings = new AppSettings
-            {
-                WindowState = existing.WindowState ,
-                Theme = Theme ,
-                Language = Language ,
-                DataDirectory = DataDirectory ,
-                ConfirmBeforeClear = ConfirmBeforeClear ,
-                DefaultZoomLevel = _defaultZoomLevel ,
-                MaxSnapshotsPerVenue = MaxSnapshotsPerVenue
-            };
+            // 直接在现有对象上修改，保留所有其他字段（CompletedPageGuides、Logging、Telemetry 等）
+            settings.Theme = Theme;
+            settings.Language = Language;
+            settings.DataDirectory = DataDirectory;
+            settings.ConfirmBeforeClear = ConfirmBeforeClear;
+            settings.DefaultZoomLevel = _defaultZoomLevel;
+            settings.MaxSnapshotsPerVenue = MaxSnapshotsPerVenue;
+            settings.Telemetry.Enabled = TelemetryEnabled;
+            settings.SuppressEnvironmentWarning = SuppressEnvironmentWarning;
+            settings.Logging.MinimumLevel = LogLevelIndex switch { 0 => "Debug", 2 => "Warning", 3 => "Error", _ => "Information" };
+            settings.AutoUpdate = AutoUpdate;
 
             await _facade.SaveAppSettingsAsync(settings , ct);
+
+            // 同步内存中的遥测状态（SetEnabled 内部也会持久化，此时 settings 已完整）
+            _telemetry.SetEnabled(TelemetryEnabled);
 
             var langChanged = !string.Equals(_originalLanguage , Language , StringComparison.Ordinal);
             _originalLanguage = Language;
@@ -221,6 +318,8 @@ public partial class SettingsViewModel : ViewModelBase
         DataDirectory = string.Empty;
         ConfirmBeforeClear = true;
         ZoomIndex = 1;
+        SuppressEnvironmentWarning = false;
+        LogLevelIndex = 1;
         StatusMessage = Resources.Settings_ResetDone;
     }
 
@@ -452,7 +551,7 @@ public partial class SettingsViewModel : ViewModelBase
     private void OpenDataDirectory ()
     {
         var path = string.IsNullOrWhiteSpace(DataDirectory)
-            ? Path.Combine(AppEnvironment.ExeDirectory , "AppData")
+            ? AppEnvironment.DefaultDataDirectory
             : DataDirectory;
 
         try
@@ -467,6 +566,187 @@ public partial class SettingsViewModel : ViewModelBase
         {
             _ = _dialog.ShowErrorAsync(Resources.Settings_OpenDirFailed , ex.Message);
         }
+    }
+
+    // ---- 更新命令 ----
+
+    [RelayCommand]
+    private async Task CheckForUpdateAsync ()
+    {
+        if (IsCheckingUpdate)
+            return;
+
+        try
+        {
+            IsCheckingUpdate = true;
+            IsUpdateAvailable = false;
+            UpdateStatusMessage = Resources.Settings_UpdateChecking;
+
+            var result = await _updateService.CheckForUpdatesAsync();
+
+            if (result.ServiceStatus == UpdateServiceStatus.NotInstalled)
+            {
+                UpdateStatusMessage = Resources.Settings_UpdateNotInstalled;
+                return;
+            }
+
+            if (result.ServiceStatus == UpdateServiceStatus.Unavailable)
+            {
+                UpdateStatusMessage = Resources.Settings_UpdateFailed;
+                await ShowGitHubFallbackDialogAsync();
+                return;
+            }
+
+            if (result.HasUpdate)
+            {
+                IsUpdateAvailable = true;
+                UpdateVersionText = result.NewVersion;
+                UpdateStatusMessage = string.Format(Resources.Settings_UpdateAvailable, result.NewVersion ?? "");
+
+                // 弹出 release notes 对话框，让用户决定是否下载更新
+                await ShowUpdateDialogAsync(result.NewVersion!);
+            }
+            else
+            {
+                UpdateStatusMessage = Resources.Settings_UpdateLatest;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "更新检查失败");
+            UpdateStatusMessage = Resources.Settings_UpdateFailed;
+        }
+        finally
+        {
+            IsCheckingUpdate = false;
+        }
+    }
+
+    /// <summary>
+    /// 弹出发布说明对话框，让用户决定是否下载/安装更新。
+    /// </summary>
+    private async Task ShowUpdateDialogAsync (string newVersion)
+    {
+        try
+        {
+            if (AvaloniaApplication.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop)
+                return;
+            if (desktop.MainWindow is not { } mainWindow)
+                return;
+
+            var dialog = await Views.UpdateDialogWindow.CreateAsync(
+                _serviceProvider, newVersion, allowDownload: true);
+
+            await dialog.ShowDialog<bool>(mainWindow);
+
+            if (dialog.Confirmed)
+            {
+                _updateService.ApplyUpdatesAndRestart();
+            }
+            else if (dialog.Downloaded)
+            {
+                // 下载完成但用户选了"稍后再说"——刷新待重启状态
+                RefreshPendingUpdateState();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "发布说明对话框异常");
+        }
+    }
+
+    /// <summary>
+    /// 更新源不可达时弹窗，询问是否前往 GitHub Releases 页面手动下载。
+    /// </summary>
+    private async Task ShowGitHubFallbackDialogAsync()
+    {
+        try
+        {
+            var goToGitHub = await _dialog.ShowConfirmAsync(
+                Resources.Update_CheckFailed,
+                Resources.Update_GoToGitHub);
+            if (!goToGitHub) return;
+
+            var url = _updateService.GetGitHubReleasesUrl(VersionInfo.Version);
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "GitHub 兜底对话框异常");
+        }
+    }
+
+    /// <summary>
+    /// 检查是否有已下载但尚未应用的更新。
+    /// 在页面加载时调用，避免用户下载后关闭应用再打开时丢失待应用状态。
+    /// </summary>
+    private void RefreshPendingUpdateState ()
+    {
+        HasPendingUpdate = _updateService.UpdatePendingRestart;
+        if (HasPendingUpdate)
+        {
+            UpdateStatusMessage = Resources.Settings_UpdatePendingRestart;
+            IsUpdateAvailable = true;
+        }
+    }
+
+    [RelayCommand]
+    private async Task DownloadAndApplyUpdateAsync ()
+    {
+        if (IsDownloading)
+            return;
+
+        try
+        {
+            IsDownloading = true;
+            UpdateDownloadProgress = 0;
+
+            var progress = new Progress<int>(p =>
+            {
+                UpdateDownloadProgress = p;
+                UpdateStatusMessage = string.Format(Resources.Settings_UpdateDownloading, p);
+            });
+
+            await _updateService.DownloadUpdatesAsync(progress);
+
+            UpdateDownloadProgress = 100;
+            UpdateStatusMessage = Resources.Settings_UpdateApply;
+
+            // 下载完成后确认重启——避免丢失未保存的工作
+            var restart = await _dialog.ShowConfirmAsync(
+                Resources.Settings_UpdateApply,
+                Resources.Settings_UpdateRestartConfirm);
+            if (!restart) return;
+
+            // 应用更新并重启
+            _updateService.ApplyUpdatesAndRestart();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "更新下载失败");
+            UpdateStatusMessage = Resources.Settings_UpdateFailed;
+        }
+        finally
+        {
+            IsDownloading = false;
+        }
+    }
+
+    /// <summary>
+    /// 应用已下载的更新并重启（无需重新下载）。
+    /// </summary>
+    [RelayCommand]
+    private async Task ApplyPendingUpdateAndRestartAsync ()
+    {
+        if (!_updateService.UpdatePendingRestart)
+            return;
+
+        var restart = await _dialog.ShowConfirmAsync(
+            Resources.Settings_UpdateApply,
+            Resources.Settings_UpdateRestartConfirm);
+        if (!restart) return;
+
+        _updateService.ApplyUpdatesAndRestart();
     }
 }
 

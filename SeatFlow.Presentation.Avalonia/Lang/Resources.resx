@@ -59,17 +59,32 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="About_Commit" xml:space="preserve">
+    <value>提交哈希</value>
+  </data>
   <data name="About_Dependencies" xml:space="preserve">
     <value>核心依赖</value>
   </data>
+  <data name="About_Documentation" xml:space="preserve">
+    <value>使用文档</value>
+  </data>
   <data name="About_Framework" xml:space="preserve">
     <value>运行框架</value>
+  </data>
+  <data name="About_GitHub" xml:space="preserve">
+    <value>GitHub 仓库</value>
+  </data>
+  <data name="About_Issues" xml:space="preserve">
+    <value>问题反馈</value>
   </data>
   <data name="About_License" xml:space="preserve">
     <value>许可证</value>
   </data>
   <data name="About_MITLicenseWarning" xml:space="preserve">
     <value>本软件依据 MIT 许可证分发，是完全免费的开源软件。任何形式的收费行为均未经授权，请警惕诈骗。</value>
+  </data>
+  <data name="About_OfficialSite" xml:space="preserve">
+    <value>官方网站</value>
   </data>
   <data name="About_OpenLink" xml:space="preserve">
     <value>打开 {0} 项目页面</value>
@@ -205,6 +220,30 @@
   </data>
   <data name="Guide_Seating_Select_Title" xml:space="preserve">
     <value>选择数据</value>
+  </data>
+  <data name="Home_Docs" xml:space="preserve">
+    <value>使用文档</value>
+  </data>
+  <data name="Home_FAQ" xml:space="preserve">
+    <value>常见问题</value>
+  </data>
+  <data name="Home_Greeting_Afternoon" xml:space="preserve">
+    <value>下午好，{0}</value>
+  </data>
+  <data name="Home_Greeting_Evening" xml:space="preserve">
+    <value>晚上好，{0}</value>
+  </data>
+  <data name="Home_Greeting_Morning" xml:space="preserve">
+    <value>早上好，{0}</value>
+  </data>
+  <data name="Home_Installation" xml:space="preserve">
+    <value>安装指南</value>
+  </data>
+  <data name="Home_QuickStart" xml:space="preserve">
+    <value>快速入门</value>
+  </data>
+  <data name="Home_Version" xml:space="preserve">
+    <value>版本 {0}</value>
   </data>
   <data name="Member_AddedRowFmt" xml:space="preserve">
     <value>已添加第 {0} 名学生</value>
@@ -1128,6 +1167,21 @@
   <data name="Settings_Appearance" xml:space="preserve">
     <value>外观</value>
   </data>
+  <data name="Settings_AutoUpdate" xml:space="preserve">
+    <value>自动更新</value>
+  </data>
+  <data name="Settings_AutoUpdateHint" xml:space="preserve">
+    <value>启动时自动检查更新。&quot;仅检查更新&quot;仅通知不下载，&quot;自动更新&quot;检查到后弹窗询问。</value>
+  </data>
+  <data name="Settings_AutoUpdate_Auto" xml:space="preserve">
+    <value>自动更新</value>
+  </data>
+  <data name="Settings_AutoUpdate_CheckOnly" xml:space="preserve">
+    <value>仅检查更新</value>
+  </data>
+  <data name="Settings_AutoUpdate_Off" xml:space="preserve">
+    <value>关闭</value>
+  </data>
   <data name="Settings_Behavior" xml:space="preserve">
     <value>行为</value>
   </data>
@@ -1182,11 +1236,35 @@
   <data name="Settings_LoadFailed" xml:space="preserve">
     <value>加载设置失败，将使用默认值</value>
   </data>
+  <data name="Settings_LogLevel" xml:space="preserve">
+    <value>日志级别</value>
+  </data>
+  <data name="Settings_LogLevelHint" xml:space="preserve">
+    <value>更详细的日志有助于排查问题，但会增加磁盘占用</value>
+  </data>
+  <data name="Settings_LogLevel_Debug" xml:space="preserve">
+    <value>调试</value>
+  </data>
+  <data name="Settings_LogLevel_Error" xml:space="preserve">
+    <value>错误</value>
+  </data>
+  <data name="Settings_LogLevel_Info" xml:space="preserve">
+    <value>信息</value>
+  </data>
+  <data name="Settings_LogLevel_Warning" xml:space="preserve">
+    <value>警告</value>
+  </data>
+  <data name="Settings_Logging" xml:space="preserve">
+    <value>日志</value>
+  </data>
   <data name="Settings_OpenDataDir" xml:space="preserve">
     <value>打开当前数据目录</value>
   </data>
   <data name="Settings_OpenDirFailed" xml:space="preserve">
     <value>打开目录失败</value>
+  </data>
+  <data name="Settings_Privacy" xml:space="preserve">
+    <value>隐私</value>
   </data>
   <data name="Settings_ResetConfirm" xml:space="preserve">
     <value>确定要恢复所有设置为默认值吗？</value>
@@ -1215,11 +1293,65 @@
   <data name="Settings_Storage" xml:space="preserve">
     <value>存储</value>
   </data>
+  <data name="Settings_SuppressEnvWarning" xml:space="preserve">
+    <value>不再显示运行环境警告</value>
+  </data>
+  <data name="Settings_SuppressEnvWarningHint" xml:space="preserve">
+    <value>环境不满足最低要求时不再弹出警告对话框</value>
+  </data>
+  <data name="Settings_Telemetry" xml:space="preserve">
+    <value>遥测</value>
+  </data>
+  <data name="Settings_TelemetryHint" xml:space="preserve">
+    <value>上报匿名使用数据（版本、功能使用统计、错误报告），帮助我们改进产品。不含任何个人信息。</value>
+  </data>
+  <data name="Settings_TelemetryToggle" xml:space="preserve">
+    <value>匿名遥测</value>
+  </data>
   <data name="Settings_ThemeMode" xml:space="preserve">
     <value>主题模式</value>
   </data>
   <data name="Settings_Title" xml:space="preserve">
     <value>设置</value>
+  </data>
+  <data name="Settings_Tools" xml:space="preserve">
+    <value>工具</value>
+  </data>
+  <data name="Settings_Update" xml:space="preserve">
+    <value>更新</value>
+  </data>
+  <data name="Settings_UpdateApply" xml:space="preserve">
+    <value>安装更新</value>
+  </data>
+  <data name="Settings_UpdateAvailable" xml:space="preserve">
+    <value>新版本 {0} 可用</value>
+  </data>
+  <data name="Settings_UpdateCheck" xml:space="preserve">
+    <value>检查更新</value>
+  </data>
+  <data name="Settings_UpdateChecking" xml:space="preserve">
+    <value>正在检查...</value>
+  </data>
+  <data name="Settings_UpdateDownloading" xml:space="preserve">
+    <value>正在下载... {0}%</value>
+  </data>
+  <data name="Settings_UpdateFailed" xml:space="preserve">
+    <value>更新检查失败</value>
+  </data>
+  <data name="Settings_UpdateFallback" xml:space="preserve">
+    <value>⚠️ 当前使用备用更新源，下载速度可能较慢</value>
+  </data>
+  <data name="Settings_UpdateLatest" xml:space="preserve">
+    <value>已是最新版本</value>
+  </data>
+  <data name="Settings_UpdateNotInstalled" xml:space="preserve">
+    <value>开发模式：更新功能不可用</value>
+  </data>
+  <data name="Settings_UpdatePendingRestart" xml:space="preserve">
+    <value>已有已下载的更新，重启即可应用</value>
+  </data>
+  <data name="Settings_UpdateRestartConfirm" xml:space="preserve">
+    <value>更新已下载完成，需要重启应用才能生效。是否立即重启？</value>
   </data>
   <data name="Snapshot_BatchDelete" xml:space="preserve">
     <value>批量删除</value>
@@ -1584,6 +1716,27 @@
 选择「确认」保存并离开
 选择「取消」放弃更改并离开</value>
   </data>
+  <data name="Telemetry_ConsentEnable" xml:space="preserve">
+    <value>开启</value>
+  </data>
+  <data name="Telemetry_ConsentLater" xml:space="preserve">
+    <value>暂不开启</value>
+  </data>
+  <data name="Telemetry_ConsentMessage" xml:space="preserve">
+    <value>开启匿名遥测以帮助我们改进产品。
+
+上报的数据包括：
+• 应用版本和运行环境（OS/.NET 版本）
+• 页面访问统计（如设置页）
+• 功能使用统计（排座次数、导出次数）
+• 匿名错误报告（不含个人信息）
+
+我们不会收集任何个人身份信息。
+您可以随时在此设置页面关闭遥测。</value>
+  </data>
+  <data name="Telemetry_ConsentTitle" xml:space="preserve">
+    <value>帮助我们改进 SeatFlow</value>
+  </data>
   <data name="Theme_Dark" xml:space="preserve">
     <value>深色</value>
   </data>
@@ -1592,6 +1745,33 @@
   </data>
   <data name="Theme_System" xml:space="preserve">
     <value>跟随系统</value>
+  </data>
+  <data name="Update_CheckFailed" xml:space="preserve">
+    <value>更新检查失败</value>
+  </data>
+  <data name="Update_CheckOnlyHint" xml:space="preserve">
+    <value>请前往&quot;设置 → 更新&quot;页面下载并安装此版本。</value>
+  </data>
+  <data name="Update_DownloadLater" xml:space="preserve">
+    <value>稍后再说</value>
+  </data>
+  <data name="Update_GoToGitHub" xml:space="preserve">
+    <value>自动更新服务暂时不可用。是否前往 GitHub Releases 页面手动下载？</value>
+  </data>
+  <data name="Update_InstallAndRestart" xml:space="preserve">
+    <value>安装并重启</value>
+  </data>
+  <data name="Update_NewVersionTitle" xml:space="preserve">
+    <value>发现新版本 {0}</value>
+  </data>
+  <data name="Update_NoReleaseNotes" xml:space="preserve">
+    <value>暂无更新日志</value>
+  </data>
+  <data name="Update_ReleaseNotes" xml:space="preserve">
+    <value>更新日志</value>
+  </data>
+  <data name="Update_UpdateNow" xml:space="preserve">
+    <value>立即更新</value>
   </data>
   <data name="Venue_AddDoor" xml:space="preserve">
     <value>添加门</value>

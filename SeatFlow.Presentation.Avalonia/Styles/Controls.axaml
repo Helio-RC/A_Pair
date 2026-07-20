@@ -20,6 +20,23 @@
     <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundListLowBrush}" />
   </Style>
 
+  <!-- ═══ 设置卡片 ═══ -->
+
+  <Style Selector="Border.settingsCard">
+    <Setter Property="Background" Value="{DynamicResource SurfaceCardBrush}" />
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="BoxShadow" Value="{DynamicResource CardShadowSmall}" />
+    <Setter Property="Padding" Value="20" />
+  </Style>
+
+  <!-- 卡片内部设置行（轻量分隔线） -->
+
+  <Style Selector="Border.settingRowInner">
+    <Setter Property="Padding" Value="0,10" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+    <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundChromeHighBrush}" />
+  </Style>
+
   <!-- ═══ 链接按钮 ═══ -->
 
   <Style Selector="Button.linkButton">
@@ -64,6 +81,74 @@
   </Style>
   <Style Selector="Button.accent:pointerover">
     <Setter Property="Background" Value="{DynamicResource SystemAccentColorDark1}" />
+  </Style>
+
+
+  <!-- ═══ 链接卡片按钮（About 页专用） ═══ -->
+
+  <Style Selector="Button.linkCard">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="Padding" Value="16,12" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="Transitions">
+      <Setter.Value>
+        <Transitions>
+          <BrushTransition Property="Background" Duration="0:0:0.12" />
+        </Transitions>
+      </Setter.Value>
+    </Setter>
+  </Style>
+  <Style Selector="Button.linkCard:pointerover">
+    <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundListLowBrush}" />
+  </Style>
+  <Style Selector="Button.linkCard:pressed">
+    <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundListMediumBrush}" />
+  </Style>
+
+  <!-- ═══ 版本信息徽章 ═══ -->
+
+  <Style Selector="Border.versionBadge">
+    <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundChromeMediumBrush}" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Padding" Value="10,6" />
+  </Style>
+
+  <!-- ═══ 等宽字体文本 ═══ -->
+
+  <Style Selector="TextBlock.textMono">
+    <Setter Property="FontFamily" Value="Cascadia Code, JetBrains Mono, Consolas, monospace" />
+    <Setter Property="FontSize" Value="11" />
+  </Style>
+
+  <!-- ═══ 依赖项卡片项 ═══ -->
+
+  <Style Selector="Border.depCardItem">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Padding" Value="14,10" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Transitions">
+      <Setter.Value>
+        <Transitions>
+          <BrushTransition Property="Background" Duration="0:0:0.12" />
+        </Transitions>
+      </Setter.Value>
+    </Setter>
+  </Style>
+  <Style Selector="Border.depCardItem:pointerover">
+    <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundListLowBrush}" />
+  </Style>
+
+  <!-- ═══ 装饰圆点 ═══ -->
+
+  <Style Selector="Border.badgeDot">
+    <Setter Property="Width" Value="6" />
+    <Setter Property="Height" Value="6" />
+    <Setter Property="CornerRadius" Value="3" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Margin" Value="0,0,8,0" />
   </Style>
 
 </Styles>

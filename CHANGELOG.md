@@ -2,7 +2,33 @@
 
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
-## [1.3.0] — 2026-06-28
+## [1.4.0] — 2026-07-13
+
+### Added
+- **Velopack 安装与自动更新**：引入 Velopack 安装框架，支持跨平台安装包（Windows Setup.exe、Linux AppImage，macOS 计划中暂无安装包）和增量自动更新。双源架构（API 网关 `seatflow.work` → GitHub Releases 兜底），已下载的更新包在启动时自动应用
+- **遥测系统**：OpenTelemetry 遥测（页面浏览、操作事件、性能指标），opt-in 同意弹窗，支持 Gzip 压缩批量上报
+- **日志系统重构**：Serilog 结构化日志替代 `Debug.WriteLine`，实例隔离文件名（`SeatFlow_{yyyyMMdd-HHmmss}.log`），分模块等级覆盖，文件尺寸/数量上限控制（`docs/LOGGING.md`）
+- **.seatsets 数据打包格式**：将 AppData 全量数据打包为单个 `.seatsets` JSON 归档（分块 SHA256 校验 + 版本号系统），三种导入途径（设置页面按钮 / 双击文件 / 首次启动自动发现），Win32 命名管道多实例转发
+- **文件关联**：Windows `.seatsets` 文件注册到 HKCU，双击自动启动程序导入
+- **"仅更新人员数据集"**：不重新排座，仅用最新学生数据更新已有快照
+- **安装时数据迁移**：Velopack `--veloapp-install` hook 自动复制安装程序目录下的 `.seatsets` 到应用根目录，首次启动自动导入
+
+### Changed
+- **取消单文件发布**：移除 `PublishSingleFile`，改为标准 `dotnet publish` 文件夹输出 + zip/tar.gz 打包。Velopack 安装包作为主要分发形式，便携包保留
+- **数据存储路径标准化**：从 `{exeDir}/AppData/` 迁移到 OS 标准路径（Windows `%APPDATA%\SeatFlow\`、Linux `~/.local/share/SeatFlow/`、macOS `~/Library/Application Support/SeatFlow/`）
+- **发布文件名简化**：zip/tar.gz 发布文件名从 `SeatFlow-{ver}-{label}-{rid}.{ext}` 简化为 `SeatFlow-{ver}-{platform}.{ext}`
+- **日志系统**：`Debug.WriteLine` → Serilog + `Microsoft.Extensions.Logging.ILogger<T>`，`docs/LOGGING.md` 完整文档
+- **辅助脚本**：`version.py` 统一管理 App/文件格式/策略清单/引导配置版本；`i18n.py` .resx 资源 CRUD + Designer.cs 自动生成
+
+### Removed
+- **启动时目录清洁检查**（`CheckCleanDirectory`）：不再要求 exe 居于空目录，适配安装包目录结构
+- **单文件发布标志**：`PublishSingleFile`、`IncludeNativeLibrariesForSelfExtract`、`IncludeAllContentForSelfExtract`
+
+### Fixed
+- **单文件发布数据目录 BUG**：修复 `AppContext.BaseDirectory` 在单文件发布时指向临时解压目录（`%TEMP%\.net\...`），改用 `Environment.ProcessPath`，防止 AppData 在更新/重启后丢失
+- **引导系统**：修复引导不显示、死锁、竞态、窗口状态不同步、初次启动配置文件缺失等多项问题
+- **UI**：弹窗内容重叠修复、颜色随主题、导入后自动刷新、教师视角导出列镜像修正、修复导出按钮无反应
+- **遥测与引导冲突**：修复引导在初次启动时覆盖遥测同意弹窗
 
 ### Added
 - **应用数据打包（.seatsets）**：将 AppData 全部数据（设置、会场、名单、快照、策略配置）打包为单个 `.seatsets` JSON 归档文件，支持分块 SHA256 完整性校验和版本号系统

@@ -335,21 +335,31 @@ UI 层通过 `LocalizeHelper.Resolve(dict)` 按 `CurrentUICulture` 解析。
 座位安排结果 Assignments/{venue}/{date}/snapshot.json 特定场次
 插件配置 Plugins/{plugin-id}/config.json 单个插件
 
-5.2 文件夹布局
+5.2 数据存储位置
+
+所有用户数据存储在 OS 标准应用数据目录（`AppEnvironment.DefaultDataDirectory`）：
+- Windows: `%APPDATA%\SeatFlow\`
+- Linux: `~/.local/share/SeatFlow/`
+- macOS: `~/Library/Application Support/SeatFlow/`
+
+用户可通过设置页面的 `DataDirectory` 选项自定义路径。
+
+5.3 文件夹布局
 
 ```
-SeatFlow/
+{DataDirectory}/
 ├── AppSettings.json
 ├── Venues/
 ├── Rosters/
 ├── Assignments/
-├── Plugins/
-├── Backups/
+├── StrategyConfig/
 ├── Logs/
 └── Temp/
 ```
 
-5.3 版本管理与升级
+插件目录：Velopack 安装时位于 `RootAppDir/Plugins/`，开发/便携模式位于 `{exeDir}/Plugins/`。
+
+5.4 版本管理与升级
 
 · 配置文件包含 `version` 字段（`VenueFile` v1.1、`RosterFile` v1.0、`SeatingSnapshot` v1.0、`AppSettings` v1.0、`StrategyConfig` v1.0、`VenueSnapshotInfo` v1.0）
 · 各文件类型当前版本号记录于 `SeatFlow.Infrastructure/Migration/file_versions.json`（嵌入资源，随程序编译）
@@ -359,7 +369,7 @@ SeatFlow/
 · JSON 序列化约定：camelCase 命名字段；`layoutType` 为数字枚举、`layoutTypeString` 为字符串；Seat 多态通过 `SeatJsonConverter` 的 `Type` 鉴别器
 · 座位快照支持父子关系，便于追溯与回滚
 
-5.4 敏感数据保护
+5.5 敏感数据保护
 
 · 字段级 AES-256 加密（标记 [SensitiveData] 的属性）。
 · 文件级加密（用户密码保护整个 Roster 文件）。
@@ -441,7 +451,7 @@ ViewModel 通过构造函数注入 IApplicationFacade，调用业务逻辑。
 
 7.4 部署与更新
 
-· 打包格式：Windows (.msi / .zip)、macOS (.app / .pkg)、Linux (AppImage / Flatpak)。
+· 打包格式：Windows (.msi / .zip)、Linux (AppImage / Flatpak)、macOS (.app / .pkg，计划中暂无安装包)。
 · 自动更新：可选集成 Velopack 或 Squirrel。
 
 7.5 测试策略

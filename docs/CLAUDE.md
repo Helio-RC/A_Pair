@@ -86,7 +86,12 @@ SeatFlow 是一个 .NET 10 跨平台桌面座位编排系统，使用 Avalonia U
 
 新建模型类型（均在 `SeatFlow.Core.Models` 中）：
 - `StrategyParameterDefinition` / `StrategyCodeBlock` / `StrategyFieldDefinition` + 枚举（`StrategyFieldType`、`StrategyDataType`、`StrategyDisplayMode`）
-- `StrategyDatasetConfig` + `StrategyConfigRow` — 持久化模型，存储在 `{AppData}/StrategyConfig/{strategyId}/` 下。
+- `StrategyDatasetConfig` + `StrategyConfigRow` — 持久化模型，存储在 `{DataDirectory}/StrategyConfig/{strategyId}/` 下。
+
+**数据存储**：所有用户数据存储在 OS 标准应用数据目录（`AppEnvironment.DefaultDataDirectory`）：
+- Windows: `%APPDATA%\SeatFlow\` / Linux: `~/.local/share/SeatFlow/` / macOS: `~/Library/Application Support/SeatFlow/`
+- 用户可通过 `AppSettings.json` 的 `DataDirectory` 选项自定义
+- 插件目录：Velopack 安装时 `RootAppDir/Plugins/`，开发模式 `{exeDir}/Plugins/`
 
 **项目配置**：Avalonia csproj 中 `AvaloniaUseCompiledBindingsByDefault` 为 `true` — 所有绑定均为编译绑定，除非显式退出。关键 csproj 设置：
 - `<AssemblyName>SeatFlow</AssemblyName>` — 输出 EXE 为 `SeatFlow.exe`，而非 `SeatFlow.Presentation.Avalonia.exe`
@@ -218,8 +223,10 @@ python3 scripts/i18n.py sync                     # 从 .resx 重新生成 Design
 |--------|------|
 | `scripts/i18n.py` | i18n .resx 资源 CRUD + Designer.cs 同步（45 个单元测试） |
 | `scripts/version.py` | 跨 15+ 个文件的统一版本管理 — App 版本、文件格式版本、策略清单版本、引导配置版本。子命令：`show`、`check`、`bump-app`、`bump-file`、`bump-strategy`、`bump-onboarding`、`sync`（26 个单元测试） |
-| `scripts/publish.sh` / `scripts/publish.ps1` | 多平台 TUI/CLI 发布（独立 + 框架依赖，裁剪，AOT，SHA256 表格） |
-| `scripts/clean.sh` / `scripts/clean.ps1` | 递归清理 bin/obj |
+| `scripts/build/publish.sh` / `scripts/build/publish.ps1` | 多平台 TUI/CLI 发布（独立 + 框架依赖，裁剪，AOT，SHA256 表格） |
+| `scripts/build/clean.sh` / `scripts/build/clean.ps1` | 递归清理 bin/obj |
+| `scripts/update_version_info.py` | MSBuild 辅助 — 读取 version.json + git → 编译时生成 VersionInfo.g.cs |
+| `scripts/release/release.py` | 发布编排器 — 构建→打包→OSS 上传→GitHub Release |
 
 单元测试位于 `scripts/tests/`。
 
@@ -247,13 +254,28 @@ python3 scripts/i18n.py sync                     # 从 .resx 重新生成 Design
 | Roster | `1.1` | `{data}/Rosters/*.roster.json` | `RosterFile` |
 | Snapshot | `1.0` | `{data}/Assignments/{venueId}/{date}/*.json` | `SeatingSnapshot` |
 | VenueInfo | `1.0` | `{data}/Assignments/{venueId}/_venue.json` | `VenueSnapshotInfo` |
-| AppSettings | `1.0` | `{data}/AppSettings.json` | `AppSettings` |
+| AppSettings | `1.1` | `{data}/AppSettings.json` | `AppSettings` |
 | StrategyConfig | `1.0` | `{data}/StrategyConfig/{strategyId}.config.json` | `StrategyConfig` |
 | StrategyDatasetConfig | `1.0` | `{data}/StrategyConfig/{strategyId}/*.config.json` | `StrategyDatasetConfig` |
 
 ### 迁移管道
 
 加载时，每个仓库将文件读取为 `JsonNode`，调用 `FileMigrationService.Migrate(fileType, node, fileVersion, targetVersion)`，然后反序列化。迁移是**仅向前**的 — 不支持版本回滚。服务查找已注册的 `IFileMigrator` 实现，通过匹配 `FromVersion`/`ToVersion` 链式执行。
+
+### 何时需要迁移器 vs 依赖模型默认值
+
+**不需要迁移器**（模型默认值即可）：
+- 新增属性/配置节，且所有字段都有合理的默认值（`bool` → `false`、`int` → `0`、`string` → `""`、引用类型 → `new()`）
+- 旧 JSON 缺少该节点时，`System.Text.Json` 反序列化会保留属性的默认值
+- 示例：新增 `TelemetryConfig` 到 `AppSettings`，默认 `Enabled = false`，旧文件无需迁移
+
+**必须写迁移器**：
+- 数据格式变化：如 `VenueMigrators 1.0→1.1` 将座位从列主序重排为行主序
+- 字段语义变化：同一个 JSON key 的含义改变，需要重新计算/转换
+- 字段重命名且不能丢失旧数据：需要将旧 key 的值复制到新 key
+- 数据结构重组：嵌套层级变化（如 `SeatSetsMigrators`）
+
+**原则**：只有旧数据**不转换就会出错或丢失信息**时才写迁移器。能用默认值兜底就不要写。
 
 ### 添加迁移
 
@@ -460,12 +482,11 @@ python3 scripts/version.py sync --force
 
 **重要**：`bump-file` 自动同步 `file_versions.json` → 7 个 Model C# 类 → `JsonStudentWriter.cs`，无需手动修改。
 
-### 发布 (`scripts/publish.sh` / `scripts/publish.ps1`)
+### 发布 (`scripts/build/publish.sh` / `scripts/build/publish.ps1`)
 
 ```bash
-cd scripts
+cd scripts/build
 ./publish.sh                    # TUI 交互模式（多选平台/选项）
-./publish.sh hash               # 仅为已有发布文件生成 SHA256 表
 
 # CLI 模式参数: <类型> <配置> <版本> <选项>...
 # 类型: both | sc | fde     (全部 / 独立 / 框架依赖)
@@ -473,10 +494,10 @@ cd scripts
 ./publish.sh both Release "" "1.2.1" clean aot   # 全平台独立+框架依赖，裁剪+AOT，版本 1.2.1
 ```
 
-### 清理 (`scripts/clean.sh` / `scripts/clean.ps1`)
+### 清理 (`scripts/build/clean.sh` / `scripts/build/clean.ps1`)
 
 ```bash
-cd scripts
+cd scripts/build
 ./clean.sh          # 确认后删除所有 bin/ 和 obj/
 ./clean.sh -n       # 仅预览（dry-run）
 ./clean.sh -f       # 直接删除（跳过确认）

@@ -386,3 +386,11 @@ dev-debug.log
 # i18n backup files
 Seatflow.Presentation.Avalonia/Lang/.backup/
 .version-backups
+
+# Release config (contains OSS credentials + GitHub token)
+scripts/release/config.json
+# Allow the release scripts themselves (VS gitignore ignores [Rr]elease/)
+!scripts/release/
+!scripts/release/__init__.py
+!scripts/release/release.py
+!scripts/release/config.json.example

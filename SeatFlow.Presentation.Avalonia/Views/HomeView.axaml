@@ -1,7 +1,10 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="using:SeatFlow.Presentation.Avalonia.Views"
+             xmlns:services="using:SeatFlow.Presentation.Avalonia.Services"
              xmlns:vm="using:SeatFlow.Presentation.Avalonia.ViewModels"
-             xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
+             xmlns:fic="using:FluentIcons.Avalonia"
+             xmlns:ficEnum="clr-namespace:FluentIcons.Common;assembly=FluentIcons.Common"
              xmlns:lang="using:SeatFlow.Presentation.Avalonia.Lang"
              x:Class="SeatFlow.Presentation.Avalonia.Views.HomeView"
              x:DataType="vm:HomeViewModel">
@@ -10,21 +13,112 @@
     <vm:HomeViewModel />
   </Design.DataContext>
 
-  <DockPanel>
-    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="16">
-      <svg:Svg Path="/Assets/icon_with_background.svg"
-               Width="240" Height="240"
-               HorizontalAlignment="Center"
-               Stretch="Uniform" />
-      <TextBlock Text="{Binding Greeting}" Classes="hero"
-                 HorizontalAlignment="Center" />
-      <TextBlock Text="{Binding Subtitle}" FontSize="16"
-                 HorizontalAlignment="Center"
-                 Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
-      <Separator Width="200" Margin="0,8" />
-      <TextBlock Text="{x:Static lang:Resources.Home_Hint}" Classes="body"
-                 HorizontalAlignment="Center"
-                 Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
-    </StackPanel>
-  </DockPanel>
+  <Grid Margin="48,40">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+      <StackPanel Spacing="0" MaxWidth="720">
+
+        <!-- ═══ Row 1: Avatar + Greeting ═══ -->
+        <StackPanel Orientation="Horizontal" Spacing="16">
+          <Border IsVisible="{Binding HasUserAvatar}"
+                  Width="48" Height="48" CornerRadius="24" ClipToBounds="True">
+            <Image Source="{Binding UserAvatar}" Width="48" Height="48"
+                   Stretch="UniformToFill" />
+          </Border>
+          <Border IsVisible="{Binding !HasUserAvatar}"
+                  x:Name="AvatarFallback"
+                  Width="48" Height="48" CornerRadius="24"
+                  Background="{DynamicResource SystemAccentColor}">
+            <TextBlock Text="{Binding UserInitialChar}" FontSize="22"
+                       Foreground="{Binding Background, ElementName=AvatarFallback,
+                                  Converter={x:Static views:HomeView.ContrastForeground}}"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+          <TextBlock Text="{Binding GreetingLine}"
+                     FontSize="24" FontWeight="SemiBold"
+                     VerticalAlignment="Center" />
+        </StackPanel>
+
+        <!-- ═══ Row 2: Doc Link Buttons ═══ -->
+        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,24,0,0">
+          <Button Classes="accent" Padding="14,8"
+                  Command="{Binding OpenUrlCommand}"
+                  CommandParameter="{Binding QuickStartUrl}"
+                  AutomationProperties.Name="{x:Static lang:Resources.Home_QuickStart}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <fic:FluentIcon Icon="{x:Static ficEnum:Icon.Rocket}" FontSize="14" />
+              <TextBlock Text="{x:Static lang:Resources.Home_QuickStart}" Classes="bodySmall" />
+            </StackPanel>
+          </Button>
+          <Button Padding="14,8"
+                  Command="{Binding OpenUrlCommand}"
+                  CommandParameter="{Binding DocsUrl}"
+                  AutomationProperties.Name="{x:Static lang:Resources.Home_Docs}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <fic:FluentIcon Icon="{x:Static ficEnum:Icon.BookOpen}" FontSize="14" />
+              <TextBlock Text="{x:Static lang:Resources.Home_Docs}" Classes="bodySmall" />
+            </StackPanel>
+          </Button>
+          <Button Padding="14,8"
+                  Command="{Binding OpenUrlCommand}"
+                  CommandParameter="{Binding FaqUrl}"
+                  AutomationProperties.Name="{x:Static lang:Resources.Home_FAQ}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <fic:FluentIcon Icon="{x:Static ficEnum:Icon.ChatHelp}" FontSize="14" />
+              <TextBlock Text="{x:Static lang:Resources.Home_FAQ}" Classes="bodySmall" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+
+        <!-- ═══ Row 3: RELEASE.md Card ═══ -->
+        <Border Classes="surfaceCard elevationMd radiusMd"
+                Padding="20" Margin="0,24,0,0"
+                BorderBrush="{DynamicResource SystemControlForegroundChromeHighBrush}"
+                BorderThickness="1">
+          <ItemsControl ItemsSource="{Binding ReleaseBlocks}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="services:MdBlock">
+                <Panel>
+                  <!-- Title -->
+                  <TextBlock IsVisible="{Binding IsTitle}" Text="{Binding Text}"
+                             FontSize="20" FontWeight="Bold" Margin="0,12,0,2"
+                             TextWrapping="Wrap" />
+                  <!-- Heading -->
+                  <TextBlock IsVisible="{Binding IsHeading}" Text="{Binding Text}"
+                             FontSize="16" FontWeight="SemiBold" Margin="0,10,0,2"
+                             TextWrapping="Wrap" />
+                  <!-- SubHeading -->
+                  <TextBlock IsVisible="{Binding IsSubHeading}" Text="{Binding Text}"
+                             FontSize="14" FontWeight="SemiBold" Margin="0,6,0,2"
+                             TextWrapping="Wrap" />
+                  <!-- ListItem -->
+                  <StackPanel IsVisible="{Binding IsListItem}"
+                              Orientation="Horizontal" Spacing="4" Margin="12,1,0,1">
+                    <TextBlock Text="·" FontSize="13"
+                               Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+                    <TextBlock Text="{Binding Text}" FontSize="13"
+                               Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                               TextWrapping="Wrap" />
+                  </StackPanel>
+                  <!-- Paragraph -->
+                  <TextBlock IsVisible="{Binding IsParagraph}" Text="{Binding Text}"
+                             FontSize="13" TextWrapping="Wrap" Margin="0,3,0,3"
+                             Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+                  <!-- Code -->
+                  <Border IsVisible="{Binding IsCode}" Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+                          CornerRadius="4" Padding="12,8" Margin="0,4">
+                    <TextBlock Text="{Binding Text}" FontSize="12"
+                               FontFamily="Cascadia Code, JetBrains Mono, Consolas, monospace"
+                               TextWrapping="Wrap" />
+                  </Border>
+                  <!-- Empty spacer -->
+                  <Border IsVisible="{Binding IsEmpty}" Height="8" />
+                </Panel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </Border>
+
+      </StackPanel>
+    </ScrollViewer>
+  </Grid>
 </UserControl>

@@ -85,7 +85,29 @@ All user-visible text uses inline i18n: `{ "zh-CN": "...", "en-US": "..." }` dic
 
 New model types (all in `SeatFlow.Core.Models`):
 - `StrategyParameterDefinition` / `StrategyCodeBlock` / `StrategyFieldDefinition` + enums (`StrategyFieldType`, `StrategyDataType`, `StrategyDisplayMode`)
-- `StrategyDatasetConfig` + `StrategyConfigRow` — persistence models stored under `{AppData}/StrategyConfig/{strategyId}/`.
+- `StrategyDatasetConfig` + `StrategyConfigRow` — persistence models stored under `{DataDirectory}/StrategyConfig/{strategyId}/`.
+
+**Data storage**: All user data is stored in OS-standard application data directories via `AppEnvironment.DefaultDataDirectory`:
+- Windows: `%APPDATA%\SeatFlow\`
+- Linux: `~/.local/share/SeatFlow/` (XDG_DATA_HOME)
+- macOS: `~/Library/Application Support/SeatFlow/`
+
+Directory structure:
+```
+{DataDirectory}/
+├── AppSettings.json              # Global settings
+├── Logs/                         # Log files
+│   └── SeatFlow_{yyyyMMdd-HHmmss}.log
+├── Venues/                       # Venue files (*.venue.json)
+├── Rosters/                      # Student rosters (*.roster.json)
+├── Assignments/                  # Seating snapshots
+│   └── {venueId}/{yyyyMMdd}/*.json
+└── StrategyConfig/               # Strategy config files
+    ├── {strategyId}.config.json
+    └── {strategyId}/*.config.json
+```
+
+Users can override via `DataDirectory` in AppSettings.json. Plugins are stored in `RootAppDir/Plugins/` (Velopack install) or `{exeDir}/Plugins/` (dev/portable).
 
 **Project config**: `AvaloniaUseCompiledBindingsByDefault` is `true` in the Avalonia csproj — all bindings are compiled unless explicitly opted out. Key csproj settings:
 - `<AssemblyName>SeatFlow</AssemblyName>` — output EXE is `SeatFlow.exe`, not `SeatFlow.Presentation.Avalonia.exe`
@@ -217,8 +239,10 @@ Besides `scripts/i18n.py` (documented above), the following scripts exist — al
 |--------|---------|
 | `scripts/i18n.py` | i18n .resx resource CRUD + Designer.cs sync (45 unit tests) |
 | `scripts/version.py` | Unified version management across 15+ files — App, file format, strategy manifest, onboarding config versions. Subcommands: `show`, `check`, `bump-app`, `bump-file`, `bump-strategy`, `bump-onboarding`, `sync` (26 unit tests) |
-| `scripts/publish.sh` / `scripts/publish.ps1` | Multi-platform TUI/CLI publishing (self-contained + framework-dependent, trimming, AOT, SHA256 table) |
-| `scripts/clean.sh` / `scripts/clean.ps1` | Recursive bin/obj cleanup |
+| `scripts/build/publish.sh` / `scripts/build/publish.ps1` | Multi-platform TUI/CLI publishing (self-contained + framework-dependent, trimming, AOT, SHA256 table) |
+| `scripts/build/clean.sh` / `scripts/build/clean.ps1` | Recursive bin/obj cleanup |
+| `scripts/update_version_info.py` | MSBuild helper — reads version.json + git → generates VersionInfo.g.cs at build time |
+| `scripts/release/release.py` | Release orchestrator — build → package → OSS upload → GitHub Release |
 
 Unit tests are in `scripts/tests/`.
 
@@ -246,13 +270,28 @@ All persisted JSON files carry a `version` field. Current versions are defined i
 | Roster | `1.1` | `{data}/Rosters/*.roster.json` | `RosterFile` |
 | Snapshot | `1.0` | `{data}/Assignments/{venueId}/{date}/*.json` | `SeatingSnapshot` |
 | VenueInfo | `1.0` | `{data}/Assignments/{venueId}/_venue.json` | `VenueSnapshotInfo` |
-| AppSettings | `1.0` | `{data}/AppSettings.json` | `AppSettings` |
+| AppSettings | `1.1` | `{data}/AppSettings.json` | `AppSettings` |
 | StrategyConfig | `1.0` | `{data}/StrategyConfig/{strategyId}.config.json` | `StrategyConfig` |
 | StrategyDatasetConfig | `1.0` | `{data}/StrategyConfig/{strategyId}/*.config.json` | `StrategyDatasetConfig` |
 
 ### Migration pipeline
 
 On load, each repository reads the file as `JsonNode`, calls `FileMigrationService.Migrate(fileType, node, fileVersion, targetVersion)`, then deserializes. Migration is **forward-only** — no version rollback. The service finds registered `IFileMigrator` implementations and chains them by matching `FromVersion`/`ToVersion`.
+
+### 何时需要迁移器 vs 依赖模型默认值
+
+**不需要迁移器**（模型默认值即可）：
+- 新增属性/配置节，且所有字段都有合理的默认值（`bool` → `false`、`int` → `0`、`string` → `""`、引用类型 → `new()`）
+- 旧 JSON 缺少该节点时，`System.Text.Json` 反序列化会保留属性的默认值
+- 示例：新增 `TelemetryConfig` 到 `AppSettings`，默认 `Enabled = false`，旧文件无需迁移
+
+**必须写迁移器**：
+- 数据格式变化：如 `VenueMigrators 1.0→1.1` 将座位从列主序重排为行主序
+- 字段语义变化：同一个 JSON key 的含义改变，需要重新计算/转换
+- 字段重命名且不能丢失旧数据：需要将旧 key 的值复制到新 key
+- 数据结构重组：嵌套层级变化（如 `SeatSetsMigrators`）
+
+**原则**：只有旧数据**不转换就会出错或丢失信息**时才写迁移器。能用默认值兜底就不要写。
 
 ### Adding a migration
 
@@ -459,12 +498,36 @@ python3 scripts/version.py sync --force
 
 **重要**：`bump-file` 自动同步 `file_versions.json` → 7 个 Model C# 类 → `JsonStudentWriter.cs`，无需手动修改。
 
-### 发布 (`scripts/publish.sh` / `scripts/publish.ps1`)
+### RELEASE.md — 发布说明
+
+**路径**: `RELEASE.md`（项目根目录）。独立于 `CHANGELOG.md`，由开发者在每次发布前手动编写。`release.py` 读取该文件作为 GitHub Release body（末尾自动附加 SHA256 表格）。
+
+格式：
+```markdown
+# SeatFlow v1.3.0 发布说明
+
+本次发布主要修复了...
+
+## 新增
+- ...
+
+## 修复
+- ...
+```
+
+### 版本真相源 (`version.json`)
+
+**路径**: `version.json`（项目根目录）。App 版本号的唯一来源。字段：`version`, `releaseTag`, `commitId`, `buildDate`。
+
+- `version` / `releaseTag` → 由 `version.py bump-app` 管理
+- `commitId` / `buildDate` → 编译时由 `update_version_info.py` 从 git 实时获取，生成 `VersionInfo.g.cs` 供 C# 使用
+- `AboutViewModel` 使用 `VersionInfo.Version` + `VersionInfo.CommitId` 显示版本
+
+### 发布 (`scripts/build/publish.sh` / `scripts/build/publish.ps1`)
 
 ```bash
-cd scripts
+cd scripts/build
 ./publish.sh                    # TUI 交互模式（多选平台/选项）
-./publish.sh hash               # 仅为已有发布文件生成 SHA256 表
 
 # CLI 模式参数: <类型> <配置> <版本> <选项>...
 # 类型: both | sc | fde     (全部 / 独立 / 框架依赖)
@@ -472,10 +535,24 @@ cd scripts
 ./publish.sh both Release "" "1.2.1" clean aot   # 全平台独立+框架依赖，裁剪+AOT，版本 1.2.1
 ```
 
-### 清理 (`scripts/clean.sh` / `scripts/clean.ps1`)
+### 发布流水线 (`scripts/release/release.py`)
 
 ```bash
-cd scripts
+python3 scripts/release/release.py --dry-run        # 预览全流程
+python3 scripts/release/release.py                  # 完整发布
+python3 scripts/release/release.py --skip-build     # 跳过构建，仅打包和发布
+```
+
+**流程**: dotnet publish (4 RID) → zip/tar.gz 打包 → SHA256 → OSS 上传 + releases.json 更新 → GitHub REST API 创建 Release。
+
+**配置文件**: `scripts/release/config.json`（gitignored，含 OSS AccessKey + GitHub token）。模板见 `config.json.example`。
+
+**依赖**: `pip install oss2 requests`
+
+### 清理 (`scripts/build/clean.sh` / `scripts/build/clean.ps1`)
+
+```bash
+cd scripts/build
 ./clean.sh          # 确认后删除所有 bin/ 和 obj/
 ./clean.sh -n       # 仅预览（dry-run）
 ./clean.sh -f       # 直接删除（跳过确认）

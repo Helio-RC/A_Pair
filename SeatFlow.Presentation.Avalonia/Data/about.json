@@ -1,8 +1,13 @@
 {
   "zh-CN": {
-    "version": "1.3.0",
     "description": "跨平台桌面座位安排与轮换系统，支持多种布局、策略引擎、插件扩展（开发中）和数据导入导出。",
     "projectUrl": "https://github.com/Helio-RC/Seatflow",
+    "officialSiteUrl": "https://seatflow.work",
+    "docsUrl": "https://seatflow.work/Docs",
+    "githubUrl": "https://github.com/Helio-RC/Seatflow",
+    "issuesUrl": "https://github.com/Helio-RC/Seatflow/issues",
+    "quickStartUrl": "https://seatflow.work/Docs/quick-start",
+    "faqUrl": "https://seatflow.work/Docs/faq",
     "license": "MIT License",
     "copyright": "© 2026 SeatFlow Contributors",
     "dependencies": [
@@ -17,9 +22,14 @@
     ]
   },
   "en-US": {
-    "version": "1.3.0",
     "description": "Cross-platform desktop seating arrangement and rotation system supporting multiple layouts, strategy engines, plugin extensions (in development), and data import/export.",
     "projectUrl": "https://github.com/Helio-RC/Seatflow",
+    "officialSiteUrl": "https://seatflow.work",
+    "docsUrl": "https://seatflow.work/Docs",
+    "githubUrl": "https://github.com/Helio-RC/Seatflow",
+    "issuesUrl": "https://github.com/Helio-RC/Seatflow/issues",
+    "quickStartUrl": "https://seatflow.work/Docs/quick-start",
+    "faqUrl": "https://seatflow.work/Docs/faq",
     "license": "MIT License",
     "copyright": "© 2026 SeatFlow Contributors",
     "dependencies": [

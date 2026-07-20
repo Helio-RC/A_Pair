@@ -31,7 +31,7 @@
 - [x] **多格式导出** — Excel、CSV、PDF、图片导出座位表
 - [x] **历史快照** — 手动保存排座快照，支持回滚到任意历史版本
 - [x] **配置驱动** — 策略优先级、布局参数、导出选项均可配置
-- [x] **跨平台** — Windows / macOS / Linux 原生运行
+- [x] **跨平台** — Windows / Linux 原生运行（macOS 支持计划中，暂无安装包）
 
 ---
 
@@ -40,7 +40,7 @@
 > [!IMPORTANT]
 > **环境要求**
 > - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
-> - Windows 11 / macOS 14+ / Ubuntu 22.04+（或其他 Linux 发行版）
+> - Windows 11 / Linux Ubuntu 22.04+（或其他 Linux 发行版）。macOS 支持计划中，暂无安装包。
 
 **构建与运行**
 

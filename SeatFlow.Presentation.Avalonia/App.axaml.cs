@@ -8,7 +8,9 @@ using System.Threading.Tasks;
 using SeatFlow.Application.Interfaces;
 using SeatFlow.Core.Models;
 using SeatFlow.Core.Providers;
+using SeatFlow.Core.Telemetry;
 using SeatFlow.Presentation.Avalonia.Services;
+using SeatFlow.Presentation.Avalonia.Telemetry;
 using SeatFlow.Presentation.Avalonia.ViewModels;
 using SeatFlow.Presentation.Avalonia.Views;
 using Avalonia;
@@ -30,12 +32,16 @@ namespace SeatFlow.Presentation.Avalonia
     {
         private readonly IServiceProvider _serviceProvider = serviceProvider;
         private readonly bool _isFirstInstance = isFirstInstance;
+        private bool _needsOnboarding;
 
         /// <summary>命令行传入的 .seatsets 文件路径（双击打开或命令行导入）。</summary>
         internal static string? PendingSeatSetsFilePath { get; set; }
 
         /// <summary>在 AppData 创建前自动扫描到的 .seatsets 文件路径（首次启动数据恢复）。</summary>
         internal static string? AutoImportSeatSetsPath { get; set; }
+
+        /// <summary>Velopack 安装后首次运行标志，由 Program.Main 中的 OnFirstRun 回调设置。</summary>
+        internal static bool IsFirstRunAfterInstall { get; set; }
 
         internal IServiceProvider ServiceProvider => _serviceProvider;
 
@@ -88,6 +94,12 @@ namespace SeatFlow.Presentation.Avalonia
             {
                 var logger = _serviceProvider.GetRequiredService<ILogger<App>>();
                 logger.LogWarning(ex, "恢复窗口设置失败");
+                try
+                {
+                    _serviceProvider.GetRequiredService<ITelemetryService>()
+                        .RecordError("startup", $"RestoreSettings: {ex.Message}");
+                }
+                catch { /* 遥测可能未启用 */ }
             }
         }
 
@@ -171,6 +183,16 @@ namespace SeatFlow.Presentation.Avalonia
                 // 退出看门狗：关闭信号发出后 20s 内未退出则强制终止
                 desktop.ShutdownRequested += (_ , _) =>
                 {
+                    // 记录应用退出遥测（fire-and-forget，不阻塞退出）
+                    try
+                    {
+                        var telemetry = _serviceProvider.GetRequiredService<ITelemetryService>();
+                        telemetry.RecordEvent(TelemetryEventTypes.AppExit);
+                        // 后台刷新，不等待结果，避免阻塞退出
+                        _ = Task.Run(() => telemetry.FlushAsync(TimeSpan.FromSeconds(2)));
+                    }
+                    catch { /* 遥测退出失败静默处理 */ }
+
                     // 手动关闭 Serilog（因为 DI 注册使用了 dispose: false 避免竞态）
                     Log.CloseAndFlush();
 
@@ -301,14 +323,10 @@ namespace SeatFlow.Presentation.Avalonia
             }
         }
 
-        private async Task CheckAndStartOnboardingAsync ()
+        private async Task<bool> DetectAndMarkFirstLaunchAsync()
         {
             try
             {
-                var logger = _serviceProvider.GetRequiredService<ILogger<App>>();
-                // 检测是否需要显示引导：
-                // 1. 设置文件不存在 → 真正的首次启动
-                // 2. 用户通过设置页面请求重新引导（IsFirstLaunch = true）
                 var repo = _serviceProvider.GetRequiredService<IAppSettingsRepository>();
                 var isTrueFirstLaunch = repo is Infrastructure.Providers.JsonAppSettingsRepository jsonRepo
                     && !File.Exists(jsonRepo.SettingsFilePath);
@@ -316,26 +334,38 @@ namespace SeatFlow.Presentation.Avalonia
                 var facade = _serviceProvider.GetRequiredService<IApplicationFacade>();
                 var settings = await facade.LoadAppSettingsAsync();
 
-                logger.LogInformation("[Onboarding] isTrueFirstLaunch={A}, IsFirstLaunch={B}" , isTrueFirstLaunch , settings.IsFirstLaunch);
                 if (isTrueFirstLaunch || settings.IsFirstLaunch)
                 {
-                    logger.LogInformation("[Onboarding] 触发启动引导");
-                    // 立即标记完成（崩溃安全）
+                    // 立即标记完成，防止崩溃导致反复触发
                     settings.IsFirstLaunch = false;
                     await facade.SaveAppSettingsAsync(settings);
-
-                    // 在 UI 线程启动引导，给 UI 一些时间完成初始渲染
-                    var onboarding = _serviceProvider.GetRequiredService<IOnboardingService>();
-                    Dispatcher.UIThread.Post(() =>
-                    {
-                        onboarding.StartOnboarding();
-                    } , DispatcherPriority.Background);
+                    return true;
                 }
+
+                return false;
             }
             catch (Exception ex)
             {
                 var logger = _serviceProvider.GetRequiredService<ILogger<App>>();
-                logger.LogError(ex , "[Onboarding] CheckAndStartOnboardingAsync 异常");
+                logger.LogError(ex, "[Onboarding] DetectAndMarkFirstLaunchAsync 异常");
+                return false;
+            }
+        }
+
+        private void StartOnboardingDeferred()
+        {
+            try
+            {
+                var onboarding = _serviceProvider.GetRequiredService<IOnboardingService>();
+                Dispatcher.UIThread.Post(() =>
+                {
+                    onboarding.StartOnboarding();
+                }, DispatcherPriority.Background);
+            }
+            catch (Exception ex)
+            {
+                var logger = _serviceProvider.GetRequiredService<ILogger<App>>();
+                logger.LogError(ex, "[Onboarding] StartOnboardingDeferred 异常");
             }
         }
 
@@ -344,9 +374,23 @@ namespace SeatFlow.Presentation.Avalonia
             // 在 AppData 创建前先检查自动导入 .seatsets（仅在 AppData 不存在时生效）
             await CheckSeatSetsAutoImportAsync();
 
-            // 先检查引导，再恢复设置；确保首次启动检测在文件创建之前
-            await CheckAndStartOnboardingAsync();
+            // 1. 检测首次启动（必须在 RestoreSettings 之前，因为后者会创建 AppSettings.json）
+            _needsOnboarding = await DetectAndMarkFirstLaunchAsync();
+
             await RestoreSettingsAsync();
+
+            // 2. 遥测同意弹窗
+            await ShowTelemetryConsentIfNeededAsync();
+
+            // 3. 启动引导（在遥测弹窗之后，避免 Popup 覆盖）
+            if (_needsOnboarding)
+                StartOnboardingDeferred();
+
+            // 记录应用启动遥测
+            RecordAppStartTelemetry();
+
+            // 4. 自动更新检查（延迟到 Background 优先级，确保 UI 完全就绪）
+            ScheduleAutoUpdateCheck();
         }
 
         /// <summary>
@@ -407,6 +451,173 @@ namespace SeatFlow.Presentation.Avalonia
                 var logger = _serviceProvider.GetRequiredService<ILogger<App>>();
                 logger.LogError(ex, "[SeatSets] 自动导入异常");
             }
+        }
+
+        /// <summary>
+        /// 首次启动时弹出遥测同意弹窗。仅在 ConsentShown==false 时触发。
+        /// </summary>
+        private async Task ShowTelemetryConsentIfNeededAsync()
+        {
+            try
+            {
+                var facade = _serviceProvider.GetRequiredService<IApplicationFacade>();
+                var settings = await facade.LoadAppSettingsAsync();
+
+                // 已经展示过同意弹窗，跳过
+                if (settings.Telemetry.ConsentShown)
+                    return;
+
+                var dialog = _serviceProvider.GetRequiredService<IDialogService>();
+                var telemetry = _serviceProvider.GetRequiredService<ITelemetryService>();
+
+                var result = await dialog.ShowMultiOptionAsync(
+                    Lang.Resources.Telemetry_ConsentTitle,
+                    Lang.Resources.Telemetry_ConsentMessage,
+                    Lang.Resources.Telemetry_ConsentEnable,
+                    Lang.Resources.Telemetry_ConsentLater,
+                    cancelText: "");
+
+                // 用户做出选择后再持久化
+                settings.Telemetry.ConsentShown = true;
+
+                if (result == 0) // "开启"
+                {
+                    settings.Telemetry.Enabled = true;
+                    telemetry.SetEnabled(true);
+                }
+
+                // 保存 ConsetShown + 可能 TelemetryEnabled
+                await facade.SaveAppSettingsAsync(settings);
+            }
+            catch (Exception ex)
+            {
+                var logger = _serviceProvider.GetRequiredService<ILogger<App>>();
+                logger.LogDebug(ex, "遥测同意弹窗异常");
+            }
+        }
+
+        /// <summary>
+        /// 将自动更新检查推迟到 UI 完全启动后（Background 优先级）。
+        /// 此时 DI 完全就绪，可以正常创建对话框。
+        /// </summary>
+        private void ScheduleAutoUpdateCheck()
+        {
+            Dispatcher.UIThread.Post(async () =>
+            {
+                // 额外延迟，确保主窗口已完全渲染
+                await Task.Delay(500);
+                await CheckAutoUpdateAsync();
+            }, DispatcherPriority.Background);
+        }
+
+        /// <summary>
+        /// 根据 AutoUpdateMode 设置执行自动更新检查。
+        /// Off → 跳过；CheckOnly → 检查并展示 release notes（仅查看）；
+        /// AutoUpdate → 检查并展示 release notes（含下载选项），确认后应用并重启。
+        /// </summary>
+        private async Task CheckAutoUpdateAsync()
+        {
+            // 引导进行中时跳过（避免弹窗冲突）
+            if (_needsOnboarding)
+                return;
+
+            try
+            {
+                var facade = _serviceProvider.GetRequiredService<IApplicationFacade>();
+                var settings = await facade.LoadAppSettingsAsync();
+
+                if (settings.AutoUpdate == AutoUpdateMode.Off)
+                    return;
+
+                var updateService = _serviceProvider.GetRequiredService<IUpdateService>();
+                var logger = _serviceProvider.GetRequiredService<ILogger<App>>();
+
+                // 开发模式跳过（NotInstalled）
+                if (updateService.Status == UpdateServiceStatus.NotInstalled)
+                    return;
+
+                logger.LogInformation("启动时自动检查更新 (Mode={Mode}, Version={Version})",
+                    settings.AutoUpdate, VersionInfo.Version);
+
+                var result = await updateService.CheckForUpdatesAsync();
+
+                if (result.ServiceStatus == UpdateServiceStatus.Unavailable)
+                {
+                    logger.LogWarning("启动检查：更新服务不可达");
+                    await ShowGitHubFallbackInStartupAsync(updateService);
+                    return;
+                }
+
+                if (!result.HasUpdate)
+                {
+                    logger.LogDebug("启动检查：已是最新版本");
+                    return;
+                }
+
+                logger.LogInformation("启动检查发现新版本: {Version}", result.NewVersion);
+
+                if (AvaloniaApplication.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop)
+                    return;
+                if (desktop.MainWindow is not { } mainWindow)
+                    return;
+
+                var dialog = await Views.UpdateDialogWindow.CreateAsync(
+                    _serviceProvider,
+                    result.NewVersion!,
+                    allowDownload: settings.AutoUpdate == AutoUpdateMode.AutoUpdate);
+
+                await dialog.ShowDialog<bool>(mainWindow);
+
+                if (dialog.Confirmed)
+                {
+                    updateService.ApplyUpdatesAndRestart();
+                }
+            }
+            catch (Exception ex)
+            {
+                var logger = _serviceProvider.GetRequiredService<ILogger<App>>();
+                logger.LogWarning(ex, "启动时自动更新检查失败");
+            }
+        }
+
+        /// <summary>
+        /// 记录应用启动遥测事件（仅在遥测启用时）。
+        /// </summary>
+        private async Task ShowGitHubFallbackInStartupAsync(IUpdateService updateService)
+        {
+            try
+            {
+                var dialog = _serviceProvider.GetRequiredService<IDialogService>();
+                var goToGitHub = await dialog.ShowConfirmAsync(
+                    Lang.Resources.Update_CheckFailed,
+                    Lang.Resources.Update_GoToGitHub);
+                if (!goToGitHub) return;
+
+                var url = updateService.GetGitHubReleasesUrl(VersionInfo.Version);
+                System.Diagnostics.Process.Start(
+                    new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                var logger = _serviceProvider.GetRequiredService<ILogger<App>>();
+                logger.LogWarning(ex, "GitHub 兜底对话框异常");
+            }
+        }
+
+        /// <summary>
+        /// 记录应用启动遥测事件（仅在遥测启用时）。
+        /// </summary>
+        private void RecordAppStartTelemetry()
+        {
+            try
+            {
+                var telemetry = _serviceProvider.GetRequiredService<ITelemetryService>();
+                if (telemetry.IsEnabled)
+                {
+                    telemetry.RecordAppLaunch();
+                }
+            }
+            catch { /* 遥测启动失败静默处理 */ }
         }
 
         /// <summary>

@@ -59,17 +59,32 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="About_Commit" xml:space="preserve">
+    <value>Commit</value>
+  </data>
   <data name="About_Dependencies" xml:space="preserve">
     <value>Dependencies</value>
   </data>
+  <data name="About_Documentation" xml:space="preserve">
+    <value>Documentation</value>
+  </data>
   <data name="About_Framework" xml:space="preserve">
     <value>Framework</value>
+  </data>
+  <data name="About_GitHub" xml:space="preserve">
+    <value>GitHub Repository</value>
+  </data>
+  <data name="About_Issues" xml:space="preserve">
+    <value>Report Issues</value>
   </data>
   <data name="About_License" xml:space="preserve">
     <value>License</value>
   </data>
   <data name="About_MITLicenseWarning" xml:space="preserve">
     <value>This software is distributed under the MIT License and is completely free and open-source. Any solicitation of payment is unauthorized — please beware of scams.</value>
+  </data>
+  <data name="About_OfficialSite" xml:space="preserve">
+    <value>Official Site</value>
   </data>
   <data name="About_OpenLink" xml:space="preserve">
     <value>Open {0} project page</value>
@@ -205,6 +220,30 @@
   </data>
   <data name="Guide_Seating_Select_Title" xml:space="preserve">
     <value>Select Data</value>
+  </data>
+  <data name="Home_Docs" xml:space="preserve">
+    <value>Documentation</value>
+  </data>
+  <data name="Home_FAQ" xml:space="preserve">
+    <value>FAQ</value>
+  </data>
+  <data name="Home_Greeting_Afternoon" xml:space="preserve">
+    <value>Good afternoon, {0}</value>
+  </data>
+  <data name="Home_Greeting_Evening" xml:space="preserve">
+    <value>Good evening, {0}</value>
+  </data>
+  <data name="Home_Greeting_Morning" xml:space="preserve">
+    <value>Good morning, {0}</value>
+  </data>
+  <data name="Home_Installation" xml:space="preserve">
+    <value>Installation</value>
+  </data>
+  <data name="Home_QuickStart" xml:space="preserve">
+    <value>Quick Start</value>
+  </data>
+  <data name="Home_Version" xml:space="preserve">
+    <value>Version {0}</value>
   </data>
   <data name="Member_AddedRowFmt" xml:space="preserve">
     <value>Added student #{0}</value>
@@ -1126,6 +1165,21 @@ Place plugins in the Plugins directory</value>
   <data name="Settings_Appearance" xml:space="preserve">
     <value>Appearance</value>
   </data>
+  <data name="Settings_AutoUpdate" xml:space="preserve">
+    <value>Auto Update</value>
+  </data>
+  <data name="Settings_AutoUpdateHint" xml:space="preserve">
+    <value>Automatically check for updates at startup. &quot;Check Only&quot; notifies without downloading, &quot;Auto Update&quot; prompts to download.</value>
+  </data>
+  <data name="Settings_AutoUpdate_Auto" xml:space="preserve">
+    <value>Auto Update</value>
+  </data>
+  <data name="Settings_AutoUpdate_CheckOnly" xml:space="preserve">
+    <value>Check Only</value>
+  </data>
+  <data name="Settings_AutoUpdate_Off" xml:space="preserve">
+    <value>Off</value>
+  </data>
   <data name="Settings_Behavior" xml:space="preserve">
     <value>Behavior</value>
   </data>
@@ -1180,11 +1234,35 @@ Place plugins in the Plugins directory</value>
   <data name="Settings_LoadFailed" xml:space="preserve">
     <value>Failed to load settings, using defaults</value>
   </data>
+  <data name="Settings_LogLevel" xml:space="preserve">
+    <value>Log level</value>
+  </data>
+  <data name="Settings_LogLevelHint" xml:space="preserve">
+    <value>More detailed logs help troubleshooting but use more disk space</value>
+  </data>
+  <data name="Settings_LogLevel_Debug" xml:space="preserve">
+    <value>Debug</value>
+  </data>
+  <data name="Settings_LogLevel_Error" xml:space="preserve">
+    <value>Error</value>
+  </data>
+  <data name="Settings_LogLevel_Info" xml:space="preserve">
+    <value>Information</value>
+  </data>
+  <data name="Settings_LogLevel_Warning" xml:space="preserve">
+    <value>Warning</value>
+  </data>
+  <data name="Settings_Logging" xml:space="preserve">
+    <value>Logging</value>
+  </data>
   <data name="Settings_OpenDataDir" xml:space="preserve">
     <value>Open current data directory</value>
   </data>
   <data name="Settings_OpenDirFailed" xml:space="preserve">
     <value>Failed to open directory</value>
+  </data>
+  <data name="Settings_Privacy" xml:space="preserve">
+    <value>Privacy</value>
   </data>
   <data name="Settings_ResetConfirm" xml:space="preserve">
     <value>Are you sure you want to restore all settings to their defaults?</value>
@@ -1213,11 +1291,65 @@ Place plugins in the Plugins directory</value>
   <data name="Settings_Storage" xml:space="preserve">
     <value>Storage</value>
   </data>
+  <data name="Settings_SuppressEnvWarning" xml:space="preserve">
+    <value>Suppress environment warning</value>
+  </data>
+  <data name="Settings_SuppressEnvWarningHint" xml:space="preserve">
+    <value>Stop showing warning dialogs when the environment doesn&apos;t meet requirements</value>
+  </data>
+  <data name="Settings_Telemetry" xml:space="preserve">
+    <value>Telemetry</value>
+  </data>
+  <data name="Settings_TelemetryHint" xml:space="preserve">
+    <value>Send anonymous usage data (version, feature usage stats, error reports) to help us improve the product. No personal information.</value>
+  </data>
+  <data name="Settings_TelemetryToggle" xml:space="preserve">
+    <value>Anonymous Telemetry</value>
+  </data>
   <data name="Settings_ThemeMode" xml:space="preserve">
     <value>Theme mode</value>
   </data>
   <data name="Settings_Title" xml:space="preserve">
     <value>Settings</value>
+  </data>
+  <data name="Settings_Tools" xml:space="preserve">
+    <value>Tools</value>
+  </data>
+  <data name="Settings_Update" xml:space="preserve">
+    <value>Update</value>
+  </data>
+  <data name="Settings_UpdateApply" xml:space="preserve">
+    <value>Install Update</value>
+  </data>
+  <data name="Settings_UpdateAvailable" xml:space="preserve">
+    <value>Version {0} is available</value>
+  </data>
+  <data name="Settings_UpdateCheck" xml:space="preserve">
+    <value>Check for Updates</value>
+  </data>
+  <data name="Settings_UpdateChecking" xml:space="preserve">
+    <value>Checking...</value>
+  </data>
+  <data name="Settings_UpdateDownloading" xml:space="preserve">
+    <value>Downloading... {0}%</value>
+  </data>
+  <data name="Settings_UpdateFailed" xml:space="preserve">
+    <value>Update check failed</value>
+  </data>
+  <data name="Settings_UpdateFallback" xml:space="preserve">
+    <value>⚠️ Using fallback update source, download may be slower</value>
+  </data>
+  <data name="Settings_UpdateLatest" xml:space="preserve">
+    <value>Up to date</value>
+  </data>
+  <data name="Settings_UpdateNotInstalled" xml:space="preserve">
+    <value>Dev mode: updates unavailable</value>
+  </data>
+  <data name="Settings_UpdatePendingRestart" xml:space="preserve">
+    <value>A downloaded update is ready, restart to apply</value>
+  </data>
+  <data name="Settings_UpdateRestartConfirm" xml:space="preserve">
+    <value>Update downloaded. A restart is required to apply the update. Restart now?</value>
   </data>
   <data name="Snapshot_BatchDelete" xml:space="preserve">
     <value>Batch delete</value>
@@ -1575,6 +1707,27 @@ Current seating will be overwritten.</value>
   <data name="Strategy_UnsavedChangesMsg" xml:space="preserve">
     <value>Unsaved strategy changes. Save before leaving?</value>
   </data>
+  <data name="Telemetry_ConsentEnable" xml:space="preserve">
+    <value>Enable</value>
+  </data>
+  <data name="Telemetry_ConsentLater" xml:space="preserve">
+    <value>Not Now</value>
+  </data>
+  <data name="Telemetry_ConsentMessage" xml:space="preserve">
+    <value>Enable anonymous telemetry to help us improve the product.
+
+Data collected:
+• App version and environment (OS/.NET version)
+• Page visit statistics (e.g. Settings page)
+• Feature usage stats (seating count, export count)
+• Anonymous error reports (no personal info)
+
+We do not collect any personally identifiable information.
+You can disable telemetry at any time on the Settings page.</value>
+  </data>
+  <data name="Telemetry_ConsentTitle" xml:space="preserve">
+    <value>Help Us Improve SeatFlow</value>
+  </data>
   <data name="Theme_Dark" xml:space="preserve">
     <value>Dark</value>
   </data>
@@ -1583,6 +1736,33 @@ Current seating will be overwritten.</value>
   </data>
   <data name="Theme_System" xml:space="preserve">
     <value>System</value>
+  </data>
+  <data name="Update_CheckFailed" xml:space="preserve">
+    <value>Update Check Failed</value>
+  </data>
+  <data name="Update_CheckOnlyHint" xml:space="preserve">
+    <value>Go to &quot;Settings → Update&quot; to download and install this version.</value>
+  </data>
+  <data name="Update_DownloadLater" xml:space="preserve">
+    <value>Later</value>
+  </data>
+  <data name="Update_GoToGitHub" xml:space="preserve">
+    <value>The update service is currently unavailable. Go to GitHub Releases to download manually?</value>
+  </data>
+  <data name="Update_InstallAndRestart" xml:space="preserve">
+    <value>Install &amp; Restart</value>
+  </data>
+  <data name="Update_NewVersionTitle" xml:space="preserve">
+    <value>New Version {0} Available</value>
+  </data>
+  <data name="Update_NoReleaseNotes" xml:space="preserve">
+    <value>No release notes available</value>
+  </data>
+  <data name="Update_ReleaseNotes" xml:space="preserve">
+    <value>Release Notes</value>
+  </data>
+  <data name="Update_UpdateNow" xml:space="preserve">
+    <value>Update Now</value>
   </data>
   <data name="Venue_AddDoor" xml:space="preserve">
     <value>Add door</value>

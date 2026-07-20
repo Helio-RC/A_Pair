@@ -8,7 +8,7 @@ namespace SeatFlow.Core.Models
     public class AppSettings
     {
         /// <summary>文件格式版本号。</summary>
-        public string Version { get; set; } = "1.0";
+        public string Version { get; set; } = "1.1";
 
         /// <summary>窗口位置与大小设置。</summary>
         public WindowStateSettings WindowState { get; set; } = new();
@@ -52,6 +52,45 @@ namespace SeatFlow.Core.Models
         /// <summary>日志配置（不暴露到设置 UI）。</summary>
         public LogSettings Logging { get; set; } = new();
 
+        /// <summary>遥测配置。</summary>
+        public TelemetryConfig Telemetry { get; set; } = new();
+
+        /// <summary>自动更新模式（默认：仅检查）。</summary>
+        public AutoUpdateMode AutoUpdate { get; set; } = AutoUpdateMode.CheckOnly;
+
+    }
+
+    /// <summary>
+    /// 遥测配置。控制 OpenTelemetry 数据采集与上报行为。
+    /// </summary>
+    public sealed class TelemetryConfig
+    {
+        /// <summary>是否启用遥测上报（opt-in，默认关闭）。</summary>
+        public bool Enabled { get; set; } = false;
+
+        /// <summary>是否已展示过同意弹窗。</summary>
+        public bool ConsentShown { get; set; } = false;
+
+        /// <summary>Web API 遥测端点 URL。</summary>
+        public string ServerUrl { get; set; } = "https://seatflow.work/api/app/telemetry";
+
+        /// <summary>正常批量发送间隔（秒）。</summary>
+        public int FlushIntervalSeconds { get; set; } = 60;
+
+        /// <summary>单次批量最大事件数。</summary>
+        public int MaxBatchSize { get; set; } = 100;
+
+        /// <summary>页面浏览采样率（0.0-1.0）。</summary>
+        public double PageViewSampleRate { get; set; } = 0.2;
+
+        /// <summary>同名页面去重窗口（秒）。</summary>
+        public int PageViewCoalesceSeconds { get; set; } = 60;
+
+        /// <summary>计数器聚合窗口（秒）。</summary>
+        public int MetricSnapshotIntervalSeconds { get; set; } = 120;
+
+        /// <summary>是否启用 Gzip 压缩。</summary>
+        public bool EnableCompression { get; set; } = true;
     }
 
     /// <summary>
@@ -100,6 +139,19 @@ namespace SeatFlow.Core.Models
         Light,
         /// <summary>深色主题。</summary>
         Dark
+    }
+
+    /// <summary>
+    /// 自动更新模式。
+    /// </summary>
+    public enum AutoUpdateMode
+    {
+        /// <summary>关闭自动更新检查。</summary>
+        Off,
+        /// <summary>启动时仅检查更新，不下載。</summary>
+        CheckOnly,
+        /// <summary>检查更新并在确认后下载。</summary>
+        AutoUpdate,
     }
 
 }

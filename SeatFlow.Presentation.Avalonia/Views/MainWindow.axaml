@@ -14,7 +14,7 @@
         Icon="/Assets/icon_with_background.ico"
         Title="{x:Static lang:Resources.App_Title}" Width="1200" Height="800"
         MinWidth="550" MinHeight="600"
-        CanResize="False"
+        CanResize="True"
         ExtendClientAreaToDecorationsHint="True"
         ExtendClientAreaTitleBarHeightHint="32"
         Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">

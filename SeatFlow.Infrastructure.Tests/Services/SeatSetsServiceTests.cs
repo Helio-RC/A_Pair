@@ -391,7 +391,7 @@ public class SeatSetsServiceTests : IDisposable
 
         var exportPath = Path.Combine(_tempRoot , "traversal.seatsets");
         var json = JsonSerializer.Serialize(archive , JsonOptions.WriteIndentedCamelCase);
-        await File.WriteAllTextAsync(exportPath , json);
+        await File.WriteAllTextAsync(exportPath , json , TestContext.Current.CancellationToken);
 
         // Act: 校验应检测到路径穿越
         var validation = await service.ValidateAsync(exportPath , TestContext.Current.CancellationToken);

@@ -203,8 +203,8 @@ public partial class MainShellViewModel : ViewModelBase
         PageOpacity = 1;
     }
 
-    /// <summary>完成引导：关闭引导模式，持久化标记，回到首页。</summary>
-    public async Task CompleteOnboardingAsync ()
+    /// <summary>完成引导：关闭引导模式，持久化标记，导航到指定页面。</summary>
+    public async Task CompleteOnboardingAsync (PageKey navigateTo = PageKey.Home)
     {
         IsOnboardingActive = false;
 
@@ -222,7 +222,6 @@ public partial class MainShellViewModel : ViewModelBase
             _logger?.LogWarning(ex, "无法持久化引导完成标记");
         }
 
-        // 回到首页
-        _navigation.NavigateTo(PageKey.Home);
+        _navigation.NavigateTo(navigateTo);
     }
 }

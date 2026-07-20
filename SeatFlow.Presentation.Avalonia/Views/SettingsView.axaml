@@ -4,6 +4,7 @@
              xmlns:fic="using:FluentIcons.Avalonia"
              xmlns:ficEnum="clr-namespace:FluentIcons.Common;assembly=FluentIcons.Common"
              xmlns:lang="using:SeatFlow.Presentation.Avalonia.Lang"
+             xmlns:conv="clr-namespace:SeatFlow.Presentation.Avalonia.Converters"
              x:Class="SeatFlow.Presentation.Avalonia.Views.SettingsView"
              x:DataType="vm:SettingsViewModel">
 
@@ -17,7 +18,7 @@
       <DockPanel>
         <TextBlock DockPanel.Dock="Left" Text="{x:Static lang:Resources.Settings_Title}"
                    Classes="pageTitle" VerticalAlignment="Center" />
-        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" Margin="16,0,0,0">
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
           <Button Command="{Binding SaveSettingsCommand}"
                   AutomationProperties.Name="{x:Static lang:Resources.Settings_Save}"
                   HorizontalContentAlignment="Center" IsDefault="True">
@@ -47,176 +48,329 @@
       </StackPanel>
     </Border>
 
-    <!-- 中间内容 -->
+    <!-- 内容区：卡片布局 -->
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-      <StackPanel Spacing="0" MaxWidth="600">
-        <!-- 外观 -->
-        <TextBlock Text="{x:Static lang:Resources.Settings_Appearance}"
-                   Classes="settingSectionHeader" Margin="0,0,0,6" />
+      <StackPanel Spacing="16" MaxWidth="680" Margin="0,0,0,32">
 
-        <Border Classes="settingRow">
-          <DockPanel>
-            <TextBlock DockPanel.Dock="Left" Text="{x:Static lang:Resources.Settings_ThemeMode}"
-                       Classes="body" VerticalAlignment="Center" />
-            <ComboBox ItemsSource="{Binding ThemeOptions}"
-                      AutomationProperties.Name="{x:Static lang:Resources.Settings_ThemeMode}"
-                      SelectedIndex="{Binding ThemeIndex, Mode=TwoWay}"
-                      MinWidth="160" HorizontalAlignment="Right" FontSize="14" />
-          </DockPanel>
-        </Border>
+        <!-- ═══ 外观卡片 ═══ -->
+        <Border Classes="settingsCard">
+          <StackPanel Spacing="12">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <fic:FluentIcon Icon="{x:Static ficEnum:Icon.PaintBrush}" FontSize="18"
+                             Foreground="{DynamicResource SystemAccentColor}" />
+              <TextBlock Text="{x:Static lang:Resources.Settings_Appearance}" Classes="sectionTitle" />
+            </StackPanel>
 
-        <Border Classes="settingRow" BorderThickness="0">
-          <DockPanel>
-            <TextBlock DockPanel.Dock="Left" Text="{x:Static lang:Resources.Settings_DefaultZoom}"
-                       Classes="body" VerticalAlignment="Center" />
-            <ComboBox ItemsSource="{Binding ZoomOptions}"
-                      AutomationProperties.Name="{x:Static lang:Resources.Settings_DefaultZoom}"
-                      SelectedIndex="{Binding ZoomIndex, Mode=TwoWay}"
-                      MinWidth="160" HorizontalAlignment="Right" FontSize="14" />
-          </DockPanel>
-        </Border>
-
-        <!-- 语言 -->
-        <TextBlock Text="{x:Static lang:Resources.Settings_Language}"
-                   Classes="settingSectionHeader" Margin="0,16,0,6" />
-
-        <Border Classes="settingRow" BorderThickness="0">
-          <DockPanel>
-            <TextBlock DockPanel.Dock="Left" Text="{x:Static lang:Resources.Settings_LanguageLabel}"
-                       Classes="body" VerticalAlignment="Center" />
-            <ComboBox ItemsSource="{Binding LanguageOptions}"
-                      SelectedItem="{Binding SelectedLanguage, Mode=TwoWay}"
-                      AutomationProperties.Name="{x:Static lang:Resources.Settings_LanguageLabel}"
-                      MinWidth="180" HorizontalAlignment="Right" FontSize="14">
-              <ComboBox.ItemTemplate>
-                <DataTemplate x:DataType="vm:LanguageOption">
-                  <TextBlock Text="{Binding DisplayName}" Classes="body" />
-                </DataTemplate>
-              </ComboBox.ItemTemplate>
-            </ComboBox>
-          </DockPanel>
-        </Border>
-
-        <!-- 存储 -->
-        <TextBlock Text="{x:Static lang:Resources.Settings_Storage}"
-                   Classes="settingSectionHeader" Margin="0,16,0,6" />
-
-        <Border Classes="settingRow" BorderThickness="0">
-          <DockPanel>
-            <TextBlock DockPanel.Dock="Left" Text="{x:Static lang:Resources.Settings_DataDir}"
-                       Classes="body" VerticalAlignment="Top" Margin="0,4,0,0" />
-            <StackPanel HorizontalAlignment="Right" Spacing="6" MinWidth="280">
+            <Border Classes="settingRowInner">
               <DockPanel>
-                <Button Command="{Binding BrowseDataDirectoryCommand}"
-                        AutomationProperties.Name="{x:Static lang:Resources.Settings_BrowseDataDir}"
-                        DockPanel.Dock="Right" Padding="8,8">
-                  <fic:FluentIcon Icon="{x:Static ficEnum:Icon.Folder}" FontSize="18" />
-                </Button>
-                <TextBox Text="{Binding DataDirectory, Mode=TwoWay}"
-                         PlaceholderText="{x:Static lang:Resources.Settings_DataDirPlaceholder}"
-                         FontSize="14" />
+                <TextBlock DockPanel.Dock="Left" Text="{x:Static lang:Resources.Settings_ThemeMode}"
+                           Classes="body" VerticalAlignment="Center" />
+                <ComboBox ItemsSource="{Binding ThemeOptions}"
+                          AutomationProperties.Name="{x:Static lang:Resources.Settings_ThemeMode}"
+                          SelectedIndex="{Binding ThemeIndex, Mode=TwoWay}"
+                          MinWidth="160" HorizontalAlignment="Right" FontSize="14" />
               </DockPanel>
-              <Button Command="{Binding OpenDataDirectoryCommand}"
-                      AutomationProperties.Name="{x:Static lang:Resources.Settings_OpenDataDir}"
-                      Classes="linkButton" HorizontalContentAlignment="Left" Padding="0">
+            </Border>
+
+            <Border Classes="settingRowInner">
+              <DockPanel>
+                <TextBlock DockPanel.Dock="Left" Text="{x:Static lang:Resources.Settings_DefaultZoom}"
+                           Classes="body" VerticalAlignment="Center" />
+                <ComboBox ItemsSource="{Binding ZoomOptions}"
+                          AutomationProperties.Name="{x:Static lang:Resources.Settings_DefaultZoom}"
+                          SelectedIndex="{Binding ZoomIndex, Mode=TwoWay}"
+                          MinWidth="160" HorizontalAlignment="Right" FontSize="14" />
+              </DockPanel>
+            </Border>
+
+            <DockPanel>
+              <TextBlock DockPanel.Dock="Left" Text="{x:Static lang:Resources.Settings_LanguageLabel}"
+                         Classes="body" VerticalAlignment="Center" />
+              <ComboBox ItemsSource="{Binding LanguageOptions}"
+                        SelectedItem="{Binding SelectedLanguage, Mode=TwoWay}"
+                        AutomationProperties.Name="{x:Static lang:Resources.Settings_LanguageLabel}"
+                        MinWidth="180" HorizontalAlignment="Right" FontSize="14">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:LanguageOption">
+                    <TextBlock Text="{Binding DisplayName}" Classes="body" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+            </DockPanel>
+          </StackPanel>
+        </Border>
+
+        <!-- ═══ 存储卡片 ═══ -->
+        <Border Classes="settingsCard">
+          <StackPanel Spacing="12">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <fic:FluentIcon Icon="{x:Static ficEnum:Icon.Folder}" FontSize="18"
+                             Foreground="{DynamicResource SystemAccentColor}" />
+              <TextBlock Text="{x:Static lang:Resources.Settings_Storage}" Classes="sectionTitle" />
+            </StackPanel>
+
+            <Border Classes="settingRowInner">
+              <DockPanel>
+                <TextBlock DockPanel.Dock="Left" Text="{x:Static lang:Resources.Settings_DataDir}"
+                           Classes="body" VerticalAlignment="Top" Margin="0,4,0,0" />
+                <StackPanel HorizontalAlignment="Right" Spacing="6" MinWidth="280">
+                  <DockPanel>
+                    <Button Command="{Binding BrowseDataDirectoryCommand}"
+                            AutomationProperties.Name="{x:Static lang:Resources.Settings_BrowseDataDir}"
+                            DockPanel.Dock="Right" Padding="8,8">
+                      <fic:FluentIcon Icon="{x:Static ficEnum:Icon.Folder}" FontSize="18" />
+                    </Button>
+                    <TextBox Text="{Binding DataDirectory, Mode=TwoWay}"
+                             PlaceholderText="{x:Static lang:Resources.Settings_DataDirPlaceholder}"
+                             FontSize="14" />
+                  </DockPanel>
+                  <Button Command="{Binding OpenDataDirectoryCommand}"
+                          AutomationProperties.Name="{x:Static lang:Resources.Settings_OpenDataDir}"
+                          Classes="linkButton" HorizontalContentAlignment="Left" Padding="0">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                      <fic:FluentIcon Icon="{x:Static ficEnum:Icon.ArrowUpload}" FontSize="12" />
+                      <TextBlock Text="{x:Static lang:Resources.Settings_OpenDataDir}" Classes="caption" />
+                    </StackPanel>
+                  </Button>
+                </StackPanel>
+              </DockPanel>
+            </Border>
+
+            <DockPanel>
+              <TextBlock DockPanel.Dock="Left" Text="{x:Static lang:Resources.Settings_MaxSnapshots}"
+                         Classes="body" VerticalAlignment="Center" />
+              <NumericUpDown Value="{Binding MaxSnapshotsPerVenue, Mode=TwoWay}"
+                             Minimum="0" Maximum="300" Increment="1"
+                             Width="150" HorizontalAlignment="Right" />
+            </DockPanel>
+          </StackPanel>
+        </Border>
+
+        <!-- ═══ 行为卡片 ═══ -->
+        <Border Classes="settingsCard">
+          <StackPanel Spacing="12">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <fic:FluentIcon Icon="{x:Static ficEnum:Icon.Options}" FontSize="18"
+                             Foreground="{DynamicResource SystemAccentColor}" />
+              <TextBlock Text="{x:Static lang:Resources.Settings_Behavior}" Classes="sectionTitle" />
+            </StackPanel>
+
+            <Border Classes="settingRowInner">
+              <DockPanel>
+                <TextBlock DockPanel.Dock="Left" Text="{x:Static lang:Resources.Settings_ConfirmClear}"
+                           Classes="body" VerticalAlignment="Center" />
+                <ToggleSwitch IsChecked="{Binding ConfirmBeforeClear, Mode=TwoWay}"
+                              AutomationProperties.Name="{x:Static lang:Resources.Settings_ConfirmClear}"
+                              HorizontalAlignment="Right" />
+              </DockPanel>
+            </Border>
+
+            <DockPanel>
+              <StackPanel DockPanel.Dock="Left" Spacing="2">
+                <TextBlock Text="{x:Static lang:Resources.Settings_SuppressEnvWarning}" Classes="body" />
+                <TextBlock Text="{x:Static lang:Resources.Settings_SuppressEnvWarningHint}" Classes="caption"
+                           Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" TextWrapping="Wrap" MaxWidth="440" />
+              </StackPanel>
+              <ToggleSwitch IsChecked="{Binding SuppressEnvironmentWarning, Mode=TwoWay}"
+                            AutomationProperties.Name="{x:Static lang:Resources.Settings_SuppressEnvWarning}"
+                            HorizontalAlignment="Right" />
+            </DockPanel>
+          </StackPanel>
+        </Border>
+
+        <!-- ═══ 日志卡片 ═══ -->
+        <Border Classes="settingsCard">
+          <StackPanel Spacing="12">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <fic:FluentIcon Icon="{x:Static ficEnum:Icon.Document}" FontSize="18"
+                             Foreground="{DynamicResource SystemAccentColor}" />
+              <TextBlock Text="{x:Static lang:Resources.Settings_Logging}" Classes="sectionTitle" />
+            </StackPanel>
+
+            <DockPanel>
+              <StackPanel DockPanel.Dock="Left" Spacing="4">
+                <TextBlock Text="{x:Static lang:Resources.Settings_LogLevel}" Classes="body" />
+                <TextBlock Text="{x:Static lang:Resources.Settings_LogLevelHint}" Classes="caption"
+                           Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" TextWrapping="Wrap" MaxWidth="440" />
+              </StackPanel>
+              <ComboBox ItemsSource="{Binding LogLevelOptions}"
+                        SelectedIndex="{Binding LogLevelIndex, Mode=TwoWay}"
+                        AutomationProperties.Name="{x:Static lang:Resources.Settings_LogLevel}"
+                        MinWidth="120" HorizontalAlignment="Right" FontSize="14" />
+            </DockPanel>
+          </StackPanel>
+        </Border>
+
+        <!-- ═══ 隐私卡片 ═══ -->
+        <Border Classes="settingsCard">
+          <StackPanel Spacing="12">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <fic:FluentIcon Icon="{x:Static ficEnum:Icon.Shield}" FontSize="18"
+                             Foreground="{DynamicResource SystemAccentColor}" />
+              <TextBlock Text="{x:Static lang:Resources.Settings_Privacy}" Classes="sectionTitle" />
+            </StackPanel>
+
+            <Border Classes="settingRowInner">
+              <DockPanel>
+                <StackPanel DockPanel.Dock="Left" Spacing="2">
+                  <TextBlock Text="{x:Static lang:Resources.Settings_TelemetryToggle}" Classes="body" />
+                  <TextBlock Text="{x:Static lang:Resources.Settings_TelemetryHint}" Classes="caption"
+                             Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" TextWrapping="Wrap" MaxWidth="440" />
+                </StackPanel>
+                <ToggleSwitch IsChecked="{Binding TelemetryEnabled, Mode=TwoWay}"
+                              AutomationProperties.Name="{x:Static lang:Resources.Settings_TelemetryToggle}"
+                              HorizontalAlignment="Right" />
+              </DockPanel>
+            </Border>
+
+            <DockPanel>
+              <StackPanel DockPanel.Dock="Left" Spacing="2">
+                <TextBlock Text="{x:Static lang:Resources.Settings_RestartGuide}" Classes="body" />
+                <TextBlock Text="{x:Static lang:Resources.Settings_RestartGuideHint}" Classes="caption"
+                           Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+              </StackPanel>
+              <Button Command="{Binding RestartGuideCommand}"
+                      AutomationProperties.Name="{x:Static lang:Resources.Settings_RestartGuide}"
+                      HorizontalAlignment="Right" Padding="12,6">
                 <StackPanel Orientation="Horizontal" Spacing="4">
-                  <fic:FluentIcon Icon="{x:Static ficEnum:Icon.ArrowUpload}" FontSize="12" />
-                  <TextBlock Text="{x:Static lang:Resources.Settings_OpenDataDir}" Classes="caption" />
+                  <fic:FluentIcon Icon="{x:Static ficEnum:Icon.Info}" FontSize="14" />
+                  <TextBlock Text="{x:Static lang:Resources.Settings_RestartGuide}" Classes="bodySmall" />
                 </StackPanel>
               </Button>
+            </DockPanel>
+          </StackPanel>
+        </Border>
+
+        <!-- ═══ 更新卡片 ═══ -->
+        <Border Classes="settingsCard">
+          <StackPanel Spacing="12">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <fic:FluentIcon Icon="{x:Static ficEnum:Icon.ArrowSync}" FontSize="18"
+                             Foreground="{DynamicResource SystemAccentColor}" />
+              <TextBlock Text="{x:Static lang:Resources.Settings_Update}" Classes="sectionTitle" />
             </StackPanel>
-          </DockPanel>
-        </Border>
 
-        <Border Classes="settingRow" BorderThickness="0">
-          <DockPanel>
-            <TextBlock DockPanel.Dock="Left" Text="{x:Static lang:Resources.Settings_MaxSnapshots}"
-                       Classes="body" VerticalAlignment="Center" />
-            <NumericUpDown Value="{Binding MaxSnapshotsPerVenue, Mode=TwoWay}"
-                           Minimum="0" Maximum="300" Increment="1"
-                           Width="150" HorizontalAlignment="Right" />
-            <!-- 真的有人能用完吗 -->
-          </DockPanel>
-        </Border>
+            <!-- 自动更新模式选择器 -->
+            <Border Classes="settingRowInner">
+              <DockPanel>
+                <StackPanel DockPanel.Dock="Left" Spacing="2">
+                  <TextBlock Text="{x:Static lang:Resources.Settings_AutoUpdate}" Classes="body" />
+                  <TextBlock Text="{x:Static lang:Resources.Settings_AutoUpdateHint}" Classes="caption"
+                             Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" TextWrapping="Wrap" MaxWidth="440" />
+                </StackPanel>
+                <ComboBox ItemsSource="{Binding AutoUpdateOptions}"
+                          SelectedIndex="{Binding AutoUpdateIndex, Mode=TwoWay}"
+                          AutomationProperties.Name="{x:Static lang:Resources.Settings_AutoUpdate}"
+                          MinWidth="160" HorizontalAlignment="Right" FontSize="14" />
+              </DockPanel>
+            </Border>
 
-        <!-- 行为 -->
-        <TextBlock Text="{x:Static lang:Resources.Settings_Behavior}"
-                   Classes="settingSectionHeader" Margin="0,16,0,6" />
+            <Border Classes="settingRowInner">
+              <DockPanel>
+                <StackPanel DockPanel.Dock="Left" Spacing="2">
+                  <TextBlock Text="{x:Static lang:Resources.Settings_UpdateCheck}" Classes="body" />
+                  <TextBlock Text="{Binding UpdateStatusMessage}" Classes="caption"
+                             Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" TextWrapping="Wrap" MaxWidth="440" />
+                </StackPanel>
+                <Button Command="{Binding CheckForUpdateCommand}"
+                        IsEnabled="{Binding IsCheckingUpdate, Converter={x:Static conv:BoolConverters.Negate}}"
+                        AutomationProperties.Name="{x:Static lang:Resources.Settings_UpdateCheck}"
+                        HorizontalAlignment="Right" Padding="12,6">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <fic:FluentIcon Icon="{x:Static ficEnum:Icon.ArrowSync}" FontSize="14" />
+                    <TextBlock Text="{x:Static lang:Resources.Settings_UpdateCheck}" Classes="bodySmall" />
+                  </StackPanel>
+                </Button>
+              </DockPanel>
+            </Border>
 
-        <Border Classes="settingRow" BorderThickness="0">
-          <DockPanel>
-            <TextBlock DockPanel.Dock="Left" Text="{x:Static lang:Resources.Settings_ConfirmClear}"
-                       Classes="body" VerticalAlignment="Center" />
-            <ToggleSwitch IsChecked="{Binding ConfirmBeforeClear, Mode=TwoWay}"
-                          AutomationProperties.Name="{x:Static lang:Resources.Settings_ConfirmClear}"
-                          HorizontalAlignment="Right" />
-          </DockPanel>
-        </Border>
-
-        <!-- 重新开始引导 -->
-        <Border Classes="settingRow" BorderThickness="0">
-          <DockPanel>
-            <StackPanel DockPanel.Dock="Left" Spacing="2">
-              <TextBlock Text="{x:Static lang:Resources.Settings_RestartGuide}"
-                         Classes="body" VerticalAlignment="Center" />
-              <TextBlock Text="{x:Static lang:Resources.Settings_RestartGuideHint}"
-                         Classes="caption"
-                         Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
-            </StackPanel>
-            <Button Command="{Binding RestartGuideCommand}"
-                    AutomationProperties.Name="{x:Static lang:Resources.Settings_RestartGuide}"
-                    HorizontalAlignment="Right" Padding="12,6">
-              <StackPanel Orientation="Horizontal" Spacing="4">
-                <fic:FluentIcon Icon="{x:Static ficEnum:Icon.Info}" FontSize="14" />
-                <TextBlock Text="{x:Static lang:Resources.Settings_RestartGuide}" Classes="bodySmall" />
+            <!-- 已有待应用更新时显示重启按钮 -->
+            <DockPanel IsVisible="{Binding HasPendingUpdate}">
+              <StackPanel DockPanel.Dock="Left" Spacing="2">
+                <TextBlock Text="{x:Static lang:Resources.Settings_UpdatePendingRestart}" Classes="body" />
               </StackPanel>
-            </Button>
-          </DockPanel>
+              <Button Command="{Binding ApplyPendingUpdateAndRestartCommand}"
+                      AutomationProperties.Name="{x:Static lang:Resources.Settings_UpdateApply}"
+                      HorizontalAlignment="Right" Padding="12,6" Classes="accent">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                  <fic:FluentIcon Icon="{x:Static ficEnum:Icon.ArrowSync}" FontSize="14" />
+                  <TextBlock Text="{x:Static lang:Resources.Settings_UpdateApply}" Classes="bodySmall" />
+                </StackPanel>
+              </Button>
+            </DockPanel>
+
+            <!-- 更新可用时显示下载按钮 -->
+            <Border Classes="settingRowInner" IsVisible="{Binding IsUpdateAvailable}">
+              <DockPanel>
+                <TextBlock Text="{Binding UpdateVersionText, StringFormat='v{0}'}"
+                           Classes="body" VerticalAlignment="Center" />
+                <Button Command="{Binding DownloadAndApplyUpdateCommand}"
+                        IsEnabled="{Binding IsDownloading, Converter={x:Static conv:BoolConverters.Negate}}"
+                        AutomationProperties.Name="{x:Static lang:Resources.Settings_UpdateApply}"
+                        HorizontalAlignment="Right" Padding="12,6">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <fic:FluentIcon Icon="{x:Static ficEnum:Icon.ArrowDownload}" FontSize="14" />
+                    <TextBlock Text="{x:Static lang:Resources.Settings_UpdateApply}" Classes="bodySmall" />
+                  </StackPanel>
+                </Button>
+              </DockPanel>
+            </Border>
+
+            <!-- 下载进度条 -->
+            <ProgressBar IsVisible="{Binding IsDownloading}"
+                         Value="{Binding UpdateDownloadProgress}"
+                         Minimum="0" Maximum="100" Height="6" />
+          </StackPanel>
         </Border>
 
-        <!-- 数据管理 -->
-        <TextBlock Text="{x:Static lang:Resources.SeatSets_DataManagement}"
-                   Classes="settingSectionHeader" Margin="0,16,0,6" />
-
-        <Border Classes="settingRow">
-          <DockPanel>
-            <StackPanel DockPanel.Dock="Left" Spacing="2">
-              <TextBlock Text="{x:Static lang:Resources.SeatSets_Export}"
-                         Classes="body" VerticalAlignment="Center" />
-              <TextBlock Text="{x:Static lang:Resources.SeatSets_ExportHint}"
-                         Classes="caption"
-                         Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+        <!-- ═══ 工具卡片 ═══ -->
+        <Border Classes="settingsCard">
+          <StackPanel Spacing="12">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <fic:FluentIcon Icon="{x:Static ficEnum:Icon.Toolbox}" FontSize="18"
+                             Foreground="{DynamicResource SystemAccentColor}" />
+              <TextBlock Text="{x:Static lang:Resources.Settings_Tools}" Classes="sectionTitle" />
             </StackPanel>
-            <Button Command="{Binding ExportSeatSetsCommand}"
-                    AutomationProperties.Name="{x:Static lang:Resources.SeatSets_Export}"
-                    HorizontalAlignment="Right" Padding="12,6">
-              <StackPanel Orientation="Horizontal" Spacing="4">
-                <fic:FluentIcon Icon="{x:Static ficEnum:Icon.ArrowExport}" FontSize="14" />
-                <TextBlock Text="{x:Static lang:Resources.SeatSets_Export}" Classes="bodySmall" />
+
+            <!-- 数据管理 -->
+            <TextBlock Text="{x:Static lang:Resources.SeatSets_DataManagement}" Classes="bodyStrong" />
+
+            <Border Classes="settingRowInner">
+              <DockPanel>
+                <StackPanel DockPanel.Dock="Left" Spacing="2">
+                  <TextBlock Text="{x:Static lang:Resources.SeatSets_Export}" Classes="body" />
+                  <TextBlock Text="{x:Static lang:Resources.SeatSets_ExportHint}" Classes="caption"
+                             Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+                </StackPanel>
+                <Button Command="{Binding ExportSeatSetsCommand}"
+                        AutomationProperties.Name="{x:Static lang:Resources.SeatSets_Export}"
+                        HorizontalAlignment="Right" Padding="12,6">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <fic:FluentIcon Icon="{x:Static ficEnum:Icon.ArrowExport}" FontSize="14" />
+                    <TextBlock Text="{x:Static lang:Resources.SeatSets_Export}" Classes="bodySmall" />
+                  </StackPanel>
+                </Button>
+              </DockPanel>
+            </Border>
+
+            <DockPanel>
+              <StackPanel DockPanel.Dock="Left" Spacing="2">
+                <TextBlock Text="{x:Static lang:Resources.SeatSets_Import}" Classes="body" />
+                <TextBlock Text="{x:Static lang:Resources.SeatSets_ImportHint}" Classes="caption"
+                           Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
               </StackPanel>
-            </Button>
-          </DockPanel>
+              <Button Command="{Binding ImportSeatSetsCommand}"
+                      AutomationProperties.Name="{x:Static lang:Resources.SeatSets_Import}"
+                      HorizontalAlignment="Right" Padding="12,6">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                  <fic:FluentIcon Icon="{x:Static ficEnum:Icon.ArrowImport}" FontSize="14" />
+                  <TextBlock Text="{x:Static lang:Resources.SeatSets_Import}" Classes="bodySmall" />
+                </StackPanel>
+              </Button>
+            </DockPanel>
+          </StackPanel>
         </Border>
 
-        <Border Classes="settingRow" BorderThickness="0">
-          <DockPanel>
-            <StackPanel DockPanel.Dock="Left" Spacing="2">
-              <TextBlock Text="{x:Static lang:Resources.SeatSets_Import}"
-                         Classes="body" VerticalAlignment="Center" />
-              <TextBlock Text="{x:Static lang:Resources.SeatSets_ImportHint}"
-                         Classes="caption"
-                         Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
-            </StackPanel>
-            <Button Command="{Binding ImportSeatSetsCommand}"
-                    AutomationProperties.Name="{x:Static lang:Resources.SeatSets_Import}"
-                    HorizontalAlignment="Right" Padding="12,6">
-              <StackPanel Orientation="Horizontal" Spacing="4">
-                <fic:FluentIcon Icon="{x:Static ficEnum:Icon.ArrowImport}" FontSize="14" />
-                <TextBlock Text="{x:Static lang:Resources.SeatSets_Import}" Classes="bodySmall" />
-              </StackPanel>
-            </Button>
-          </DockPanel>
-        </Border>
       </StackPanel>
     </ScrollViewer>
   </DockPanel>

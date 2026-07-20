@@ -8,6 +8,13 @@
         "avdt"
       ],
       "rollForward": false
+    },
+    "vpk": {
+      "version": "1.2.110-ge826545",
+      "commands": [
+        "vpk"
+      ],
+      "rollForward": false
     }
   }
 }

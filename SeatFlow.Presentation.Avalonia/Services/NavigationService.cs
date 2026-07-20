@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using SeatFlow.Core.Telemetry;
 using SeatFlow.Presentation.Avalonia.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -60,6 +61,15 @@ public class NavigationService : INavigationService
             _ => throw new ArgumentOutOfRangeException(nameof(page))
         };
         _logger.LogInformation("导航切换：{From} → {To}" , CurrentPage , page);
+
+        // 记录页面访问遥测
+        try
+        {
+            var telemetry = _serviceProvider.GetRequiredService<ITelemetryService>();
+            telemetry.RecordPageView(page.ToString());
+        }
+        catch { /* 遥测未注册时静默处理 */ }
+
         CurrentViewModelChanged?.Invoke();
     }
 }

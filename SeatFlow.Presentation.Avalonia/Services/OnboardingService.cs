@@ -756,7 +756,8 @@ public sealed class OnboardingService : IOnboardingService, IOnboardingStarter
             var mainWindow = GetMainWindow();
             if (mainWindow?.DataContext is MainShellViewModel vm)
             {
-                await vm.CompleteOnboardingAsync();
+                var navigateTo = ParsePageKey(_config?.CompleteAction) ?? PageKey.Home;
+                await vm.CompleteOnboardingAsync(navigateTo);
             }
         }
 
@@ -811,6 +812,16 @@ public sealed class OnboardingService : IOnboardingService, IOnboardingStarter
     {
         if (global::Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             return desktop.MainWindow as MainWindow;
+        return null;
+    }
+
+    /// <summary>将配置中的页面名称解析为 PageKey 枚举值，失败返回 null。</summary>
+    private static PageKey? ParsePageKey (string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return null;
+        if (Enum.TryParse<PageKey>(name, ignoreCase: true, out var key))
+            return key;
         return null;
     }
 }
