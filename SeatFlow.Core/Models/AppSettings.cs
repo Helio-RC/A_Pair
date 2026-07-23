@@ -56,7 +56,10 @@ namespace SeatFlow.Core.Models
         public TelemetryConfig Telemetry { get; set; } = new();
 
         /// <summary>自动更新模式（默认：仅检查）。</summary>
-        public AutoUpdateMode AutoUpdate { get; set; } = AutoUpdateMode.CheckOnly;
+        public AutoUpdateMode AutoUpdate { get; set; } = AutoUpdateMode.AutoUpdate;
+
+        /// <summary>键盘快捷键配置。</summary>
+        public KeyboardShortcutConfig KeyboardShortcuts { get; set; } = new();
 
         /// <summary>键盘快捷键配置。</summary>
         public KeyboardShortcutConfig KeyboardShortcuts { get; set; } = new();
