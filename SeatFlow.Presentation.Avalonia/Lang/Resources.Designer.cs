@@ -72,10 +72,12 @@ public class Resources
     public static string ConfigBlock_Dataset => ResourceManager.GetString("ConfigBlock_Dataset", Culture)!;
     public static string ConfigBlock_Venue => ResourceManager.GetString("ConfigBlock_Venue", Culture)!;
     public static string Data_CSVFile => ResourceManager.GetString("Data_CSVFile", Culture)!;
+    public static string DragDrop_DropHint => ResourceManager.GetString("DragDrop_DropHint", Culture)!;
     public static string DragDrop_InvalidFileType => ResourceManager.GetString("DragDrop_InvalidFileType", Culture)!;
     public static string DragDrop_InvalidFileTypeFmt => ResourceManager.GetString("DragDrop_InvalidFileTypeFmt", Culture)!;
     public static string DragDrop_MultipleFilesMsg => ResourceManager.GetString("DragDrop_MultipleFilesMsg", Culture)!;
     public static string DragDrop_MultipleFilesTitle => ResourceManager.GetString("DragDrop_MultipleFilesTitle", Culture)!;
+    public static string DragDrop_UnsupportedDropHint => ResourceManager.GetString("DragDrop_UnsupportedDropHint", Culture)!;
     public static string DragDrop_UnsupportedPage => ResourceManager.GetString("DragDrop_UnsupportedPage", Culture)!;
     public static string DragDrop_UnsupportedPageMsg => ResourceManager.GetString("DragDrop_UnsupportedPageMsg", Culture)!;
     public static string Freeform_UnsavedChanges => ResourceManager.GetString("Freeform_UnsavedChanges", Culture)!;

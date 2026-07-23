@@ -9,6 +9,8 @@ using SeatFlow.Presentation.Avalonia.Services;
 using SeatFlow.Presentation.Avalonia.ViewModels;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Media;
+using FluentIcons.Common;
 using Microsoft.Extensions.DependencyInjection;
 using AvaloniaApp = Avalonia.Application;
 
@@ -17,13 +19,19 @@ namespace SeatFlow.Presentation.Avalonia.Behaviors;
 /// <summary>
 /// 全局文件拖放导入行为。注册在 MainWindow 上，拦截 OS 文件拖放事件，
 /// 根据当前页面的 ViewModel 是否实现 <see cref="IFileDropHandler"/> 来路由处理。
+/// 拖入文件时显示遮罩覆盖层（支持/不支持两种状态）。
 /// </summary>
 internal static class FileDropHandler
 {
+    private static Window? _window;
+
     public static void Attach(Window window)
     {
+        _window = window;
         DragDrop.AddDragOverHandler(window, OnDragOver);
         DragDrop.AddDropHandler(window, OnDrop);
+        DragDrop.AddDragEnterHandler(window, OnDragEnter);
+        DragDrop.AddDragLeaveHandler(window, OnDragLeave);
     }
 
     private static ViewModelBase? ResolveCurrentViewModel()
@@ -41,10 +49,8 @@ internal static class FileDropHandler
         return null;
     }
 
-    /// <summary>从 DataTransfer 中提取拖放文件路径。</summary>
     private static string[]? GetDroppedFilePaths(DragEventArgs e)
     {
-        // 使用 Avalonia 标准 API：DataFormat.File + TryGetFiles()
         if (!e.DataTransfer.Formats.Contains(DataFormat.File))
             return null;
 
@@ -55,12 +61,92 @@ internal static class FileDropHandler
         return files.Select(f => f.Path.LocalPath).ToArray();
     }
 
+    /// <summary>判断当前拖入的文件是否被当前页面接受。</summary>
+    private static bool IsAcceptedByCurrentPage(DragEventArgs e)
+    {
+        var vm = ResolveCurrentViewModel();
+        if (vm is not IFileDropHandler handler)
+            return false;
+
+        if (!e.DataTransfer.Formats.Contains(DataFormat.File))
+            return false;
+
+        var filePaths = GetDroppedFilePaths(e);
+        if (filePaths is null || filePaths.Length == 0 || filePaths.Length > 1)
+            return false;
+
+        var ext = Path.GetExtension(filePaths[0])?.ToLowerInvariant();
+        return ext is not null && handler.AcceptedFileExtensions.Contains(ext);
+    }
+
+    /// <summary>显示遮罩覆盖层并根据页面对文件的接受情况设置图标、文字和边框颜色。</summary>
+    private static void SetOverlayState(bool accepted)
+    {
+        if (_window is null) return;
+
+        var overlay = _window.FindControl<Border>("FileDropOverlay");
+        if (overlay is null) return;
+
+        var icon = _window.FindControl<FluentIcons.Avalonia.FluentIcon>("FileDropOverlayIcon");
+        var text = _window.FindControl<TextBlock>("FileDropOverlayText");
+        var card = _window.FindControl<Border>("FileDropOverlayCard");
+
+        if (accepted)
+        {
+            // 支持状态：下载图标 + 主题色边框 + "释放文件以导入"
+            if (icon is not null)
+            {
+                icon.Icon = Icon.ArrowDownload;
+                icon.Foreground = _window.FindResource("SystemAccentColor") as IBrush;
+            }
+            if (text is not null)
+                text.Text = Resources.DragDrop_DropHint;
+            if (card is not null)
+                card.BorderBrush = _window.FindResource("SystemAccentColor") as IBrush;
+        }
+        else
+        {
+            // 不支持状态：禁止图标 + 错误色边框 + "该页面不支持此文件类型"
+            if (icon is not null)
+            {
+                icon.Icon = Icon.Dismiss;
+                icon.Foreground = _window.FindResource("ErrorBrush") as IBrush;
+            }
+            if (text is not null)
+                text.Text = Resources.DragDrop_UnsupportedDropHint;
+            if (card is not null)
+                card.BorderBrush = _window.FindResource("ErrorBrush") as IBrush;
+        }
+
+        overlay.IsVisible = true;
+    }
+
+    private static void HideOverlay()
+    {
+        if (_window is null) return;
+        var overlay = _window.FindControl<Border>("FileDropOverlay");
+        if (overlay is not null)
+            overlay.IsVisible = false;
+    }
+
+    private static void OnDragEnter(object? sender, DragEventArgs e)
+    {
+        if (!e.DataTransfer.Formats.Contains(DataFormat.File))
+            return;
+
+        SetOverlayState(IsAcceptedByCurrentPage(e));
+    }
+
+    private static void OnDragLeave(object? sender, DragEventArgs e)
+    {
+        HideOverlay();
+    }
+
     private static void OnDragOver(object? sender, DragEventArgs e)
     {
         var vm = ResolveCurrentViewModel();
         if (vm is not IFileDropHandler handler)
         {
-            // 非拖放处理页面：有文件时显示禁止光标
             if (e.DataTransfer.Formats.Contains(DataFormat.File))
                 e.DragEffects = DragDropEffects.None;
             return;
@@ -70,7 +156,6 @@ internal static class FileDropHandler
         if (filePaths is null || filePaths.Length == 0)
             return;
 
-        // 只接受单个文件拖放
         if (filePaths.Length > 1)
         {
             e.DragEffects = DragDropEffects.None;
@@ -91,6 +176,8 @@ internal static class FileDropHandler
 
     private static async void OnDrop(object? sender, DragEventArgs e)
     {
+        HideOverlay();
+
         try
         {
             var filePaths = GetDroppedFilePaths(e);
@@ -99,7 +186,6 @@ internal static class FileDropHandler
 
             var vm = ResolveCurrentViewModel();
 
-            // 多文件：警告并只处理第一个
             if (filePaths.Length > 1)
             {
                 var dialog = GetDialogService();
@@ -115,7 +201,6 @@ internal static class FileDropHandler
 
             if (vm is IFileDropHandler handler)
             {
-                // 扩展名不匹配
                 if (ext is null || !handler.AcceptedFileExtensions.Contains(ext))
                 {
                     var dialog = GetDialogService();
@@ -145,7 +230,6 @@ internal static class FileDropHandler
         }
         catch (Exception ex)
         {
-            // async void 事件处理器中未捕获异常会被静默吞掉，显示错误弹窗
             try
             {
                 var dialog = GetDialogService();

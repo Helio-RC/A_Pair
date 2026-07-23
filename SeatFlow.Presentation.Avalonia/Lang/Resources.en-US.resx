@@ -197,6 +197,9 @@
   <data name="Data_CSVFile" xml:space="preserve">
     <value>CSV file</value>
   </data>
+  <data name="DragDrop_DropHint" xml:space="preserve">
+    <value>Drop files to import</value>
+  </data>
   <data name="DragDrop_InvalidFileType" xml:space="preserve">
     <value>Unsupported Format</value>
   </data>
@@ -208,6 +211,9 @@
   </data>
   <data name="DragDrop_MultipleFilesTitle" xml:space="preserve">
     <value>Multiple Files</value>
+  </data>
+  <data name="DragDrop_UnsupportedDropHint" xml:space="preserve">
+    <value>This page does not support this file type</value>
   </data>
   <data name="DragDrop_UnsupportedPage" xml:space="preserve">
     <value>Cannot Import</value>
