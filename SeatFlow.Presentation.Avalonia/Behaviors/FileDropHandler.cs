@@ -91,31 +91,21 @@ internal static class FileDropHandler
         var text = _window.FindControl<TextBlock>("FileDropOverlayText");
         var card = _window.FindControl<Border>("FileDropOverlayCard");
 
+        // 使用 Application 级别的资源查找（Window.FindResource 找不到主题级资源）
+        var accentBrush = AvaloniaApp.Current?.FindResource("SystemAccentColor") as IBrush;
+        var errorBrush = AvaloniaApp.Current?.FindResource("SystemFillColorCriticalBrush") as IBrush;
+
         if (accepted)
         {
-            // 支持状态：下载图标 + 主题色边框 + "释放文件以导入"
-            if (icon is not null)
-            {
-                icon.Icon = Icon.ArrowDownload;
-                icon.Foreground = _window.FindResource("SystemAccentColor") as IBrush;
-            }
-            if (text is not null)
-                text.Text = Resources.DragDrop_DropHint;
-            if (card is not null)
-                card.BorderBrush = _window.FindResource("SystemAccentColor") as IBrush;
+            if (icon is not null) icon.Icon = Icon.ArrowDownload;
+            if (text is not null) text.Text = Resources.DragDrop_DropHint;
+            if (card is not null && accentBrush is not null) card.BorderBrush = accentBrush;
         }
         else
         {
-            // 不支持状态：禁止图标 + 错误色边框 + "该页面不支持此文件类型"
-            if (icon is not null)
-            {
-                icon.Icon = Icon.Dismiss;
-                icon.Foreground = _window.FindResource("ErrorBrush") as IBrush;
-            }
-            if (text is not null)
-                text.Text = Resources.DragDrop_UnsupportedDropHint;
-            if (card is not null)
-                card.BorderBrush = _window.FindResource("ErrorBrush") as IBrush;
+            if (icon is not null) icon.Icon = Icon.Dismiss;
+            if (text is not null) text.Text = Resources.DragDrop_UnsupportedDropHint;
+            if (card is not null && errorBrush is not null) card.BorderBrush = errorBrush;
         }
 
         overlay.IsVisible = true;
