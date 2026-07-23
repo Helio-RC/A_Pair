@@ -266,7 +266,7 @@
   </DockPanel>
 
     <!-- 文件拖放导入覆盖层 -->
-    <Border x:Name="FileDropOverlay" IsVisible="False" Background="#80000000"
+    <Border x:Name="FileDropOverlay" IsVisible="False" Background="{DynamicResource OverlayMaskBrush}"
             ZIndex="100" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
       <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
               CornerRadius="12" BorderThickness="3"
@@ -301,7 +301,7 @@
                   IsPointAtCenter="True"
                   IsScrollIntoView="True"
                   IsShowMask="False"
-                  MaskColor="#80000000"
+                  MaskColor="{DynamicResource OverlayMaskColor}"
                   TargetBorderBrush="{DynamicResource SystemAccentColor}"
                   TargetBorderThickness="3"
                   TargetResolveDelay="0:0:0"
