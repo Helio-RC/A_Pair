@@ -123,6 +123,7 @@ Users can override via `DataDirectory` in AppSettings.json. Plugins are stored i
 5. Initialize `ViewModelBase.Dialog` (static) and `ViewModelBase` logger
 6. Start `WatchdogService` with a 3s DispatcherTimer ping
 7. Attach `ChineseInputNormalizer` behavior (全角数字/符号 → 半角)
+7.5. Attach `KeyboardShortcutHandler` behavior (全局键盘快捷键)
 8. `RestoreSettingsAsync()` — restore theme, window position/size (language already applied in step 1)
 
 ## Key Patterns
@@ -176,6 +177,7 @@ Called by `NavigationService` before navigating away. Override to prompt user ab
 - `CanvasZoomPan` — Pan and zoom for Canvas-based previews. **拖放座位时通过 NaN 哨兵机制跳过平移**（详见 `docs/DragDrop.md`）
 - `ZoomOnScroll` — Ctrl+Scroll to zoom
 - `ChineseInputNormalizer` — Converts full-width numbers/symbols to half-width on text input
+- `KeyboardShortcutHandler` — 全局键盘快捷键处理（Ctrl+Z/Y 撤销/重做、Ctrl+S 保存、Delete 删除、Esc 取消）。通过 `KeyboardShortcutConfig` 开关控制，设置页面可配。详见 `docs/adr/ADR-011-keyboard-shortcuts.md`。
 - `FileDropHandler` — Global OS file drag-drop import. Intercepts `DragDrop.DragOverEvent`/`DropEvent` with `RoutingStrategies.Tunnel` on MainWindow. Routes to page ViewModels that implement `IFileDropHandler` (in `Services/`).
 
 ### File Drag-Drop Import
@@ -315,7 +317,7 @@ On load, each repository reads the file as `JsonNode`, calls `FileMigrationServi
 **不需要迁移器**（模型默认值即可）：
 - 新增属性/配置节，且所有字段都有合理的默认值（`bool` → `false`、`int` → `0`、`string` → `""`、引用类型 → `new()`）
 - 旧 JSON 缺少该节点时，`System.Text.Json` 反序列化会保留属性的默认值
-- 示例：新增 `TelemetryConfig` 到 `AppSettings`，默认 `Enabled = false`，旧文件无需迁移
+- 示例：新增 `TelemetryConfig`、`KeyboardShortcutConfig` 到 `AppSettings`，所有字段有默认值，旧文件无需迁移
 
 **必须写迁移器**：
 - 数据格式变化：如 `VenueMigrators 1.0→1.1` 将座位从列主序重排为行主序
@@ -410,7 +412,7 @@ Bind to sidebar buttons with `Opacity` (not `IsEnabled` — disabled controls hi
 Fully data-driven via `Data/onboarding_config.json` (v3.2). See `docs/ONBOARDING_GUIDE.md` for full details. See `docs/adr/ADR-008-onboarding-demo-data-injection.md` for the demo data injection decision.
 
 **Two types of guides:**
-- **启动引导 (`startupPhases`)** — 20-step full workflow at first launch: Home→MemberManagement(ExportTemplate→ImportButton)→[auto Home round-trip]→MemberManagement(UpdateButton)→VenueConfiguration→StrategyConfiguration (含策略冲突提示居中步骤)→SeatingArrangement→SnapshotHistory→Closing
+- **启动引导 (`startupPhases`)** — 9 阶段（~24 子步骤）完整工作流：Welcome → MemberManagement(导出模板→导入→更新→管理) → VenueConfiguration(新建→布局→保存) → StrategyConfiguration(列表→调整→冲突提示→保存) → SeatingArrangement(选择→生成→导出) → SnapshotHistory → **Settings(快捷键配置)** → Closing。左下角步骤点按阶段呈现（9 个点），通过延迟 Dispatch 覆盖 Guide Indicator 实现（详见 ADR-011）。
 - **页面引导 (`pageGuides`)** — Triggered on first visit to a page (FreeformManagement, PluginManagement). Tracked in `AppSettings.CompletedPageGuides`.
 
 **声明式示例数据注入 (v3.2):** `OnboardingPhaseDefinition.SeedData` (bool, 默认 false) 控制跨阶段导航时是否注入演示数据。原运行状态标志 `_memberManagementDataSeeded` 已删除，改为 JSON 声明式控制。MemberManagement 分两次进入（中间隔 Home 过渡阶段），第一次不注入（ImportButton 可见），第二次注入（UpdateFromFileButton 可见）。`ClearPageData` 使用 `_memberManagementDemoInjected` 静态标志判断是否实际注入过。
