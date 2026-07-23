@@ -1210,6 +1210,45 @@ Place plugins in the Plugins directory</value>
   <data name="Settings_FolderTitle" xml:space="preserve">
     <value>Select data directory</value>
   </data>
+  <data name="Settings_KbShortcut_Delete" xml:space="preserve">
+    <value>Delete Remove</value>
+  </data>
+  <data name="Settings_KbShortcut_DeleteHint" xml:space="preserve">
+    <value>Remove the selected assigned student from the seat</value>
+  </data>
+  <data name="Settings_KbShortcut_Escape" xml:space="preserve">
+    <value>Esc Cancel</value>
+  </data>
+  <data name="Settings_KbShortcut_EscapeHint" xml:space="preserve">
+    <value>Cancel current swap mode or deselect</value>
+  </data>
+  <data name="Settings_KbShortcut_Redo" xml:space="preserve">
+    <value>Ctrl+Y Redo</value>
+  </data>
+  <data name="Settings_KbShortcut_RedoHint" xml:space="preserve">
+    <value>Redo the undone seating assignment</value>
+  </data>
+  <data name="Settings_KbShortcut_Save" xml:space="preserve">
+    <value>Ctrl+S Save</value>
+  </data>
+  <data name="Settings_KbShortcut_SaveHint" xml:space="preserve">
+    <value>Save current page data (members, venues, seating results, etc.)</value>
+  </data>
+  <data name="Settings_KbShortcut_Undo" xml:space="preserve">
+    <value>Ctrl+Z Undo</value>
+  </data>
+  <data name="Settings_KbShortcut_UndoHint" xml:space="preserve">
+    <value>Undo the last seating assignment</value>
+  </data>
+  <data name="Settings_KbShortcut_Zoom" xml:space="preserve">
+    <value>Ctrl+Scroll Zoom</value>
+  </data>
+  <data name="Settings_KbShortcut_ZoomHint" xml:space="preserve">
+    <value>Hold Ctrl and scroll to zoom the seating canvas</value>
+  </data>
+  <data name="Settings_KeyboardShortcuts" xml:space="preserve">
+    <value>Keyboard Shortcuts</value>
+  </data>
   <data name="Settings_LangChangedMessage" xml:space="preserve">
     <value>The interface language has been changed. Restart the application for the change to take effect.</value>
   </data>

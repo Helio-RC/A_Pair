@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using CommunityToolkit.Mvvm.Input;
+using SeatFlow.Core.Models;
 using SeatFlow.Presentation.Avalonia.ViewModels;
 
 namespace SeatFlow.Presentation.Avalonia.Behaviors;
@@ -11,9 +12,13 @@ namespace SeatFlow.Presentation.Avalonia.Behaviors;
 /// <summary>
 /// 全局键盘快捷键处理行为。
 /// 在 <see cref="App.axaml.cs"/> 中通过 <c>KeyboardShortcutHandler.Attach(mainWindow)</c> 注册到 MainWindow。
+/// 快捷键开关通过 <see cref="ShortcutConfig"/> 控制，由设置页面写入。
 /// </summary>
 internal static class KeyboardShortcutHandler
 {
+    /// <summary>快捷键开关配置，默认为全部启用。由 <see cref="SettingsViewModel"/> 加载/保存时更新。</summary>
+    internal static KeyboardShortcutConfig ShortcutConfig { get; set; } = new();
+
     /// <summary>保存命令的候选属性名（CommunityToolkit.Mvvm 从 [RelayCommand] 方法生成）。</summary>
     private static readonly string[] SaveCommandNames =
     [
@@ -36,14 +41,16 @@ internal static class KeyboardShortcutHandler
         if (sender is not Window window) return;
         if (window.DataContext is not MainShellViewModel shell) return;
 
+        var cfg = ShortcutConfig;
         var currentVm = shell.CurrentViewModel;
         var modifiers = e.KeyModifiers;
         var isCtrl = modifiers.HasFlag(KeyModifiers.Control);
+        var isTextFocused = IsTextInputFocused(window);
 
         switch (e.Key)
         {
             // ── Ctrl+Z: 撤销 ──
-            case Key.Z when isCtrl && !IsTextInputFocused(window):
+            case Key.Z when isCtrl && cfg.UndoEnabled && !isTextFocused:
                 if (currentVm is SeatingArrangementViewModel saVm)
                 {
                     saVm.UndoCommand.Execute(null);
@@ -52,7 +59,7 @@ internal static class KeyboardShortcutHandler
                 break;
 
             // ── Ctrl+Y: 重做 ──
-            case Key.Y when isCtrl && !IsTextInputFocused(window):
+            case Key.Y when isCtrl && cfg.RedoEnabled && !isTextFocused:
                 if (currentVm is SeatingArrangementViewModel saVm2)
                 {
                     saVm2.RedoCommand.Execute(null);
@@ -61,13 +68,13 @@ internal static class KeyboardShortcutHandler
                 break;
 
             // ── Ctrl+S: 保存当前数据 ──
-            case Key.S when isCtrl && !IsTextInputFocused(window):
+            case Key.S when isCtrl && cfg.SaveEnabled && !isTextFocused:
                 HandleSave(currentVm);
                 e.Handled = true;
                 break;
 
             // ── Delete: 删除选中的已分配学生 ──
-            case Key.Delete when !IsTextInputFocused(window):
+            case Key.Delete when cfg.DeleteEnabled && !isTextFocused:
                 if (currentVm is SeatingArrangementViewModel saVm3)
                 {
                     saVm3.RemoveToTrashCommand.Execute(null);
@@ -77,7 +84,7 @@ internal static class KeyboardShortcutHandler
 
             // ── Esc: 取消选择 / 关闭弹窗 ──
             case Key.Escape:
-                e.Handled = HandleEscape(shell , currentVm);
+                e.Handled = cfg.EscapeEnabled && HandleEscape(shell , currentVm);
                 break;
         }
     }

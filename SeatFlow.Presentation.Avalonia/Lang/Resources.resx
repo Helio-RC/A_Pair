@@ -1212,6 +1212,45 @@
   <data name="Settings_FolderTitle" xml:space="preserve">
     <value>选择数据目录</value>
   </data>
+  <data name="Settings_KbShortcut_Delete" xml:space="preserve">
+    <value>Delete 删除</value>
+  </data>
+  <data name="Settings_KbShortcut_DeleteHint" xml:space="preserve">
+    <value>删除座位图中选中的已分配学生</value>
+  </data>
+  <data name="Settings_KbShortcut_Escape" xml:space="preserve">
+    <value>Esc 取消</value>
+  </data>
+  <data name="Settings_KbShortcut_EscapeHint" xml:space="preserve">
+    <value>取消当前的交换模式或取消选中</value>
+  </data>
+  <data name="Settings_KbShortcut_Redo" xml:space="preserve">
+    <value>Ctrl+Y 重做</value>
+  </data>
+  <data name="Settings_KbShortcut_RedoHint" xml:space="preserve">
+    <value>重做被撤销的座位分配操作</value>
+  </data>
+  <data name="Settings_KbShortcut_Save" xml:space="preserve">
+    <value>Ctrl+S 保存</value>
+  </data>
+  <data name="Settings_KbShortcut_SaveHint" xml:space="preserve">
+    <value>保存当前页面数据（会员/会场/排座结果等）</value>
+  </data>
+  <data name="Settings_KbShortcut_Undo" xml:space="preserve">
+    <value>Ctrl+Z 撤销</value>
+  </data>
+  <data name="Settings_KbShortcut_UndoHint" xml:space="preserve">
+    <value>撤销上一步座位分配操作</value>
+  </data>
+  <data name="Settings_KbShortcut_Zoom" xml:space="preserve">
+    <value>Ctrl+滚轮 缩放</value>
+  </data>
+  <data name="Settings_KbShortcut_ZoomHint" xml:space="preserve">
+    <value>在座位图画布中按住 Ctrl 并滚动滚轮来缩放视图</value>
+  </data>
+  <data name="Settings_KeyboardShortcuts" xml:space="preserve">
+    <value>键盘快捷键</value>
+  </data>
   <data name="Settings_LangChangedMessage" xml:space="preserve">
     <value>界面语言已更改，需要重启应用才能生效。</value>
   </data>

@@ -91,6 +91,25 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     public partial bool SuppressEnvironmentWarning { get; set; }
 
+    // ── 键盘快捷键开关 ──
+    [ObservableProperty]
+    public partial bool UndoShortcutEnabled { get; set; } = true;
+
+    [ObservableProperty]
+    public partial bool RedoShortcutEnabled { get; set; } = true;
+
+    [ObservableProperty]
+    public partial bool SaveShortcutEnabled { get; set; } = true;
+
+    [ObservableProperty]
+    public partial bool ZoomShortcutEnabled { get; set; } = true;
+
+    [ObservableProperty]
+    public partial bool DeleteShortcutEnabled { get; set; } = true;
+
+    [ObservableProperty]
+    public partial bool EscapeShortcutEnabled { get; set; } = true;
+
     [ObservableProperty]
     public partial int LogLevelIndex { get; set; } = 1;
     public List<string> LogLevelOptions { get; } =
@@ -179,6 +198,15 @@ public partial class SettingsViewModel : ViewModelBase
             TelemetryEnabled = settings.Telemetry.Enabled;
 
             SuppressEnvironmentWarning = settings.SuppressEnvironmentWarning;
+
+            UndoShortcutEnabled = settings.KeyboardShortcuts.UndoEnabled;
+            RedoShortcutEnabled = settings.KeyboardShortcuts.RedoEnabled;
+            SaveShortcutEnabled = settings.KeyboardShortcuts.SaveEnabled;
+            ZoomShortcutEnabled = settings.KeyboardShortcuts.ZoomWithCtrlEnabled;
+            DeleteShortcutEnabled = settings.KeyboardShortcuts.DeleteEnabled;
+            EscapeShortcutEnabled = settings.KeyboardShortcuts.EscapeEnabled;
+            SyncShortcutConfig();
+
             var logLevel = settings.Logging.MinimumLevel;
             LogLevelIndex = logLevel switch { "Debug" => 0 , "Warning" => 2 , "Error" => 3 , _ => 1 };
 
@@ -248,6 +276,20 @@ public partial class SettingsViewModel : ViewModelBase
         };
     }
 
+    /// <summary>将 ViewModel 中的快捷键开关同步到静态行为配置。</summary>
+    private void SyncShortcutConfig ()
+    {
+        Behaviors.KeyboardShortcutHandler.ShortcutConfig = new KeyboardShortcutConfig
+        {
+            UndoEnabled = UndoShortcutEnabled ,
+            RedoEnabled = RedoShortcutEnabled ,
+            SaveEnabled = SaveShortcutEnabled ,
+            ZoomWithCtrlEnabled = ZoomShortcutEnabled ,
+            DeleteEnabled = DeleteShortcutEnabled ,
+            EscapeEnabled = EscapeShortcutEnabled
+        };
+    }
+
     [RelayCommand]
     private async Task SaveSettingsAsync (CancellationToken ct)
     {
@@ -267,6 +309,15 @@ public partial class SettingsViewModel : ViewModelBase
             settings.MaxSnapshotsPerVenue = MaxSnapshotsPerVenue;
             settings.Telemetry.Enabled = TelemetryEnabled;
             settings.SuppressEnvironmentWarning = SuppressEnvironmentWarning;
+
+            settings.KeyboardShortcuts.UndoEnabled = UndoShortcutEnabled;
+            settings.KeyboardShortcuts.RedoEnabled = RedoShortcutEnabled;
+            settings.KeyboardShortcuts.SaveEnabled = SaveShortcutEnabled;
+            settings.KeyboardShortcuts.ZoomWithCtrlEnabled = ZoomShortcutEnabled;
+            settings.KeyboardShortcuts.DeleteEnabled = DeleteShortcutEnabled;
+            settings.KeyboardShortcuts.EscapeEnabled = EscapeShortcutEnabled;
+            SyncShortcutConfig();
+
             settings.Logging.MinimumLevel = LogLevelIndex switch { 0 => "Debug", 2 => "Warning", 3 => "Error", _ => "Information" };
             settings.AutoUpdate = AutoUpdate;
 
@@ -319,6 +370,12 @@ public partial class SettingsViewModel : ViewModelBase
         ConfirmBeforeClear = true;
         ZoomIndex = 1;
         SuppressEnvironmentWarning = false;
+        UndoShortcutEnabled = true;
+        RedoShortcutEnabled = true;
+        SaveShortcutEnabled = true;
+        ZoomShortcutEnabled = true;
+        DeleteShortcutEnabled = true;
+        EscapeShortcutEnabled = true;
         LogLevelIndex = 1;
         StatusMessage = Resources.Settings_ResetDone;
     }

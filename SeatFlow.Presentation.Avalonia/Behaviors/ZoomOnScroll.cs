@@ -31,8 +31,9 @@ public static class ZoomOnScroll
     {
         if (sender is not ScrollViewer sv) return;
 
-        // 仅在按住 Ctrl 时缩放，否则让 ScrollViewer 正常滚动
-        if (!e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        // 仅在 ZoomWithCtrl 启用且按住 Ctrl 时缩放，否则让 ScrollViewer 正常滚动
+        if (!KeyboardShortcutHandler.ShortcutConfig.ZoomWithCtrlEnabled
+            || !e.KeyModifiers.HasFlag(KeyModifiers.Control))
             return;
 
         e.Handled = true;
