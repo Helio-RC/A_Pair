@@ -80,6 +80,12 @@ public class Resources
     public static string Guide_Members_Update_Title => ResourceManager.GetString("Guide_Members_Update_Title", Culture)!;
     public static string Guide_Seating_Select_Desc => ResourceManager.GetString("Guide_Seating_Select_Desc", Culture)!;
     public static string Guide_Seating_Select_Title => ResourceManager.GetString("Guide_Seating_Select_Title", Culture)!;
+    public static string Guide_Settings_Save_Desc => ResourceManager.GetString("Guide_Settings_Save_Desc", Culture)!;
+    public static string Guide_Settings_Save_Title => ResourceManager.GetString("Guide_Settings_Save_Title", Culture)!;
+    public static string Guide_Settings_Shortcuts_Desc => ResourceManager.GetString("Guide_Settings_Shortcuts_Desc", Culture)!;
+    public static string Guide_Settings_Shortcuts_Title => ResourceManager.GetString("Guide_Settings_Shortcuts_Title", Culture)!;
+    public static string Guide_Settings_Toggle_Desc => ResourceManager.GetString("Guide_Settings_Toggle_Desc", Culture)!;
+    public static string Guide_Settings_Toggle_Title => ResourceManager.GetString("Guide_Settings_Toggle_Title", Culture)!;
     public static string Home_Docs => ResourceManager.GetString("Home_Docs", Culture)!;
     public static string Home_FAQ => ResourceManager.GetString("Home_FAQ", Culture)!;
     public static string Home_Greeting_Afternoon => ResourceManager.GetString("Home_Greeting_Afternoon", Culture)!;

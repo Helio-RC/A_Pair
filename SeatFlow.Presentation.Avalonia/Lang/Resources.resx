@@ -221,6 +221,24 @@
   <data name="Guide_Seating_Select_Title" xml:space="preserve">
     <value>选择数据</value>
   </data>
+  <data name="Guide_Settings_Save_Desc" xml:space="preserve">
+    <value>修改快捷键配置后，点击保存按钮使设置生效。你也可以随时回到此页面调整。</value>
+  </data>
+  <data name="Guide_Settings_Save_Title" xml:space="preserve">
+    <value>保存设置</value>
+  </data>
+  <data name="Guide_Settings_Shortcuts_Desc" xml:space="preserve">
+    <value>在这里可以查看和配置键盘快捷键。每个快捷键都有独立的开关，你可以根据自己的习惯启用或禁用。</value>
+  </data>
+  <data name="Guide_Settings_Shortcuts_Title" xml:space="preserve">
+    <value>快捷键设置</value>
+  </data>
+  <data name="Guide_Settings_Toggle_Desc" xml:space="preserve">
+    <value>点击右侧开关即可启用或禁用对应的快捷键。例如，关闭 Ctrl+Z 开关后，撤销快捷键将不再生效。修改后记得保存！</value>
+  </data>
+  <data name="Guide_Settings_Toggle_Title" xml:space="preserve">
+    <value>启用/禁用快捷键</value>
+  </data>
   <data name="Home_Docs" xml:space="preserve">
     <value>使用文档</value>
   </data>

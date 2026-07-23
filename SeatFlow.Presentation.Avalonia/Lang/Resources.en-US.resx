@@ -221,6 +221,24 @@
   <data name="Guide_Seating_Select_Title" xml:space="preserve">
     <value>Select Data</value>
   </data>
+  <data name="Guide_Settings_Save_Desc" xml:space="preserve">
+    <value>After changing shortcut settings, click Save to apply. You can return to this page anytime to adjust.</value>
+  </data>
+  <data name="Guide_Settings_Save_Title" xml:space="preserve">
+    <value>Save Settings</value>
+  </data>
+  <data name="Guide_Settings_Shortcuts_Desc" xml:space="preserve">
+    <value>View and configure keyboard shortcuts here. Each shortcut has its own toggle — enable or disable to match your workflow.</value>
+  </data>
+  <data name="Guide_Settings_Shortcuts_Title" xml:space="preserve">
+    <value>Keyboard Shortcuts</value>
+  </data>
+  <data name="Guide_Settings_Toggle_Desc" xml:space="preserve">
+    <value>Click the toggle to enable or disable a shortcut. For example, turning off Ctrl+Z disables the undo shortcut. Don&apos;t forget to save!</value>
+  </data>
+  <data name="Guide_Settings_Toggle_Title" xml:space="preserve">
+    <value>Toggle Shortcuts</value>
+  </data>
   <data name="Home_Docs" xml:space="preserve">
     <value>Documentation</value>
   </data>
