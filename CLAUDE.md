@@ -176,6 +176,38 @@ Called by `NavigationService` before navigating away. Override to prompt user ab
 - `CanvasZoomPan` — Pan and zoom for Canvas-based previews. **拖放座位时通过 NaN 哨兵机制跳过平移**（详见 `docs/DragDrop.md`）
 - `ZoomOnScroll` — Ctrl+Scroll to zoom
 - `ChineseInputNormalizer` — Converts full-width numbers/symbols to half-width on text input
+- `FileDropHandler` — Global OS file drag-drop import. Intercepts `DragDrop.DragOverEvent`/`DropEvent` with `RoutingStrategies.Tunnel` on MainWindow. Routes to page ViewModels that implement `IFileDropHandler` (in `Services/`).
+
+### File Drag-Drop Import
+
+Page ViewModels opt into file drag-drop by implementing `IFileDropHandler` (`Services/IFileDropHandler.cs`):
+
+```csharp
+public interface IFileDropHandler
+{
+    IReadOnlyList<string> AcceptedFileExtensions { get; }
+    Task<bool> HandleFileDropAsync(IReadOnlyList<string> filePaths, CancellationToken ct);
+}
+```
+
+**Routing table:**
+
+| Page | Accepted Extensions | Handler |
+|------|-------------------|---------|
+| MemberManagement | `.csv`, `.xlsx`, `.json` | `ImportFromPathAsync` |
+| FreeformManagement | `.csv`, `.json` | `ImportCsvCoreAsync` / `ImportJsonCoreAsync` |
+| Home | `.seatsets` | Delegates to `SeatSetsImportHelper` |
+| Settings | `.seatsets` | Delegates to `SeatSetsImportHelper` |
+| Other pages | (none) | Shows "该页面无可导入的数据" dialog |
+
+`SeatSetsImportHelper` (`Services/SeatSetsImportHelper.cs`) centralizes the `.seatsets` import flow (validate → probe → category selection dialog → import → refresh). It is shared by `App.HandleSeatSetsFileOpenAsync`, `SettingsViewModel`, and `HomeViewModel`.
+
+**To add drag-drop support to a new page:**
+1. Implement `IFileDropHandler` on the ViewModel
+2. Return accepted extensions from `AcceptedFileExtensions`
+3. Call existing import methods from `HandleFileDropAsync`
+
+**Cross-platform**: OS file drop detection uses reflection to access `IDataTransfer` APIs that differ between Avalonia versions. The fallback chain tries `GetFiles()` → common data format IDs (`"files"`, `"FileDrop"`, `"FileNameW"`, `"text/uri-list"`). Wayland partial support; `DragEffects.None` fallback when file paths cannot be resolved.
 
 ### Adding a New Page
 1. Add a new value to `PageKey` enum in `INavigationService.cs`

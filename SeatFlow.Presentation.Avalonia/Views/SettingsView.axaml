@@ -19,7 +19,7 @@
         <TextBlock DockPanel.Dock="Left" Text="{x:Static lang:Resources.Settings_Title}"
                    Classes="pageTitle" VerticalAlignment="Center" />
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
-          <Button Command="{Binding SaveSettingsCommand}"
+          <Button x:Name="SaveSettingsButton" Command="{Binding SaveSettingsCommand}"
                   AutomationProperties.Name="{x:Static lang:Resources.Settings_Save}"
                   HorizontalContentAlignment="Center" IsDefault="True">
             <StackPanel Orientation="Horizontal" Spacing="4">
@@ -173,6 +173,89 @@
               </StackPanel>
               <ToggleSwitch IsChecked="{Binding SuppressEnvironmentWarning, Mode=TwoWay}"
                             AutomationProperties.Name="{x:Static lang:Resources.Settings_SuppressEnvWarning}"
+                            HorizontalAlignment="Right" />
+            </DockPanel>
+          </StackPanel>
+        </Border>
+
+        <!-- ═══ 键盘快捷键卡片 ═══ -->
+        <Border Classes="settingsCard">
+          <StackPanel Spacing="12">
+            <StackPanel x:Name="KeyboardShortcutsSection" Orientation="Horizontal" Spacing="8">
+              <fic:FluentIcon Icon="{x:Static ficEnum:Icon.Keyboard}" FontSize="18"
+                             Foreground="{DynamicResource SystemAccentColor}" />
+              <TextBlock Text="{x:Static lang:Resources.Settings_KeyboardShortcuts}" Classes="sectionTitle" />
+            </StackPanel>
+
+            <!-- Ctrl+Z 撤销 -->
+            <DockPanel>
+              <StackPanel DockPanel.Dock="Left" Spacing="2">
+                <TextBlock Text="{x:Static lang:Resources.Settings_KbShortcut_Undo}" Classes="body" />
+                <TextBlock Text="{x:Static lang:Resources.Settings_KbShortcut_UndoHint}" Classes="caption"
+                           Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" TextWrapping="Wrap" MaxWidth="440" />
+              </StackPanel>
+              <ToggleSwitch x:Name="UndoShortcutSwitch" IsChecked="{Binding UndoShortcutEnabled, Mode=TwoWay}"
+                            AutomationProperties.Name="{x:Static lang:Resources.Settings_KbShortcut_Undo}"
+                            HorizontalAlignment="Right" />
+            </DockPanel>
+
+            <!-- Ctrl+Y 重做 -->
+            <DockPanel>
+              <StackPanel DockPanel.Dock="Left" Spacing="2">
+                <TextBlock Text="{x:Static lang:Resources.Settings_KbShortcut_Redo}" Classes="body" />
+                <TextBlock Text="{x:Static lang:Resources.Settings_KbShortcut_RedoHint}" Classes="caption"
+                           Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" TextWrapping="Wrap" MaxWidth="440" />
+              </StackPanel>
+              <ToggleSwitch IsChecked="{Binding RedoShortcutEnabled, Mode=TwoWay}"
+                            AutomationProperties.Name="{x:Static lang:Resources.Settings_KbShortcut_Redo}"
+                            HorizontalAlignment="Right" />
+            </DockPanel>
+
+            <!-- Ctrl+S 保存 -->
+            <DockPanel>
+              <StackPanel DockPanel.Dock="Left" Spacing="2">
+                <TextBlock Text="{x:Static lang:Resources.Settings_KbShortcut_Save}" Classes="body" />
+                <TextBlock Text="{x:Static lang:Resources.Settings_KbShortcut_SaveHint}" Classes="caption"
+                           Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" TextWrapping="Wrap" MaxWidth="440" />
+              </StackPanel>
+              <ToggleSwitch IsChecked="{Binding SaveShortcutEnabled, Mode=TwoWay}"
+                            AutomationProperties.Name="{x:Static lang:Resources.Settings_KbShortcut_Save}"
+                            HorizontalAlignment="Right" />
+            </DockPanel>
+
+            <!-- Ctrl+滚轮 缩放 -->
+            <DockPanel>
+              <StackPanel DockPanel.Dock="Left" Spacing="2">
+                <TextBlock Text="{x:Static lang:Resources.Settings_KbShortcut_Zoom}" Classes="body" />
+                <TextBlock Text="{x:Static lang:Resources.Settings_KbShortcut_ZoomHint}" Classes="caption"
+                           Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" TextWrapping="Wrap" MaxWidth="440" />
+              </StackPanel>
+              <ToggleSwitch IsChecked="{Binding ZoomShortcutEnabled, Mode=TwoWay}"
+                            AutomationProperties.Name="{x:Static lang:Resources.Settings_KbShortcut_Zoom}"
+                            HorizontalAlignment="Right" />
+            </DockPanel>
+
+            <!-- Delete 删除 -->
+            <DockPanel>
+              <StackPanel DockPanel.Dock="Left" Spacing="2">
+                <TextBlock Text="{x:Static lang:Resources.Settings_KbShortcut_Delete}" Classes="body" />
+                <TextBlock Text="{x:Static lang:Resources.Settings_KbShortcut_DeleteHint}" Classes="caption"
+                           Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" TextWrapping="Wrap" MaxWidth="440" />
+              </StackPanel>
+              <ToggleSwitch IsChecked="{Binding DeleteShortcutEnabled, Mode=TwoWay}"
+                            AutomationProperties.Name="{x:Static lang:Resources.Settings_KbShortcut_Delete}"
+                            HorizontalAlignment="Right" />
+            </DockPanel>
+
+            <!-- Esc 取消 -->
+            <DockPanel>
+              <StackPanel DockPanel.Dock="Left" Spacing="2">
+                <TextBlock Text="{x:Static lang:Resources.Settings_KbShortcut_Escape}" Classes="body" />
+                <TextBlock Text="{x:Static lang:Resources.Settings_KbShortcut_EscapeHint}" Classes="caption"
+                           Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" TextWrapping="Wrap" MaxWidth="440" />
+              </StackPanel>
+              <ToggleSwitch IsChecked="{Binding EscapeShortcutEnabled, Mode=TwoWay}"
+                            AutomationProperties.Name="{x:Static lang:Resources.Settings_KbShortcut_Escape}"
                             HorizontalAlignment="Right" />
             </DockPanel>
           </StackPanel>

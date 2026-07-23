@@ -30,6 +30,12 @@ public static class ZoomOnScroll
     private static void OnWheel (object? sender , PointerWheelEventArgs e)
     {
         if (sender is not ScrollViewer sv) return;
+
+        // 仅在 ZoomWithCtrl 启用且按住 Ctrl 时缩放，否则让 ScrollViewer 正常滚动
+        if (!KeyboardShortcutHandler.ShortcutConfig.ZoomWithCtrlEnabled
+            || !e.KeyModifiers.HasFlag(KeyModifiers.Control))
+            return;
+
         e.Handled = true;
         double delta = e.Delta.Y > 0 ? 0.1 : -0.1;
         sv.GetValue(OnZoomProperty)?.Invoke(delta);

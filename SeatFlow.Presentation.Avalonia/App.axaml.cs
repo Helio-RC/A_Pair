@@ -180,6 +180,12 @@ namespace SeatFlow.Presentation.Avalonia
                 // 全角字符输入转换（全角数字/符号 → 半角）
                 Behaviors.ChineseInputNormalizer.Attach(mainWindow);
 
+                // 全局键盘快捷键（Ctrl+Z/Y 撤销/重做、Ctrl+S 保存、Delete 删除、Esc 取消）
+                Behaviors.KeyboardShortcutHandler.Attach(mainWindow);
+
+                // 全局文件拖放导入
+                Behaviors.FileDropHandler.Attach(mainWindow);
+
                 // 退出看门狗：关闭信号发出后 20s 内未退出则强制终止
                 desktop.ShutdownRequested += (_ , _) =>
                 {
@@ -627,86 +633,10 @@ namespace SeatFlow.Presentation.Avalonia
         private async Task HandleSeatSetsFileOpenAsync (string filePath)
         {
             var dialog = _serviceProvider.GetRequiredService<IDialogService>();
-            var facade = _serviceProvider.GetRequiredService<IApplicationFacade>();
             var logger = _serviceProvider.GetRequiredService<ILogger<App>>();
 
-            try
-            {
-                logger.LogInformation("[SeatSets] 处理打开的文件: {Path}", filePath);
-
-                // 校验文件
-                var validation = await facade.ValidateSeatSetsAsync(filePath, CancellationToken.None);
-                if (!validation.IsValid)
-                {
-                    var errors = string.Join("\n", validation.ValidationErrors);
-                    await DialogServiceShim.ShowWarningAsync(dialog,
-                        Lang.Resources.SeatSets_InvalidFile,
-                        string.IsNullOrEmpty(errors)
-                            ? Lang.Resources.SeatSets_IntegrityFailed
-                            : errors);
-                    return;
-                }
-
-                // 探测并显示选择对话框
-                var categories = await facade.ProbeSeatSetsCategoriesAsync(filePath, CancellationToken.None);
-                var selectionWindow = new Views.SeatSetsSelectionWindow
-                {
-                    IsExport = false
-                };
-                selectionWindow.SetAvailableCategories(
-                    categories.IncludeAppSettings,
-                    categories.IncludeVenues,
-                    categories.IncludeRosters,
-                    categories.IncludeSnapshots,
-                    categories.IncludeStrategyConfig);
-
-                // 获取 MainWindow 用于 ShowDialog
-                var mainWindow = (ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow;
-                if (mainWindow == null) return;
-
-                var confirmed = await selectionWindow.ShowDialog<bool>(mainWindow);
-                if (!confirmed) return;
-
-                var selection = selectionWindow.ViewModel.ToSelection();
-
-                // 执行导入
-                var result = await facade.ImportSeatSetsAsync(filePath, selection,
-                    progress: null, CancellationToken.None);
-
-                // 显示结果
-                if (result.Success)
-                {
-                    await dialog.ShowInfoAsync(Lang.Resources.SeatSets_ImportTitle,
-                        string.Format(Lang.Resources.SeatSets_ImportSuccess, result.Restored));
-                }
-                else if (result.Failed > 0 && result.Restored > 0)
-                {
-                    var errorDetails = result.Errors.Count > 0
-                        ? "\n\n" + string.Join("\n", result.Errors.Take(5))
-                        : "";
-                    await dialog.ShowWarningAsync(Lang.Resources.SeatSets_ImportTitle,
-                        string.Format(Lang.Resources.SeatSets_ImportPartial,
-                            result.Restored, result.TotalFiles, result.Failed) + errorDetails);
-                }
-                else
-                {
-                    var errorDetails = result.Errors.Count > 0
-                        ? "\n" + string.Join("\n", result.Errors.Take(10))
-                        : "";
-                    await dialog.ShowErrorAsync(Lang.Resources.SeatSets_ImportTitle,
-                        string.Join("\n", result.Errors.Take(10)) + errorDetails);
-                }
-
-                // 导入后刷新设置（主题/语言）并导航到主页
-                if (result.Restored > 0)
-                    await RefreshAfterImportAsync(_serviceProvider);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "[SeatSets] 处理打开文件异常: {Path}", filePath);
-                await DialogServiceShim.ShowWarningAsync(dialog,
-                    Lang.Resources.Common_OperationFailed, ex.Message);
-            }
+            await Services.SeatSetsImportHelper.ImportAsync(
+                filePath, _serviceProvider, dialog, logger, CancellationToken.None);
         }
 
         /// <summary>

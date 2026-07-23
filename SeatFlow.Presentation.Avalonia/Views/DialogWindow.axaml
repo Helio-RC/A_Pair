@@ -4,6 +4,7 @@
         xmlns:ficEnum="clr-namespace:FluentIcons.Common;assembly=FluentIcons.Common"
         xmlns:lang="using:SeatFlow.Presentation.Avalonia.Lang"
         x:Class="SeatFlow.Presentation.Avalonia.Views.DialogWindow"
+        x:CompileBindings="False"
         Width="420" SizeToContent="Height" MinHeight="160"
         CanResize="False" ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"

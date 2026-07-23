@@ -774,10 +774,27 @@ public sealed class OnboardingService : IOnboardingService, IOnboardingStarter
         HandleStepOpening(e.Index , e.Step);
     }
 
-    /// <summary>步骤打开后（只做清理/诊断，不触发动画——避免闪烁）。</summary>
-    private static void OnStepOpened (object? sender , GuideStepEventArgs e)
+    /// <summary>步骤打开后：同步阶段指示点数量和激活位置。</summary>
+    /// <remarks>
+    /// Guide 内部 SyncIndicator() 在 StepOpened 之前执行，会将 Indicator.StepCount
+    /// 重置为总步骤数。这里用 Background 优先级的延迟 Dispatch 覆盖回去，确保在 Guide
+    /// 的所有同步操作完成后，Indicator 显示的是阶段数而非步骤数。
+    /// </remarks>
+    private void OnStepOpened (object? sender , GuideStepEventArgs e)
     {
-        // 不再触发动画；仅首次出场有弹出动画
+        if (_guide is null || _activePhaseBoundaries.Count <= 1)
+            return;
+
+        int phaseCount = _activePhaseBoundaries.Count - 1; // 减去哨兵
+        int phaseIndex = GetPhaseIndex(e.Index);
+        var guide = _guide; // 捕获引用
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (guide.Indicator is null) return;
+            guide.Indicator.StepCount = phaseCount;
+            guide.Indicator.ActiveIndex = phaseIndex;
+        } , DispatcherPriority.Background);
     }
 
     /// <summary>卡片缩放弹出动画：0.96 → 1.0。</summary>

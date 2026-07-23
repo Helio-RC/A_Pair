@@ -22,7 +22,7 @@ using AvaloniaApplication = Avalonia.Application;
 
 namespace SeatFlow.Presentation.Avalonia.ViewModels;
 
-public partial class SettingsViewModel : ViewModelBase
+public partial class SettingsViewModel : ViewModelBase, IFileDropHandler
 {
     private readonly IApplicationFacade _facade;
     private readonly IDialogService _dialog;
@@ -90,6 +90,25 @@ public partial class SettingsViewModel : ViewModelBase
 
     [ObservableProperty]
     public partial bool SuppressEnvironmentWarning { get; set; }
+
+    // ── 键盘快捷键开关 ──
+    [ObservableProperty]
+    public partial bool UndoShortcutEnabled { get; set; } = true;
+
+    [ObservableProperty]
+    public partial bool RedoShortcutEnabled { get; set; } = true;
+
+    [ObservableProperty]
+    public partial bool SaveShortcutEnabled { get; set; } = true;
+
+    [ObservableProperty]
+    public partial bool ZoomShortcutEnabled { get; set; } = true;
+
+    [ObservableProperty]
+    public partial bool DeleteShortcutEnabled { get; set; } = true;
+
+    [ObservableProperty]
+    public partial bool EscapeShortcutEnabled { get; set; } = true;
 
     [ObservableProperty]
     public partial int LogLevelIndex { get; set; } = 1;
@@ -179,6 +198,15 @@ public partial class SettingsViewModel : ViewModelBase
             TelemetryEnabled = settings.Telemetry.Enabled;
 
             SuppressEnvironmentWarning = settings.SuppressEnvironmentWarning;
+
+            UndoShortcutEnabled = settings.KeyboardShortcuts.UndoEnabled;
+            RedoShortcutEnabled = settings.KeyboardShortcuts.RedoEnabled;
+            SaveShortcutEnabled = settings.KeyboardShortcuts.SaveEnabled;
+            ZoomShortcutEnabled = settings.KeyboardShortcuts.ZoomWithCtrlEnabled;
+            DeleteShortcutEnabled = settings.KeyboardShortcuts.DeleteEnabled;
+            EscapeShortcutEnabled = settings.KeyboardShortcuts.EscapeEnabled;
+            SyncShortcutConfig();
+
             var logLevel = settings.Logging.MinimumLevel;
             LogLevelIndex = logLevel switch { "Debug" => 0 , "Warning" => 2 , "Error" => 3 , _ => 1 };
 
@@ -248,6 +276,20 @@ public partial class SettingsViewModel : ViewModelBase
         };
     }
 
+    /// <summary>将 ViewModel 中的快捷键开关同步到静态行为配置。</summary>
+    private void SyncShortcutConfig ()
+    {
+        Behaviors.KeyboardShortcutHandler.ShortcutConfig = new KeyboardShortcutConfig
+        {
+            UndoEnabled = UndoShortcutEnabled ,
+            RedoEnabled = RedoShortcutEnabled ,
+            SaveEnabled = SaveShortcutEnabled ,
+            ZoomWithCtrlEnabled = ZoomShortcutEnabled ,
+            DeleteEnabled = DeleteShortcutEnabled ,
+            EscapeEnabled = EscapeShortcutEnabled
+        };
+    }
+
     [RelayCommand]
     private async Task SaveSettingsAsync (CancellationToken ct)
     {
@@ -267,6 +309,15 @@ public partial class SettingsViewModel : ViewModelBase
             settings.MaxSnapshotsPerVenue = MaxSnapshotsPerVenue;
             settings.Telemetry.Enabled = TelemetryEnabled;
             settings.SuppressEnvironmentWarning = SuppressEnvironmentWarning;
+
+            settings.KeyboardShortcuts.UndoEnabled = UndoShortcutEnabled;
+            settings.KeyboardShortcuts.RedoEnabled = RedoShortcutEnabled;
+            settings.KeyboardShortcuts.SaveEnabled = SaveShortcutEnabled;
+            settings.KeyboardShortcuts.ZoomWithCtrlEnabled = ZoomShortcutEnabled;
+            settings.KeyboardShortcuts.DeleteEnabled = DeleteShortcutEnabled;
+            settings.KeyboardShortcuts.EscapeEnabled = EscapeShortcutEnabled;
+            SyncShortcutConfig();
+
             settings.Logging.MinimumLevel = LogLevelIndex switch { 0 => "Debug", 2 => "Warning", 3 => "Error", _ => "Information" };
             settings.AutoUpdate = AutoUpdate;
 
@@ -319,6 +370,12 @@ public partial class SettingsViewModel : ViewModelBase
         ConfirmBeforeClear = true;
         ZoomIndex = 1;
         SuppressEnvironmentWarning = false;
+        UndoShortcutEnabled = true;
+        RedoShortcutEnabled = true;
+        SaveShortcutEnabled = true;
+        ZoomShortcutEnabled = true;
+        DeleteShortcutEnabled = true;
+        EscapeShortcutEnabled = true;
         LogLevelIndex = 1;
         StatusMessage = Resources.Settings_ResetDone;
     }
@@ -437,114 +494,40 @@ public partial class SettingsViewModel : ViewModelBase
             await _dialog.ShowErrorAsync(Resources.SeatSets_ExportFailed, ex.Message);
         }
     }
-
     [RelayCommand]
     private async Task ImportSeatSetsAsync (CancellationToken ct)
     {
-        string? importPath = null;
-        try
+        var seatSetsFilter = new FilePickerFileType("SeatFlow Data Package")
         {
-            // 1. 文件选择对话框
-            var seatSetsFilter = new FilePickerFileType("SeatFlow Data Package")
-            {
-                Patterns = ["*.seatsets"]
-            };
+            Patterns = ["*.seatsets"]
+        };
 
-            var file = await _fileService.OpenFileAsync(
-                Resources.SeatSets_ImportTitle,
-                [seatSetsFilter]);
+        var file = await _fileService.OpenFileAsync(
+            Resources.SeatSets_ImportTitle,
+            [seatSetsFilter]);
 
-            if (file is null) return;
+        if (file is null) return;
 
-            importPath = file.Path.LocalPath;
+        StatusMessage = Resources.SeatSets_Processing;
+        await SeatSetsImportHelper.ImportAsync(
+            file.Path.LocalPath, _serviceProvider, _dialog, _logger, ct);
+        StatusMessage = "";
+    }
 
-            // 2. 校验文件
-            StatusMessage = Resources.SeatSets_Processing;
-            var validation = await _facade.ValidateSeatSetsAsync(importPath, ct);
+    // ═══════════════════════════════════════════════
+    //  IFileDropHandler
+    // ═══════════════════════════════════════════════
 
-            if (!validation.IsValid)
-            {
-                var errors = string.Join("\n", validation.ValidationErrors);
-                await _dialog.ShowErrorAsync(Resources.SeatSets_InvalidFile,
-                    string.IsNullOrEmpty(errors) ? Resources.SeatSets_IntegrityFailed : errors);
-                StatusMessage = "";
-                return;
-            }
+    IReadOnlyList<string> IFileDropHandler.AcceptedFileExtensions { get; } =
+        [".seatsets"];
 
-            // 3. 探测并显示选择对话框（导入模式）
-            var categories = await _facade.ProbeSeatSetsCategoriesAsync(importPath, ct);
-            var selectionWindow = new Views.SeatSetsSelectionWindow
-            {
-                IsExport = false
-            };
-            selectionWindow.SetAvailableCategories(
-                categories.IncludeAppSettings,
-                categories.IncludeVenues,
-                categories.IncludeRosters,
-                categories.IncludeSnapshots,
-                categories.IncludeStrategyConfig);
-
-            if (AvaloniaApplication.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop)
-                return;
-
-            var confirmed = await selectionWindow.ShowDialog<bool>(desktop.MainWindow!);
-            if (!confirmed) return;
-
-            var selection = selectionWindow.ViewModel.ToSelection();
-
-            // 4. 执行导入
-            StatusMessage = Resources.SeatSets_Processing;
-            var result = await _facade.ImportSeatSetsAsync(importPath, selection, progress: null, ct);
-
-            // 5. 显示结果
-            if (result.Success)
-            {
-                StatusMessage = string.Format(Resources.SeatSets_ImportSuccess, result.Restored);
-                await _dialog.ShowInfoAsync(Resources.SeatSets_ImportTitle,
-                    string.Format(Resources.SeatSets_ImportSuccess, result.Restored));
-            }
-            else if (result.Failed > 0 && result.Restored > 0)
-            {
-                StatusMessage = string.Format(Resources.SeatSets_ImportPartial,
-                    result.Restored, result.TotalFiles, result.Failed);
-                var errorDetails = result.Errors.Count > 0
-                    ? "\n\n" + string.Join("\n", result.Errors.Take(5))
-                    : "";
-                await _dialog.ShowWarningAsync(Resources.SeatSets_ImportTitle,
-                    string.Format(Resources.SeatSets_ImportPartial,
-                        result.Restored, result.TotalFiles, result.Failed) + errorDetails);
-            }
-            else
-            {
-                StatusMessage = Resources.SeatSets_ImportPartial;
-                var errorDetails = result.Errors.Count > 0
-                    ? "\n" + string.Join("\n", result.Errors.Take(5))
-                    : "";
-                await _dialog.ShowErrorAsync(Resources.SeatSets_ImportTitle,
-                    string.Join("\n", result.Errors.Take(10)) + errorDetails);
-            }
-
-            // 6. 导入后刷新：应用新设置（主题/语言）并导航到主页
-            if (result.Restored > 0 && importPath != null)
-            {
-                try
-                {
-                    if (AvaloniaApplication.Current is App app)
-                        await App.RefreshAfterImportAsync(app.ServiceProvider);
-                }
-                catch { /* 刷新失败不影响导入结果 */ }
-            }
-        }
-        catch (Exception ex) when (ex is TaskCanceledException or OperationCanceledException)
-        {
-            _logger.LogDebug(ex, "导入操作取消");
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = Resources.SeatSets_ImportTitle + ": " + ex.Message;
-            _logger.LogError(ex, "导入数据包失败: {Path}", importPath);
-            await _dialog.ShowErrorAsync(Resources.SeatSets_ImportTitle, ex.Message);
-        }
+    async Task<bool> IFileDropHandler.HandleFileDropAsync (IReadOnlyList<string> filePaths , CancellationToken ct)
+    {
+        StatusMessage = Resources.SeatSets_Processing;
+        var result = await SeatSetsImportHelper.ImportAsync(
+            filePaths[0], _serviceProvider, _dialog, _logger, ct);
+        StatusMessage = "";
+        return result;
     }
 
     [RelayCommand]

@@ -197,6 +197,30 @@
   <data name="Data_CSVFile" xml:space="preserve">
     <value>CSV 文件</value>
   </data>
+  <data name="DragDrop_DropHint" xml:space="preserve">
+    <value>释放文件以导入</value>
+  </data>
+  <data name="DragDrop_InvalidFileType" xml:space="preserve">
+    <value>不支持的文件格式</value>
+  </data>
+  <data name="DragDrop_InvalidFileTypeFmt" xml:space="preserve">
+    <value>文件「{0}」格式不支持。当前页面支持：{1}</value>
+  </data>
+  <data name="DragDrop_MultipleFilesMsg" xml:space="preserve">
+    <value>拖放了 {0} 个文件，将只处理第一个。是否继续？</value>
+  </data>
+  <data name="DragDrop_MultipleFilesTitle" xml:space="preserve">
+    <value>多个文件</value>
+  </data>
+  <data name="DragDrop_UnsupportedDropHint" xml:space="preserve">
+    <value>该页面不支持此文件类型</value>
+  </data>
+  <data name="DragDrop_UnsupportedPage" xml:space="preserve">
+    <value>无法导入</value>
+  </data>
+  <data name="DragDrop_UnsupportedPageMsg" xml:space="preserve">
+    <value>该页面无可导入的数据</value>
+  </data>
   <data name="Freeform_UnsavedChanges" xml:space="preserve">
     <value>未保存的修改</value>
   </data>
@@ -220,6 +244,24 @@
   </data>
   <data name="Guide_Seating_Select_Title" xml:space="preserve">
     <value>选择数据</value>
+  </data>
+  <data name="Guide_Settings_Save_Desc" xml:space="preserve">
+    <value>修改快捷键配置后，点击保存按钮使设置生效。你也可以随时回到此页面调整。</value>
+  </data>
+  <data name="Guide_Settings_Save_Title" xml:space="preserve">
+    <value>保存设置</value>
+  </data>
+  <data name="Guide_Settings_Shortcuts_Desc" xml:space="preserve">
+    <value>在这里可以查看和配置键盘快捷键。每个快捷键都有独立的开关，你可以根据自己的习惯启用或禁用。</value>
+  </data>
+  <data name="Guide_Settings_Shortcuts_Title" xml:space="preserve">
+    <value>快捷键设置</value>
+  </data>
+  <data name="Guide_Settings_Toggle_Desc" xml:space="preserve">
+    <value>点击右侧开关即可启用或禁用对应的快捷键。例如，关闭 Ctrl+Z 开关后，撤销快捷键将不再生效。修改后记得保存！</value>
+  </data>
+  <data name="Guide_Settings_Toggle_Title" xml:space="preserve">
+    <value>启用/禁用快捷键</value>
   </data>
   <data name="Home_Docs" xml:space="preserve">
     <value>使用文档</value>
@@ -1211,6 +1253,45 @@
   </data>
   <data name="Settings_FolderTitle" xml:space="preserve">
     <value>选择数据目录</value>
+  </data>
+  <data name="Settings_KbShortcut_Delete" xml:space="preserve">
+    <value>Delete 删除</value>
+  </data>
+  <data name="Settings_KbShortcut_DeleteHint" xml:space="preserve">
+    <value>删除座位图中选中的已分配学生</value>
+  </data>
+  <data name="Settings_KbShortcut_Escape" xml:space="preserve">
+    <value>Esc 取消</value>
+  </data>
+  <data name="Settings_KbShortcut_EscapeHint" xml:space="preserve">
+    <value>取消当前的交换模式或取消选中</value>
+  </data>
+  <data name="Settings_KbShortcut_Redo" xml:space="preserve">
+    <value>Ctrl+Y 重做</value>
+  </data>
+  <data name="Settings_KbShortcut_RedoHint" xml:space="preserve">
+    <value>重做被撤销的座位分配操作</value>
+  </data>
+  <data name="Settings_KbShortcut_Save" xml:space="preserve">
+    <value>Ctrl+S 保存</value>
+  </data>
+  <data name="Settings_KbShortcut_SaveHint" xml:space="preserve">
+    <value>保存当前页面数据（会员/会场/排座结果等）</value>
+  </data>
+  <data name="Settings_KbShortcut_Undo" xml:space="preserve">
+    <value>Ctrl+Z 撤销</value>
+  </data>
+  <data name="Settings_KbShortcut_UndoHint" xml:space="preserve">
+    <value>撤销上一步座位分配操作</value>
+  </data>
+  <data name="Settings_KbShortcut_Zoom" xml:space="preserve">
+    <value>Ctrl+滚轮 缩放</value>
+  </data>
+  <data name="Settings_KbShortcut_ZoomHint" xml:space="preserve">
+    <value>在座位图画布中按住 Ctrl 并滚动滚轮来缩放视图</value>
+  </data>
+  <data name="Settings_KeyboardShortcuts" xml:space="preserve">
+    <value>键盘快捷键</value>
   </data>
   <data name="Settings_LangChangedMessage" xml:space="preserve">
     <value>界面语言已更改，需要重启应用才能生效。</value>

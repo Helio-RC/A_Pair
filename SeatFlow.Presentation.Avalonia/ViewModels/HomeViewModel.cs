@@ -4,19 +4,23 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.DependencyInjection;
 using SeatFlow.Presentation.Avalonia.Lang;
 using SeatFlow.Presentation.Avalonia.Services;
 using AvaloniaApplication = Avalonia.Application;
 
 namespace SeatFlow.Presentation.Avalonia.ViewModels;
 
-public partial class HomeViewModel : ViewModelBase
+public partial class HomeViewModel : ViewModelBase, IFileDropHandler
 {
+    private readonly IServiceProvider? _serviceProvider;
+
     public string Greeting { get; } = Resources.Home_Greeting;
     public string Subtitle { get; } = Resources.Home_Subtitle;
 
@@ -33,8 +37,10 @@ public partial class HomeViewModel : ViewModelBase
 
     public List<MdBlock> ReleaseBlocks { get; } = [];
 
-    public HomeViewModel ()
+    public HomeViewModel (IServiceProvider? serviceProvider = null)
     {
+        _serviceProvider = serviceProvider;
+
         var data = LoadAboutData();
 
         UserName = Environment.UserName;
@@ -239,5 +245,22 @@ public partial class HomeViewModel : ViewModelBase
             >= 'a' and <= 'z' => char.ConvertFromUtf32(0x1D41A + (c - 'a')),
             _                  => c.ToString()
         };
+    }
+
+    // ═══════════════════════════════════════════════
+    //  IFileDropHandler
+    // ═══════════════════════════════════════════════
+
+    IReadOnlyList<string> IFileDropHandler.AcceptedFileExtensions { get; } =
+        [".seatsets"];
+
+    async Task<bool> IFileDropHandler.HandleFileDropAsync (IReadOnlyList<string> filePaths , CancellationToken ct)
+    {
+        if (_serviceProvider is null)
+            return false;
+
+        var dialog = _serviceProvider.GetRequiredService<IDialogService>();
+        return await SeatSetsImportHelper.ImportAsync(
+            filePaths[0], _serviceProvider, dialog, logger: null, ct);
     }
 }

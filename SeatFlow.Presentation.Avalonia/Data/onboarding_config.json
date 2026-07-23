@@ -1,5 +1,5 @@
 {
-  "version": "3.3",
+  "version": "3.4",
   "completeAction": "About",
   "startupPhases": [
     {
@@ -151,6 +151,29 @@
           "titleKey": "Guide_Snapshot_Browse_Title",
           "descKey": "Guide_Snapshot_Browse_Desc",
           "target": "SnapshotListBox"
+        }
+      ]
+    },
+    {
+      "page": "Settings",
+      "seedData": false,
+      "steps": [
+        {
+          "titleKey": "Guide_Settings_Shortcuts_Title",
+          "descKey": "Guide_Settings_Shortcuts_Desc",
+          "target": "KeyboardShortcutsSection",
+          "placement": "Bottom"
+        },
+        {
+          "titleKey": "Guide_Settings_Toggle_Title",
+          "descKey": "Guide_Settings_Toggle_Desc",
+          "target": "UndoShortcutSwitch"
+        },
+        {
+          "titleKey": "Guide_Settings_Save_Title",
+          "descKey": "Guide_Settings_Save_Desc",
+          "target": "SaveSettingsButton",
+          "placement": "Bottom"
         }
       ]
     },

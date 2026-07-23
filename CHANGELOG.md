@@ -2,7 +2,7 @@
 
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
-## [1.4.0] — 2026-07-13
+## [1.4.0] — 2026-07-24
 
 ### Added
 - **Velopack 安装与自动更新**：引入 Velopack 安装框架，支持跨平台安装包（Windows Setup.exe、Linux AppImage，macOS 计划中暂无安装包）和增量自动更新。双源架构（API 网关 `seatflow.work` → GitHub Releases 兜底），已下载的更新包在启动时自动应用
@@ -12,6 +12,10 @@
 - **文件关联**：Windows `.seatsets` 文件注册到 HKCU，双击自动启动程序导入
 - **"仅更新人员数据集"**：不重新排座，仅用最新学生数据更新已有快照
 - **安装时数据迁移**：Velopack `--veloapp-install` hook 自动复制安装程序目录下的 `.seatsets` 到应用根目录，首次启动自动导入
+- **键盘快捷键系统**：全局快捷键支持（Ctrl+Z 撤销、Ctrl+Y 重做、Ctrl+S 保存、Ctrl+滚轮 缩放、Delete 删除、Esc 取消），采用 Static Behavior + Tunnel 路由实现，与 TextBox 内置快捷键自动避让
+- **快捷键设置页面**：在设置中添加"键盘快捷键"卡片，6 个独立 ToggleSwitch 开关，保存后即时生效无需重启
+- **初次引导新增快捷键环节**：启动引导（v3.4）新增 Settings 阶段（3 步），引导新用户了解快捷键开关功能
+- **引导指示器按阶段呈现**：左下角步骤点从 ~24 个缩减为 9 个阶段点，通过延迟 Dispatch 覆盖 Guide Indicator 实现
 
 ### Changed
 - **取消单文件发布**：移除 `PublishSingleFile`，改为标准 `dotnet publish` 文件夹输出 + zip/tar.gz 打包。Velopack 安装包作为主要分发形式，便携包保留
@@ -19,6 +23,7 @@
 - **发布文件名简化**：zip/tar.gz 发布文件名从 `SeatFlow-{ver}-{label}-{rid}.{ext}` 简化为 `SeatFlow-{ver}-{platform}.{ext}`
 - **日志系统**：`Debug.WriteLine` → Serilog + `Microsoft.Extensions.Logging.ILogger<T>`，`docs/LOGGING.md` 完整文档
 - **辅助脚本**：`version.py` 统一管理 App/文件格式/策略清单/引导配置版本；`i18n.py` .resx 资源 CRUD + Designer.cs 自动生成
+- **ZoomOnScroll**：滚轮缩放改为 Ctrl+滚轮（不再任意滚轮缩放），普通滚轮恢复 ScrollViewer 正常滚动
 
 ### Removed
 - **启动时目录清洁检查**（`CheckCleanDirectory`）：不再要求 exe 居于空目录，适配安装包目录结构
@@ -29,6 +34,7 @@
 - **引导系统**：修复引导不显示、死锁、竞态、窗口状态不同步、初次启动配置文件缺失等多项问题
 - **UI**：弹窗内容重叠修复、颜色随主题、导入后自动刷新、教师视角导出列镜像修正、修复导出按钮无反应
 - **遥测与引导冲突**：修复引导在初次启动时覆盖遥测同意弹窗
+- **文件拖放导入**：支持从 OS 文件管理器直接拖入文件到应用窗口完成导入，拖入时显示遮罩覆盖层（支持/不支持两种视觉反馈）。人员管理页支持 `.csv`/`.xlsx`/`.json`，自由点管理支持 `.csv`/`.json`，首页和设置页支持 `.seatsets`，其他页面显示不支持提示
 
 ### Added
 - **应用数据打包（.seatsets）**：将 AppData 全部数据（设置、会场、名单、快照、策略配置）打包为单个 `.seatsets` JSON 归档文件，支持分块 SHA256 完整性校验和版本号系统

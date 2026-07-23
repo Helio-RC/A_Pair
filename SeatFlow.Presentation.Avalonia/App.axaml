@@ -33,6 +33,9 @@
           <!-- Loading Overlay -->
           <Color x:Key="LoadingOverlayColor">#40FFFFFF</Color>
 
+          <!-- Overlay Mask (文件拖放 / 引导遮罩 — 50% 黑) -->
+          <Color x:Key="OverlayMaskColor">#80000000</Color>
+
           <!-- Preview Background -->
           <Color x:Key="PreviewBackgroundColor">#F5F5F5</Color>
 
@@ -68,6 +71,9 @@
 
           <!-- Loading Overlay -->
           <Color x:Key="LoadingOverlayColor">#40FFFFFF</Color>
+
+          <!-- Overlay Mask (文件拖放 / 引导遮罩 — 50% 黑) -->
+          <Color x:Key="OverlayMaskColor">#80000000</Color>
 
           <!-- Preview Background -->
           <Color x:Key="PreviewBackgroundColor">#1C1C1C</Color>
@@ -105,6 +111,9 @@
 
       <!-- Loading Overlay -->
       <SolidColorBrush x:Key="LoadingOverlayBrush" Color="{DynamicResource LoadingOverlayColor}" />
+
+      <!-- Overlay Mask -->
+      <SolidColorBrush x:Key="OverlayMaskBrush" Color="{DynamicResource OverlayMaskColor}" />
 
       <!-- Preview Background -->
       <SolidColorBrush x:Key="PreviewBackgroundBrush" Color="{DynamicResource PreviewBackgroundColor}" />

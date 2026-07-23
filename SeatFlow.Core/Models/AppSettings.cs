@@ -56,7 +56,10 @@ namespace SeatFlow.Core.Models
         public TelemetryConfig Telemetry { get; set; } = new();
 
         /// <summary>自动更新模式（默认：仅检查）。</summary>
-        public AutoUpdateMode AutoUpdate { get; set; } = AutoUpdateMode.CheckOnly;
+        public AutoUpdateMode AutoUpdate { get; set; } = AutoUpdateMode.AutoUpdate;
+
+        /// <summary>键盘快捷键配置。</summary>
+        public KeyboardShortcutConfig KeyboardShortcuts { get; set; } = new();
 
     }
 
@@ -91,6 +94,30 @@ namespace SeatFlow.Core.Models
 
         /// <summary>是否启用 Gzip 压缩。</summary>
         public bool EnableCompression { get; set; } = true;
+    }
+
+    /// <summary>
+    /// 键盘快捷键开关配置。控制各全局快捷键的启用/禁用状态。
+    /// </summary>
+    public sealed class KeyboardShortcutConfig
+    {
+        /// <summary>Ctrl+Z：撤销上一步操作。</summary>
+        public bool UndoEnabled { get; set; } = true;
+
+        /// <summary>Ctrl+Y：重做被撤销的操作。</summary>
+        public bool RedoEnabled { get; set; } = true;
+
+        /// <summary>Ctrl+S：保存当前数据。</summary>
+        public bool SaveEnabled { get; set; } = true;
+
+        /// <summary>Ctrl+滚轮：在座位图画布中缩放视图。</summary>
+        public bool ZoomWithCtrlEnabled { get; set; } = true;
+
+        /// <summary>Delete：删除选中的项目。</summary>
+        public bool DeleteEnabled { get; set; } = true;
+
+        /// <summary>Esc：取消当前选择或关闭弹窗。</summary>
+        public bool EscapeEnabled { get; set; } = true;
     }
 
     /// <summary>

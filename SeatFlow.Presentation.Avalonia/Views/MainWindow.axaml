@@ -15,6 +15,7 @@
         Title="{x:Static lang:Resources.App_Title}" Width="1200" Height="800"
         MinWidth="550" MinHeight="600"
         CanResize="True"
+        DragDrop.AllowDrop="True"
         ExtendClientAreaToDecorationsHint="True"
         ExtendClientAreaTitleBarHeightHint="32"
         Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
@@ -264,6 +265,30 @@
     </Grid>
   </DockPanel>
 
+    <!-- 文件拖放导入覆盖层 -->
+    <Border x:Name="FileDropOverlay" IsVisible="False" Background="{DynamicResource OverlayMaskBrush}"
+            ZIndex="100" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+      <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+              CornerRadius="12" BorderThickness="3"
+              x:Name="FileDropOverlayCard"
+              BorderBrush="{DynamicResource SystemAccentColor}"
+              HorizontalAlignment="Center" VerticalAlignment="Center"
+              Padding="48,40" MaxWidth="320">
+        <StackPanel Spacing="16" HorizontalAlignment="Center">
+          <fic:FluentIcon x:Name="FileDropOverlayIcon"
+                          Icon="{x:Static ficEnum:Icon.ArrowDownload}"
+                          FontSize="56" Height="56"
+                          Foreground="{DynamicResource SystemAccentColor}"
+                          HorizontalAlignment="Center" />
+          <TextBlock x:Name="FileDropOverlayText"
+                     Text="{x:Static lang:Resources.DragDrop_DropHint}"
+                     Classes="heading" FontSize="18"
+                     HorizontalAlignment="Center" TextWrapping="Wrap"
+                     TextAlignment="Center" />
+        </StackPanel>
+      </Border>
+    </Border>
+
     <!-- 首次启动引导覆盖层 -->
     <codewf:Guide x:Name="OnboardingGuide"
                   Placement="Right"
@@ -276,7 +301,7 @@
                   IsPointAtCenter="True"
                   IsScrollIntoView="True"
                   IsShowMask="False"
-                  MaskColor="#80000000"
+                  MaskColor="{DynamicResource OverlayMaskColor}"
                   TargetBorderBrush="{DynamicResource SystemAccentColor}"
                   TargetBorderThickness="3"
                   TargetResolveDelay="0:0:0"

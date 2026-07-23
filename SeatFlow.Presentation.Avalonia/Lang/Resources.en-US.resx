@@ -197,6 +197,30 @@
   <data name="Data_CSVFile" xml:space="preserve">
     <value>CSV file</value>
   </data>
+  <data name="DragDrop_DropHint" xml:space="preserve">
+    <value>Drop files to import</value>
+  </data>
+  <data name="DragDrop_InvalidFileType" xml:space="preserve">
+    <value>Unsupported Format</value>
+  </data>
+  <data name="DragDrop_InvalidFileTypeFmt" xml:space="preserve">
+    <value>File &quot;{0}&quot; is not supported. Supported: {1}</value>
+  </data>
+  <data name="DragDrop_MultipleFilesMsg" xml:space="preserve">
+    <value>{0} files dropped. Only the first will be processed. Continue?</value>
+  </data>
+  <data name="DragDrop_MultipleFilesTitle" xml:space="preserve">
+    <value>Multiple Files</value>
+  </data>
+  <data name="DragDrop_UnsupportedDropHint" xml:space="preserve">
+    <value>This page does not support this file type</value>
+  </data>
+  <data name="DragDrop_UnsupportedPage" xml:space="preserve">
+    <value>Cannot Import</value>
+  </data>
+  <data name="DragDrop_UnsupportedPageMsg" xml:space="preserve">
+    <value>This page does not support file import.</value>
+  </data>
   <data name="Freeform_UnsavedChanges" xml:space="preserve">
     <value>Unsaved Changes</value>
   </data>
@@ -220,6 +244,24 @@
   </data>
   <data name="Guide_Seating_Select_Title" xml:space="preserve">
     <value>Select Data</value>
+  </data>
+  <data name="Guide_Settings_Save_Desc" xml:space="preserve">
+    <value>After changing shortcut settings, click Save to apply. You can return to this page anytime to adjust.</value>
+  </data>
+  <data name="Guide_Settings_Save_Title" xml:space="preserve">
+    <value>Save Settings</value>
+  </data>
+  <data name="Guide_Settings_Shortcuts_Desc" xml:space="preserve">
+    <value>View and configure keyboard shortcuts here. Each shortcut has its own toggle — enable or disable to match your workflow.</value>
+  </data>
+  <data name="Guide_Settings_Shortcuts_Title" xml:space="preserve">
+    <value>Keyboard Shortcuts</value>
+  </data>
+  <data name="Guide_Settings_Toggle_Desc" xml:space="preserve">
+    <value>Click the toggle to enable or disable a shortcut. For example, turning off Ctrl+Z disables the undo shortcut. Don&apos;t forget to save!</value>
+  </data>
+  <data name="Guide_Settings_Toggle_Title" xml:space="preserve">
+    <value>Toggle Shortcuts</value>
   </data>
   <data name="Home_Docs" xml:space="preserve">
     <value>Documentation</value>
@@ -1209,6 +1251,45 @@ Place plugins in the Plugins directory</value>
   </data>
   <data name="Settings_FolderTitle" xml:space="preserve">
     <value>Select data directory</value>
+  </data>
+  <data name="Settings_KbShortcut_Delete" xml:space="preserve">
+    <value>Delete Remove</value>
+  </data>
+  <data name="Settings_KbShortcut_DeleteHint" xml:space="preserve">
+    <value>Remove the selected assigned student from the seat</value>
+  </data>
+  <data name="Settings_KbShortcut_Escape" xml:space="preserve">
+    <value>Esc Cancel</value>
+  </data>
+  <data name="Settings_KbShortcut_EscapeHint" xml:space="preserve">
+    <value>Cancel current swap mode or deselect</value>
+  </data>
+  <data name="Settings_KbShortcut_Redo" xml:space="preserve">
+    <value>Ctrl+Y Redo</value>
+  </data>
+  <data name="Settings_KbShortcut_RedoHint" xml:space="preserve">
+    <value>Redo the undone seating assignment</value>
+  </data>
+  <data name="Settings_KbShortcut_Save" xml:space="preserve">
+    <value>Ctrl+S Save</value>
+  </data>
+  <data name="Settings_KbShortcut_SaveHint" xml:space="preserve">
+    <value>Save current page data (members, venues, seating results, etc.)</value>
+  </data>
+  <data name="Settings_KbShortcut_Undo" xml:space="preserve">
+    <value>Ctrl+Z Undo</value>
+  </data>
+  <data name="Settings_KbShortcut_UndoHint" xml:space="preserve">
+    <value>Undo the last seating assignment</value>
+  </data>
+  <data name="Settings_KbShortcut_Zoom" xml:space="preserve">
+    <value>Ctrl+Scroll Zoom</value>
+  </data>
+  <data name="Settings_KbShortcut_ZoomHint" xml:space="preserve">
+    <value>Hold Ctrl and scroll to zoom the seating canvas</value>
+  </data>
+  <data name="Settings_KeyboardShortcuts" xml:space="preserve">
+    <value>Keyboard Shortcuts</value>
   </data>
   <data name="Settings_LangChangedMessage" xml:space="preserve">
     <value>The interface language has been changed. Restart the application for the change to take effect.</value>

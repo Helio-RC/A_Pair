@@ -20,7 +20,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace SeatFlow.Presentation.Avalonia.ViewModels;
 
-public partial class FreeformManagementViewModel : ViewModelBase
+public partial class FreeformManagementViewModel : ViewModelBase, IFileDropHandler
 {
     private readonly IApplicationFacade _facade;
     private readonly IFileService _fileService;
@@ -202,67 +202,68 @@ public partial class FreeformManagementViewModel : ViewModelBase
             }
             catch (Exception ex) { _logger.LogDebug(ex , "文件对话框取消或异常: 导入CSV"); return; }
             if (csvFile == null) return;
-            var file = csvFile;
 
-            var cleanImport = false;
-            if (Points.Count > 0)
-            {
-                var choice = await Dialog.ShowMultiOptionAsync(Resources.Freeform_ImportTitle ,
-                    string.Format(Resources.Freeform_ImportMsgFmt , Points.Count) ,
-                    Resources.Freeform_UnloadAndImport , Resources.Freeform_Overwrite , "取消");
-                if (choice == null || choice == 2) return;
-                cleanImport = choice == 0;
-            }
+            await ImportCsvCoreAsync(csvFile.Path.LocalPath , csvFile.Name);
+        }
+        catch (Exception ex) { _logger.LogDebug(ex , "文件对话框取消或异常: 导入CSV"); }
+        finally { await Task.Delay(150); Interlocked.Exchange(ref _dialogLock , 0); }
+    }
 
-            if (cleanImport)
+    /// <summary>从指定路径导入 CSV 自由布局（跳过文件对话框）。</summary>
+    private async Task ImportCsvCoreAsync (string filePath , string? displayName = null)
+    {
+        // 冲突检测
+        if (Points.Count > 0)
+        {
+            var choice = await Dialog.ShowMultiOptionAsync(Resources.Freeform_ImportTitle ,
+                string.Format(Resources.Freeform_ImportMsgFmt , Points.Count) ,
+                Resources.Freeform_UnloadAndImport , Resources.Freeform_Overwrite , "取消");
+            if (choice == null || choice == 2) return;
+            if (choice == 0)
             {
                 SelectedLayout = null;
                 LayoutName = string.Empty;
             }
-
-            await SafeExecuteAsync(async () =>
-            {
-                await using var stream = await file.OpenReadAsync();
-                using var reader = new StreamReader(stream);
-                var pts = new List<FreeformPoint>();
-                var lineNum = 0;
-                while (await reader.ReadLineAsync() is { } line)
-                {
-                    lineNum++;
-                    if (lineNum == 1) continue;
-                    var parts = line.Split(',');
-                    if (parts.Length >= 2 &&
-                        double.TryParse(parts[0].Trim() , NumberStyles.Any , CultureInfo.InvariantCulture , out var x) &&
-                        double.TryParse(parts[1].Trim() , NumberStyles.Any , CultureInfo.InvariantCulture , out var y))
-                    {
-                        var pt = new FreeformPoint(x , y);
-                        // 解析可选列：Type,GroupId,Row,Column
-                        if (parts.Length >= 3)
-                            pt.ElementType = parts[2].Trim() switch
-                            {
-                                "Podium" => (int)FreeformElementType.Podium,
-                                "Door" => (int)FreeformElementType.Door,
-                                _ => (int)FreeformElementType.Seat
-                            };
-                        if (parts.Length >= 4 && int.TryParse(parts[3].Trim() , out var gid))
-                            pt.GroupId = gid;
-                        if (parts.Length >= 5 && int.TryParse(parts[4].Trim() , out var row))
-                            pt.Row = row;
-                        if (parts.Length >= 6 && int.TryParse(parts[5].Trim() , out var col))
-                            pt.Column = col;
-                        pts.Add(pt);
-                    }
-                }
-                Points = new ObservableCollection<FreeformPoint>(pts);
-                _isDirty = true;
-                RefreshIndices();
-                IsEmpty = Points.Count == 0;
-                LayoutName = file.Name.Replace(".csv" , "");
-                StatusMessage = string.Format(Resources.Freeform_ImportedPtsFmt , pts.Count);
-            } , Resources.Freeform_ImportFailed);
         }
-        catch (Exception ex) { _logger.LogDebug(ex , "文件对话框取消或异常: 导入CSV"); }
-        finally { await Task.Delay(150); Interlocked.Exchange(ref _dialogLock , 0); }
+
+        await SafeExecuteAsync(async () =>
+        {
+            using var reader = new StreamReader(filePath);
+            var pts = new List<FreeformPoint>();
+            var lineNum = 0;
+            while (await reader.ReadLineAsync() is { } line)
+            {
+                lineNum++;
+                if (lineNum == 1) continue;
+                var parts = line.Split(',');
+                if (parts.Length >= 2 &&
+                    double.TryParse(parts[0].Trim() , NumberStyles.Any , CultureInfo.InvariantCulture , out var x) &&
+                    double.TryParse(parts[1].Trim() , NumberStyles.Any , CultureInfo.InvariantCulture , out var y))
+                {
+                    var pt = new FreeformPoint(x , y);
+                    if (parts.Length >= 3)
+                        pt.ElementType = parts[2].Trim() switch
+                        {
+                            "Podium" => (int)FreeformElementType.Podium,
+                            "Door" => (int)FreeformElementType.Door,
+                            _ => (int)FreeformElementType.Seat
+                        };
+                    if (parts.Length >= 4 && int.TryParse(parts[3].Trim() , out var gid))
+                        pt.GroupId = gid;
+                    if (parts.Length >= 5 && int.TryParse(parts[4].Trim() , out var row))
+                        pt.Row = row;
+                    if (parts.Length >= 6 && int.TryParse(parts[5].Trim() , out var col))
+                        pt.Column = col;
+                    pts.Add(pt);
+                }
+            }
+            Points = new ObservableCollection<FreeformPoint>(pts);
+            _isDirty = true;
+            RefreshIndices();
+            IsEmpty = Points.Count == 0;
+            LayoutName = displayName?.Replace(".csv" , "") ?? Path.GetFileNameWithoutExtension(filePath);
+            StatusMessage = string.Format(Resources.Freeform_ImportedPtsFmt , pts.Count);
+        } , Resources.Freeform_ImportFailed);
     }
 
     [RelayCommand]
@@ -280,68 +281,106 @@ public partial class FreeformManagementViewModel : ViewModelBase
             }
             catch (Exception ex) { _logger.LogDebug(ex , "文件对话框取消或异常: 导入JSON"); return; }
             if (jsonFile == null) return;
-            var file = jsonFile;
 
-            var cleanImport = false;
-            if (Points.Count > 0)
-            {
-                var choice = await Dialog.ShowMultiOptionAsync(Resources.Freeform_ImportTitle ,
-                    string.Format(Resources.Freeform_ImportMsgFmt , Points.Count) ,
-                    Resources.Freeform_UnloadAndImport , Resources.Freeform_Overwrite , "取消");
-                if (choice == null || choice == 2) return;
-                cleanImport = choice == 0;
-            }
+            await ImportJsonCoreAsync(jsonFile.Path.LocalPath);
+        }
+        catch (Exception ex) { _logger.LogDebug(ex , "文件对话框取消或异常: 导入JSON"); }
+        finally { await Task.Delay(150); Interlocked.Exchange(ref _dialogLock , 0); }
+    }
 
-            if (cleanImport)
+    /// <summary>从指定路径导入 JSON 自由布局（跳过文件对话框）。</summary>
+    private async Task ImportJsonCoreAsync (string filePath)
+    {
+        // 冲突检测
+        if (Points.Count > 0)
+        {
+            var choice = await Dialog.ShowMultiOptionAsync(Resources.Freeform_ImportTitle ,
+                string.Format(Resources.Freeform_ImportMsgFmt , Points.Count) ,
+                Resources.Freeform_UnloadAndImport , Resources.Freeform_Overwrite , "取消");
+            if (choice == null || choice == 2) return;
+            if (choice == 0)
             {
                 SelectedLayout = null;
                 LayoutName = string.Empty;
             }
-
-            await SafeExecuteAsync(async () =>
-            {
-                await using var stream = await file.OpenReadAsync();
-                var layout = await System.Text.Json.JsonSerializer.DeserializeAsync<ClassroomLayoutDefinition>(stream);
-                if (layout == null) return;
-
-                var pts = new List<FreeformPoint>();
-                foreach (var s in layout.Seats.OfType<FreeformSeat>())
-                {
-                    int? groupId = null;
-                    if (!string.IsNullOrEmpty(s.LogicalGroup) && s.LogicalGroup.StartsWith('G')
-                        && int.TryParse(s.LogicalGroup[1..] , out var gid))
-                        groupId = gid;
-                    pts.Add(new FreeformPoint(s.X , s.Y , s.Id)
-                    {
-                        ElementType = (int)FreeformElementType.Seat ,
-                        GroupId = groupId ,
-                        Row = s.Row ,
-                        Column = s.Column
-                    });
-                }
-                foreach (var obs in layout.Obstacles)
-                {
-                    var et = obs.Type == "Podium" ? (int)FreeformElementType.Podium
-                           : obs.Type == "Door" ? (int)FreeformElementType.Door
-                           : (int)FreeformElementType.Seat;
-                    pts.Add(new FreeformPoint(obs.X , obs.Y)
-                    {
-                        ElementType = et ,
-                        Width = obs.Width ,
-                        Height = obs.Height
-                    });
-                }
-
-                Points = new ObservableCollection<FreeformPoint>(pts);
-                _isDirty = true;
-                RefreshIndices();
-                IsEmpty = Points.Count == 0;
-                LayoutName = layout.Name;
-                StatusMessage = string.Format(Resources.Freeform_ImportedFmt , pts.Count);
-            } , Resources.Freeform_ImportFailed);
         }
-        catch (Exception ex) { _logger.LogDebug(ex , "文件对话框取消或异常: 导入JSON"); }
-        finally { await Task.Delay(150); Interlocked.Exchange(ref _dialogLock , 0); }
+
+        await SafeExecuteAsync(async () =>
+        {
+            await using var stream = File.OpenRead(filePath);
+            var layout = await System.Text.Json.JsonSerializer.DeserializeAsync<ClassroomLayoutDefinition>(stream);
+            if (layout == null) return;
+
+            var pts = new List<FreeformPoint>();
+            foreach (var s in layout.Seats.OfType<FreeformSeat>())
+            {
+                int? groupId = null;
+                if (!string.IsNullOrEmpty(s.LogicalGroup) && s.LogicalGroup.StartsWith('G')
+                    && int.TryParse(s.LogicalGroup[1..] , out var gid))
+                    groupId = gid;
+                pts.Add(new FreeformPoint(s.X , s.Y , s.Id)
+                {
+                    ElementType = (int)FreeformElementType.Seat ,
+                    GroupId = groupId ,
+                    Row = s.Row ,
+                    Column = s.Column
+                });
+            }
+            foreach (var obs in layout.Obstacles)
+            {
+                var et = obs.Type == "Podium" ? (int)FreeformElementType.Podium
+                       : obs.Type == "Door" ? (int)FreeformElementType.Door
+                       : (int)FreeformElementType.Seat;
+                pts.Add(new FreeformPoint(obs.X , obs.Y)
+                {
+                    ElementType = et ,
+                    Width = obs.Width ,
+                    Height = obs.Height
+                });
+            }
+
+            Points = new ObservableCollection<FreeformPoint>(pts);
+            _isDirty = true;
+            RefreshIndices();
+            IsEmpty = Points.Count == 0;
+            LayoutName = layout.Name;
+            StatusMessage = string.Format(Resources.Freeform_ImportedFmt , pts.Count);
+        } , Resources.Freeform_ImportFailed);
+    }
+
+    // ═══════════════════════════════════════════════
+    //  IFileDropHandler
+    // ═══════════════════════════════════════════════
+
+    IReadOnlyList<string> IFileDropHandler.AcceptedFileExtensions { get; } =
+        [".csv", ".json"];
+
+    async Task<bool> IFileDropHandler.HandleFileDropAsync (IReadOnlyList<string> filePaths , CancellationToken ct)
+    {
+        if (Interlocked.CompareExchange(ref _dialogLock , 1 , 0) != 0)
+            return false;
+        try
+        {
+            var filePath = filePaths[0];
+            var ext = Path.GetExtension(filePath).ToLowerInvariant();
+
+            if (ext == ".csv")
+                await ImportCsvCoreAsync(filePath);
+            else if (ext == ".json")
+                await ImportJsonCoreAsync(filePath);
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex , "拖放导入失败");
+            return false;
+        }
+        finally
+        {
+            await Task.Delay(150);
+            Interlocked.Exchange(ref _dialogLock , 0);
+        }
     }
 
     [RelayCommand]
