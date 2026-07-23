@@ -50,67 +50,88 @@ public sealed class ArrangementCounterService : IArrangementCounterService, IDis
         Interlocked.Increment(ref _count);
     }
 
+    /// <summary>
+    /// 每批最多上报次数。当累积值超过此阈值时自动拆分为多个批次上报。
+    /// </summary>
+    private const int MaxPerBatch = 20;
+
     /// <inheritdoc />
     public async Task<int> ReportAndResetAsync()
     {
         // 原子读取并重置
-        var value = Interlocked.Exchange(ref _count, 0);
-        if (value <= 0)
+        var totalValue = Interlocked.Exchange(ref _count, 0);
+        if (totalValue <= 0)
             return 0;
 
-        // 第一步：获取递增令牌
-        TokenResponse? tokenResponse;
-        try
-        {
-            tokenResponse = await _httpClient.GetFromJsonAsync<TokenResponse>(
-                "/api/counters/token?name=arrangements", JsonOptions);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug(ex, "获取排座计数器令牌失败 (value={Value})", value);
-            return value;
-        }
+        var remaining = totalValue;
+        var totalReported = 0;
 
-        if (tokenResponse is null || string.IsNullOrEmpty(tokenResponse.Token))
+        while (remaining > 0)
         {
-            _logger.LogDebug("排座计数器令牌响应为空");
-            return value;
-        }
+            var batchValue = Math.Min(remaining, MaxPerBatch);
+            remaining -= batchValue;
 
-        if (tokenResponse.ExpiresAt <= DateTimeOffset.UtcNow)
-        {
-            _logger.LogDebug("排座计数器令牌已过期 (expiresAt={ExpiresAt})", tokenResponse.ExpiresAt);
-            return value;
-        }
-
-        // 第二步：提交累计值
-        try
-        {
-            var request = new IncrementRequest
+            // 第一步：获取递增令牌
+            TokenResponse? tokenResponse;
+            try
             {
-                Name = "arrangements",
-                Value = value,
-                Token = tokenResponse.Token,
-                Nonce = tokenResponse.Nonce
-            };
+                tokenResponse = await _httpClient.GetFromJsonAsync<TokenResponse>(
+                    "/api/counters/token?name=arrangements", JsonOptions);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "获取排座计数器令牌失败 (batch={Batch}, remaining={Remaining})",
+                    batchValue, remaining);
+                // 若已有部分上报成功则返回已上报数，否则返回原始值表示未上报
+                return totalReported > 0 ? totalReported : totalValue;
+            }
 
-            var response = await _httpClient.PostAsJsonAsync(
-                "/api/counters/public/increment", request, JsonOptions);
+            if (tokenResponse is null || string.IsNullOrEmpty(tokenResponse.Token))
+            {
+                _logger.LogDebug("排座计数器令牌响应为空 (batch={Batch})", batchValue);
+                return totalReported > 0 ? totalReported : totalValue;
+            }
 
-            response.EnsureSuccessStatusCode();
+            if (tokenResponse.ExpiresAt <= DateTimeOffset.UtcNow)
+            {
+                _logger.LogDebug("排座计数器令牌已过期 (expiresAt={ExpiresAt}, batch={Batch})",
+                    tokenResponse.ExpiresAt, batchValue);
+                return totalReported > 0 ? totalReported : totalValue;
+            }
 
-            var result = await response.Content
-                .ReadFromJsonAsync<IncrementResponse>(JsonOptions);
+            // 第二步：提交批次值
+            try
+            {
+                var request = new IncrementRequest
+                {
+                    Name = "arrangements",
+                    Value = batchValue,
+                    Token = tokenResponse.Token,
+                    Nonce = tokenResponse.Nonce
+                };
 
-            _logger.LogDebug("排座计数器已上报: value={Value}, newTotal={NewTotal}",
-                value, result?.Value);
+                var response = await _httpClient.PostAsJsonAsync(
+                    "/api/counters/public/increment", request, JsonOptions);
+
+                response.EnsureSuccessStatusCode();
+
+                var result = await response.Content
+                    .ReadFromJsonAsync<IncrementResponse>(JsonOptions);
+
+                totalReported += batchValue;
+
+                _logger.LogDebug("排座计数器已上报: batch={Batch}, newTotal={NewTotal}, totalReported={TotalReported}/{TotalValue}",
+                    batchValue, result?.Value, totalReported, totalValue);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "上报排座计数器失败 (batch={Batch}, remaining={Remaining})",
+                    batchValue, remaining);
+                return totalReported > 0 ? totalReported : totalValue;
+            }
         }
-        catch (Exception ex)
-        {
-            _logger.LogDebug(ex, "上报排座计数器失败 (value={Value})", value);
-        }
 
-        return value;
+        return totalReported;
     }
 
     public void Dispose()
