@@ -20,7 +20,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace SeatFlow.Presentation.Avalonia.ViewModels;
 
-public partial class MemberManagementViewModel : ViewModelBase
+public partial class MemberManagementViewModel : ViewModelBase, IFileDropHandler
 {
     private readonly IApplicationFacade _facade;
     private readonly IFileService _fileService;
@@ -338,61 +338,92 @@ public partial class MemberManagementViewModel : ViewModelBase
         if (Interlocked.CompareExchange(ref _dialogLock , 1 , 0) != 0) return;
         try
         {
-            string? errorTitle = null;
-            string? errorMsg = null;
+            IStorageFile? importFile;
+            try { importFile = await _fileService.OpenFileAsync(Resources.Member_ImportData , StudentFileTypes); }
+            catch (Exception ex) { _logger.LogDebug(ex , "文件对话框取消或异常: 导入"); return; }
+            if (importFile is null) return;
 
-            try
-            {
-                IStorageFile? importFile;
-                try { importFile = await _fileService.OpenFileAsync(Resources.Member_ImportData , StudentFileTypes); }
-                catch (Exception ex) { _logger.LogDebug(ex , "文件对话框取消或异常: 导入"); return; }
-                if (importFile is null) return;
-                var file = importFile;
-
-                FilePath = file.Path.LocalPath;
-                IsLoading = true;
-                ErrorMessage = string.Empty;
-                StatusMessage = Resources.Member_Importing;
-
-                var students = await _facade.LoadStudentsAsync(FilePath , ct);
-
-                Students = new ObservableCollection<Student>(students);
-                StudentCount = Students.Count;
-                IsEmpty = StudentCount == 0;
-                StatusMessage = IsEmpty ? Resources.Member_NoImport : $"已导入 {StudentCount} 名学生";
-
-                // 自动保存到托管存储
-                if (!IsEmpty)
-                {
-                    var name = Path.GetFileNameWithoutExtension(FilePath);
-                    CurrentDatasetId = await _facade.SaveStudentDatasetAsync(name , students , Path.GetFileName(FilePath) , ct);
-                    CurrentDatasetName = name;
-                    MarkClean();
-                    _ = RefreshDatasetsAsync(ct);
-                }
-
-                if (IsEmpty)
-                {
-                    errorTitle = Resources.Member_ImportResult;
-                    errorMsg = Resources.Member_NoValidMembers;
-                }
-            }
-            catch (Exception ex)
-            {
-                errorTitle = Resources.Member_ImportFailed;
-                errorMsg = ex is FileNotFoundException
-                    ? string.Format(Resources.Member_FileNotFoundFmt , FilePath)
-                    : string.Format(Resources.Member_ImportErrorFmt , ex.Message);
-                StatusMessage = Resources.Member_ImportFailed;
-            }
-            finally
-            {
-                IsLoading = false;
-                if (errorTitle != null)
-                    await _dialog.ShowErrorAsync(errorTitle , errorMsg!);
-            }
+            await ImportFromPathAsync(importFile.Path.LocalPath , ct);
         }
         finally { await Task.Delay(150 , CancellationToken.None); Interlocked.Exchange(ref _dialogLock , 0); }
+    }
+
+    /// <summary>从指定路径导入学生数据（跳过文件对话框）。供 ImportAsync 和拖放使用。</summary>
+    /// <returns>true 表示导入成功（至少有一条有效数据）。</returns>
+    private async Task<bool> ImportFromPathAsync (string filePath , CancellationToken ct)
+    {
+        string? errorTitle = null;
+        string? errorMsg = null;
+
+        try
+        {
+            FilePath = filePath;
+            IsLoading = true;
+            ErrorMessage = string.Empty;
+            StatusMessage = Resources.Member_Importing;
+
+            var students = await _facade.LoadStudentsAsync(FilePath , ct);
+
+            Students = new ObservableCollection<Student>(students);
+            StudentCount = Students.Count;
+            IsEmpty = StudentCount == 0;
+            StatusMessage = IsEmpty ? Resources.Member_NoImport : $"已导入 {StudentCount} 名学生";
+
+            // 自动保存到托管存储
+            if (!IsEmpty)
+            {
+                var name = Path.GetFileNameWithoutExtension(FilePath);
+                CurrentDatasetId = await _facade.SaveStudentDatasetAsync(name , students , Path.GetFileName(FilePath) , ct);
+                CurrentDatasetName = name;
+                MarkClean();
+                _ = RefreshDatasetsAsync(ct);
+            }
+
+            if (IsEmpty)
+            {
+                errorTitle = Resources.Member_ImportResult;
+                errorMsg = Resources.Member_NoValidMembers;
+            }
+
+            return !IsEmpty;
+        }
+        catch (Exception ex)
+        {
+            errorTitle = Resources.Member_ImportFailed;
+            errorMsg = ex is FileNotFoundException
+                ? string.Format(Resources.Member_FileNotFoundFmt , FilePath)
+                : string.Format(Resources.Member_ImportErrorFmt , ex.Message);
+            StatusMessage = Resources.Member_ImportFailed;
+            return false;
+        }
+        finally
+        {
+            IsLoading = false;
+            if (errorTitle != null)
+                await _dialog.ShowErrorAsync(errorTitle , errorMsg!);
+        }
+    }
+
+    // ═══════════════════════════════════════════════
+    //  IFileDropHandler
+    // ═══════════════════════════════════════════════
+
+    IReadOnlyList<string> IFileDropHandler.AcceptedFileExtensions { get; } =
+        [".csv", ".xlsx", ".json"];
+
+    async Task<bool> IFileDropHandler.HandleFileDropAsync (IReadOnlyList<string> filePaths , CancellationToken ct)
+    {
+        if (Interlocked.CompareExchange(ref _dialogLock , 1 , 0) != 0)
+            return false;
+        try
+        {
+            return await ImportFromPathAsync(filePaths[0] , ct);
+        }
+        finally
+        {
+            await Task.Delay(150 , CancellationToken.None);
+            Interlocked.Exchange(ref _dialogLock , 0);
+        }
     }
 
     /// <summary>从文件更新当前数据集，保持 CurrentDatasetId 不变。</summary>

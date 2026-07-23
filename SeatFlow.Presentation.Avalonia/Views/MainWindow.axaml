@@ -15,6 +15,7 @@
         Title="{x:Static lang:Resources.App_Title}" Width="1200" Height="800"
         MinWidth="550" MinHeight="600"
         CanResize="True"
+        DragDrop.AllowDrop="True"
         ExtendClientAreaToDecorationsHint="True"
         ExtendClientAreaTitleBarHeightHint="32"
         Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">

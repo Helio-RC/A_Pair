@@ -61,7 +61,7 @@ README.md                     ← 项目入口，功能概览 + 开发状态
 
 ### docs/CLAUDE.md
 - **覆盖**: 与根目录 CLAUDE.md 相同的可读副本
-- **何时更新**: **每次修改根 CLAUDE.md 后必须同步**
+- **何时更新**: **每次修改根 CLAUDE.md 后必须同步**（包括新增的"文件拖放导入"小节）
 - **关联文档**: CLAUDE.md（一一对应）
 
 ### ARCHITECTURE.md

@@ -197,6 +197,24 @@
   <data name="Data_CSVFile" xml:space="preserve">
     <value>CSV 文件</value>
   </data>
+  <data name="DragDrop_InvalidFileType" xml:space="preserve">
+    <value>不支持的文件格式</value>
+  </data>
+  <data name="DragDrop_InvalidFileTypeFmt" xml:space="preserve">
+    <value>文件「{0}」格式不支持。当前页面支持：{1}</value>
+  </data>
+  <data name="DragDrop_MultipleFilesMsg" xml:space="preserve">
+    <value>拖放了 {0} 个文件，将只处理第一个。是否继续？</value>
+  </data>
+  <data name="DragDrop_MultipleFilesTitle" xml:space="preserve">
+    <value>多个文件</value>
+  </data>
+  <data name="DragDrop_UnsupportedPage" xml:space="preserve">
+    <value>无法导入</value>
+  </data>
+  <data name="DragDrop_UnsupportedPageMsg" xml:space="preserve">
+    <value>该页面无可导入的数据</value>
+  </data>
   <data name="Freeform_UnsavedChanges" xml:space="preserve">
     <value>未保存的修改</value>
   </data>

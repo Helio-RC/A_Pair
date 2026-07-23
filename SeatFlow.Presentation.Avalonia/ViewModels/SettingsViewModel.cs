@@ -22,7 +22,7 @@ using AvaloniaApplication = Avalonia.Application;
 
 namespace SeatFlow.Presentation.Avalonia.ViewModels;
 
-public partial class SettingsViewModel : ViewModelBase
+public partial class SettingsViewModel : ViewModelBase, IFileDropHandler
 {
     private readonly IApplicationFacade _facade;
     private readonly IDialogService _dialog;
@@ -494,114 +494,40 @@ public partial class SettingsViewModel : ViewModelBase
             await _dialog.ShowErrorAsync(Resources.SeatSets_ExportFailed, ex.Message);
         }
     }
-
     [RelayCommand]
     private async Task ImportSeatSetsAsync (CancellationToken ct)
     {
-        string? importPath = null;
-        try
+        var seatSetsFilter = new FilePickerFileType("SeatFlow Data Package")
         {
-            // 1. 文件选择对话框
-            var seatSetsFilter = new FilePickerFileType("SeatFlow Data Package")
-            {
-                Patterns = ["*.seatsets"]
-            };
+            Patterns = ["*.seatsets"]
+        };
 
-            var file = await _fileService.OpenFileAsync(
-                Resources.SeatSets_ImportTitle,
-                [seatSetsFilter]);
+        var file = await _fileService.OpenFileAsync(
+            Resources.SeatSets_ImportTitle,
+            [seatSetsFilter]);
 
-            if (file is null) return;
+        if (file is null) return;
 
-            importPath = file.Path.LocalPath;
+        StatusMessage = Resources.SeatSets_Processing;
+        await SeatSetsImportHelper.ImportAsync(
+            file.Path.LocalPath, _serviceProvider, _dialog, _logger, ct);
+        StatusMessage = "";
+    }
 
-            // 2. 校验文件
-            StatusMessage = Resources.SeatSets_Processing;
-            var validation = await _facade.ValidateSeatSetsAsync(importPath, ct);
+    // ═══════════════════════════════════════════════
+    //  IFileDropHandler
+    // ═══════════════════════════════════════════════
 
-            if (!validation.IsValid)
-            {
-                var errors = string.Join("\n", validation.ValidationErrors);
-                await _dialog.ShowErrorAsync(Resources.SeatSets_InvalidFile,
-                    string.IsNullOrEmpty(errors) ? Resources.SeatSets_IntegrityFailed : errors);
-                StatusMessage = "";
-                return;
-            }
+    IReadOnlyList<string> IFileDropHandler.AcceptedFileExtensions { get; } =
+        [".seatsets"];
 
-            // 3. 探测并显示选择对话框（导入模式）
-            var categories = await _facade.ProbeSeatSetsCategoriesAsync(importPath, ct);
-            var selectionWindow = new Views.SeatSetsSelectionWindow
-            {
-                IsExport = false
-            };
-            selectionWindow.SetAvailableCategories(
-                categories.IncludeAppSettings,
-                categories.IncludeVenues,
-                categories.IncludeRosters,
-                categories.IncludeSnapshots,
-                categories.IncludeStrategyConfig);
-
-            if (AvaloniaApplication.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop)
-                return;
-
-            var confirmed = await selectionWindow.ShowDialog<bool>(desktop.MainWindow!);
-            if (!confirmed) return;
-
-            var selection = selectionWindow.ViewModel.ToSelection();
-
-            // 4. 执行导入
-            StatusMessage = Resources.SeatSets_Processing;
-            var result = await _facade.ImportSeatSetsAsync(importPath, selection, progress: null, ct);
-
-            // 5. 显示结果
-            if (result.Success)
-            {
-                StatusMessage = string.Format(Resources.SeatSets_ImportSuccess, result.Restored);
-                await _dialog.ShowInfoAsync(Resources.SeatSets_ImportTitle,
-                    string.Format(Resources.SeatSets_ImportSuccess, result.Restored));
-            }
-            else if (result.Failed > 0 && result.Restored > 0)
-            {
-                StatusMessage = string.Format(Resources.SeatSets_ImportPartial,
-                    result.Restored, result.TotalFiles, result.Failed);
-                var errorDetails = result.Errors.Count > 0
-                    ? "\n\n" + string.Join("\n", result.Errors.Take(5))
-                    : "";
-                await _dialog.ShowWarningAsync(Resources.SeatSets_ImportTitle,
-                    string.Format(Resources.SeatSets_ImportPartial,
-                        result.Restored, result.TotalFiles, result.Failed) + errorDetails);
-            }
-            else
-            {
-                StatusMessage = Resources.SeatSets_ImportPartial;
-                var errorDetails = result.Errors.Count > 0
-                    ? "\n" + string.Join("\n", result.Errors.Take(5))
-                    : "";
-                await _dialog.ShowErrorAsync(Resources.SeatSets_ImportTitle,
-                    string.Join("\n", result.Errors.Take(10)) + errorDetails);
-            }
-
-            // 6. 导入后刷新：应用新设置（主题/语言）并导航到主页
-            if (result.Restored > 0 && importPath != null)
-            {
-                try
-                {
-                    if (AvaloniaApplication.Current is App app)
-                        await App.RefreshAfterImportAsync(app.ServiceProvider);
-                }
-                catch { /* 刷新失败不影响导入结果 */ }
-            }
-        }
-        catch (Exception ex) when (ex is TaskCanceledException or OperationCanceledException)
-        {
-            _logger.LogDebug(ex, "导入操作取消");
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = Resources.SeatSets_ImportTitle + ": " + ex.Message;
-            _logger.LogError(ex, "导入数据包失败: {Path}", importPath);
-            await _dialog.ShowErrorAsync(Resources.SeatSets_ImportTitle, ex.Message);
-        }
+    async Task<bool> IFileDropHandler.HandleFileDropAsync (IReadOnlyList<string> filePaths , CancellationToken ct)
+    {
+        StatusMessage = Resources.SeatSets_Processing;
+        var result = await SeatSetsImportHelper.ImportAsync(
+            filePaths[0], _serviceProvider, _dialog, _logger, ct);
+        StatusMessage = "";
+        return result;
     }
 
     [RelayCommand]
