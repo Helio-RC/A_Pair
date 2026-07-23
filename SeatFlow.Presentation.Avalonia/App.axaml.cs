@@ -180,6 +180,9 @@ namespace SeatFlow.Presentation.Avalonia
                 // 全角字符输入转换（全角数字/符号 → 半角）
                 Behaviors.ChineseInputNormalizer.Attach(mainWindow);
 
+                // 全局键盘快捷键（Ctrl+Z/Y 撤销/重做、Ctrl+S 保存、Delete 删除、Esc 取消）
+                Behaviors.KeyboardShortcutHandler.Attach(mainWindow);
+
                 // 退出看门狗：关闭信号发出后 20s 内未退出则强制终止
                 desktop.ShutdownRequested += (_ , _) =>
                 {
