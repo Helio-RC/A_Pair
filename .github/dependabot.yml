@@ -1,0 +1,51 @@
+version: 2
+updates:
+  # ── NuGet 依赖 ──
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Shanghai
+    open-pull-requests-limit: 10
+    groups:
+      # Avalonia 系列版本必须同步，放一组
+      avalonia:
+        patterns:
+          - Avalonia
+          - Avalonia.Desktop
+          - Avalonia.Headless
+          - Avalonia.Themes.Fluent
+          - Avalonia.Fonts.Inter
+          - AvaloniaUI.DiagnosticsSupport
+      # xUnit 测试栈放一组
+      xunit:
+        patterns:
+          - xunit.v3
+          - xunit.runner.visualstudio
+          - Microsoft.NET.Test.Sdk
+      # Microsoft.Extensions 系列放一组
+      ms-extensions:
+        patterns:
+          - Microsoft.Extensions.*
+      # Serilog 相关放一组
+      serilog:
+        patterns:
+          - Serilog
+          - Serilog.Extensions.Logging
+          - Serilog.Sinks.File
+          - Serilog.Enrichers.Thread
+      # 其余 NuGet 自动归入 catch-all 组
+      nuget:
+        patterns:
+          - "*"
+
+  # ── GitHub Actions ──
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Shanghai

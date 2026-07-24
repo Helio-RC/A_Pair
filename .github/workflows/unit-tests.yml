@@ -1,0 +1,54 @@
+name: UnitTests
+
+on:
+  push:
+    paths: ['**.cs', '**.csproj', '**.slnx', '**.axaml']
+  pull_request:
+    paths: ['**.cs', '**.csproj', '**.slnx', '**.axaml']
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            core:       ['SeatFlow.Core/**', 'SeatFlow.Contracts/**']
+            infra:      ['SeatFlow.Infrastructure/**']
+            app:        ['SeatFlow.Application/**']
+            pres:       ['SeatFlow.Presentation.Avalonia/**']
+            plugins:    ['SeatFlow.Plugins.Sdk/**']
+            tests-core: ['SeatFlow.Core.Tests/**']
+            tests-infra:['SeatFlow.Infrastructure.Tests/**']
+            tests-app:  ['SeatFlow.Application.Tests/**']
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - run: dotnet build
+
+      - if: steps.filter.outputs.core == 'true'
+           || steps.filter.outputs.infra == 'true'
+           || steps.filter.outputs.tests-core == 'true'
+        run: dotnet test SeatFlow.Core.Tests --no-build
+
+      - if: steps.filter.outputs.core == 'true'
+           || steps.filter.outputs.infra == 'true'
+           || steps.filter.outputs.tests-infra == 'true'
+        run: dotnet test SeatFlow.Infrastructure.Tests --no-build
+
+      - if: steps.filter.outputs.core == 'true'
+           || steps.filter.outputs.infra == 'true'
+           || steps.filter.outputs.app == 'true'
+           || steps.filter.outputs.tests-app == 'true'
+        run: dotnet test SeatFlow.Application.Tests --no-build

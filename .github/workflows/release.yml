@@ -2,14 +2,8 @@ name: Release SeatFlow
 
 on:
   push:
-    branches: ['main', 'develop']
+    branches: ['main']
     paths: ['version.json']
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version (override version.json, e.g. 1.4.1)'
-        required: false
-        type: string
 
 env:
   DOTNET_NOLOGO: 'true'
@@ -17,11 +11,15 @@ env:
   PROJECT_PATH: 'SeatFlow.Presentation.Avalonia'
   CONFIGURATION: 'Release'
 
+concurrency: release-${{ github.ref }}
+
 jobs:
   # ──────────────────────────────────────────────
   # Job 1: 多平台构建 + vpk 打包
   # ──────────────────────────────────────────────
   build:
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     strategy:
       fail-fast: false
       matrix:
@@ -60,19 +58,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       - name: Resolve version
         id: version
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.version }}" ]]; then
-            python3 -c "
-          import json
-          with open('version.json') as f:
-              data = json.load(f)
-          data['version'] = '${{ inputs.version }}'
-          with open('version.json', 'w') as f:
-              json.dump(data, f, indent=2)
-            "
-          fi
           V=$(python3 -c "import json; print(json.load(open('version.json'))['version'])")
           echo "version=$V" >> $GITHUB_OUTPUT
           echo "Version: $V"
@@ -127,7 +119,7 @@ jobs:
           if-no-files-found: error
 
   # ──────────────────────────────────────────────
-  # Job 3: GitHub Release + OSS 上传
+  # Job 2: GitHub Release + OSS 上传
   # ──────────────────────────────────────────────
   release:
     needs: build
@@ -137,19 +129,51 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Resolve version
-        id: version
-        run: |
-          V=$(python3 -c "import json; print(json.load(open('version.json'))['version'])")
-          echo "version=$V" >> $GITHUB_OUTPUT
-          echo "Version: $V"
-
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Install OSS SDK
-        run: pip install oss2
+      - name: Resolve version
+        id: version
+        run: |
+          V="${{ needs.build.outputs.version }}"
+          echo "version=$V" >> $GITHUB_OUTPUT
+          echo "Version: $V"
+
+      - name: Install dependencies
+        run: pip install oss2 packaging
+
+      - name: Pre-flight checks
+        run: |
+          V="${{ steps.version.outputs.version }}"
+          TAG="v${V}"
+          echo "Target: $TAG"
+
+          # 1. 禁止发布已存在的 Release
+          if gh release view "$TAG" --repo "${{ github.repository }}" &>/dev/null; then
+            echo "✗ Release $TAG already exists. Abort."
+            exit 1
+          fi
+
+          # 2. 版本号必须大于当前最大 Release tag
+          LATEST_TAG=$(gh release list --repo "${{ github.repository }}" -L 1 --order desc --exclude-pre-releases --json tagName -q '.[0].tagName' 2>/dev/null || echo "")
+          if [[ -n "$LATEST_TAG" ]]; then
+            LATEST=${LATEST_TAG#v}
+            echo "Latest release: $LATEST_TAG"
+            RESULT=$(python3 -c "
+          from packaging.version import Version
+          print('ok' if Version('$V') > Version('$LATEST') else 'fail')
+          ")
+            if [[ "$RESULT" == "fail" ]]; then
+              echo "✗ Version $V is not greater than latest $LATEST. Abort."
+              exit 1
+            fi
+            echo "✓ Version $V > $LATEST"
+          else
+            echo "No existing releases — first release, proceeding."
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -161,10 +185,20 @@ jobs:
       - name: List artifacts
         run: ls -la all-artifacts/
 
+      - name: Validate RELEASE.md
+        run: |
+          if [ ! -f RELEASE.md ]; then
+            echo "✗ RELEASE.md not found in repository root."
+            exit 1
+          fi
+          echo "✓ RELEASE.md found"
+
       # ── 1. 构建 Release body（RELEASE.md + SHA256 表格） ──
       - name: Build release body
         id: body
+        shell: bash
         run: |
+          shopt -s nullglob
           {
             cat RELEASE.md
             echo ""
@@ -172,11 +206,12 @@ jobs:
             echo ""
             echo "| File | SHA256 |"
             echo "|------|--------|"
-            for f in all-artifacts/*.exe all-artifacts/*.AppImage all-artifacts/*.pkg all-artifacts/*.dmg; do
-              [ -f "$f" ] || continue
-              SHA=$(sha256sum "$f" | awk '{print $1}')
-              NAME=$(basename "$f")
-              echo "| $NAME | $SHA |"
+            for ext in exe AppImage pkg dmg; do
+              for f in all-artifacts/*.$ext; do
+                SHA=$(sha256sum "$f" | awk '{print $1}')
+                NAME=$(basename "$f")
+                echo "| $NAME | $SHA |"
+              done
             done
           } > /tmp/release-body.md
           echo "body<<EOF" >> $GITHUB_OUTPUT
@@ -185,21 +220,29 @@ jobs:
 
       # ── 2. 创建 GitHub Release ──
       - name: Create GitHub Release
+        shell: bash
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          gh release create "v${VERSION}" \
+          shopt -s nullglob
+          V="${{ steps.version.outputs.version }}"
+          ASSETS=()
+          for ext in exe AppImage pkg dmg; do
+            for f in all-artifacts/*.$ext; do
+              ASSETS+=("$f")
+            done
+          done
+          if [ ${#ASSETS[@]} -eq 0 ]; then
+            echo "✗ No release assets found!"
+            exit 1
+          fi
+          gh release create "v${V}" \
             --repo "${{ github.repository }}" \
-            --title "SeatFlow ${VERSION}" \
+            --title "SeatFlow ${V}" \
             --notes-file /tmp/release-body.md \
-            all-artifacts/*.exe \
-            all-artifacts/*.AppImage \
-            all-artifacts/*.pkg \
-            all-artifacts/*.dmg \
-            || echo "::warning::Release may already exist (non-fatal)"
+            "${ASSETS[@]}"
         env:
           GH_TOKEN: ${{ github.token }}
 
-      # ── 3. OSS 上传（与 release.py 行为严格一致） ──
+      # ── 3. OSS 上传（先校验索引，再上传文件，保证原子性） ──
       - name: Upload to OSS
         run: |
           python3 << 'PYEOF'
@@ -214,16 +257,8 @@ jobs:
           COMMIT_ID = "${{ github.sha }}"
 
           def is_installer(name):
-              """_is_installer() — 可下载的安装程序"""
               n = name.lower()
               return n.endswith(('.exe', '.appimage', '.pkg', '.dmg'))
-
-          def should_distribute(name):
-              """_should_distribute() — 过滤 vpk 内部元数据"""
-              n = name.lower()
-              if n.startswith('assets.') and n.endswith('.json'):
-                  return False
-              return True
 
           def sha256_file(path):
               h = hashlib.sha256()
@@ -248,11 +283,8 @@ jobs:
           auth = oss2.Auth(os.environ['OSS_KEY_ID'], os.environ['OSS_KEY_SECRET'])
           bucket = oss2.Bucket(auth, os.environ['OSS_ENDPOINT'], os.environ['OSS_BUCKET'])
 
-          # 扫描 + 过滤产物
-          all_files = sorted(
-              [f for f in ARTIFACTS_DIR.iterdir() if f.is_file() and should_distribute(f.name)],
-              key=lambda f: f.name,
-          )
+          all_files = sorted([f for f in ARTIFACTS_DIR.iterdir() if f.is_file()],
+                             key=lambda f: f.name)
           if not all_files:
               print("No artifacts found, skipping OSS upload.")
               sys.exit(0)
@@ -260,6 +292,25 @@ jobs:
           installers = [f for f in all_files if is_installer(f.name)]
           updates = [f for f in all_files if not is_installer(f.name)]
           print(f"Artifacts: {len(installers)} installers + {len(updates)} updates")
+
+          # ── 0. 先校验 releases.json 索引（确保版本可用后再上传文件） ──
+          index_key = "releases/releases.json"
+          existing = None
+          try:
+              result = bucket.get_object(index_key)
+              existing = json.loads(result.read())
+          except Exception:
+              print("  releases.json not found, will create.")
+
+          if existing is None:
+              existing = {"latest": VERSION, "versions": []}
+          else:
+              for v in existing.get("versions", []):
+                  if v["version"] == VERSION:
+                      print(f"✗ Version {VERSION} already exists in releases.json.")
+                      sys.exit(1)
+
+          print("Pre-checks passed, uploading...")
 
           prefix = f"releases/{VERSION}"
 
@@ -299,27 +350,7 @@ jobs:
                   size_mb = f.stat().st_size / (1024 * 1024)
                   print(f"    ✓ {key} ({size_mb:.1f} MiB)")
 
-          # ── 4. 更新 releases.json 索引 ──
-          index_key = "releases/releases.json"
-          existing = None
-          try:
-              result = bucket.get_object(index_key)
-              existing = json.loads(result.read())
-          except Exception:
-              print("  releases.json 不存在，将创建新的版本索引。")
-
-          if existing is None:
-              existing = {"latest": VERSION, "versions": []}
-
-          # 检查版本是否已存在
-          for v in existing.get("versions", []):
-              if v["version"] == VERSION:
-                  raise ValueError(
-                      f"版本 {VERSION} 已存在于 releases.json 中。"
-                      f"禁止覆盖已发布版本。"
-                  )
-
-          # 构建新条目（插入到头部）
+          # ── 4. 写入 releases.json（前面的预检已确保版本不重复） ──
           release_date = datetime.now(timezone.utc).astimezone().isoformat()
           entry = {
               "version": VERSION,
@@ -340,7 +371,6 @@ jobs:
           existing["versions"].insert(0, entry)
           existing["latest"] = VERSION
 
-          # 上传
           data = json.dumps(existing, ensure_ascii=False, indent=2).encode("utf-8")
           bucket.put_object(index_key, data, headers={"Content-Type": "application/json"})
           print(f"  ✓ {index_key} (latest: {VERSION})")
