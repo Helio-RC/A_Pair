@@ -1047,7 +1047,9 @@ class ReleaseManager:
         return existing
 
     # ── 步骤 6: GitHub Release ────────────────
-        """通过 GitHub REST API 创建 Release，上传 zip/tar.gz + Velopack 产物。"""
+
+    def create_github_release(self, vpk_artifacts: list[dict], release_notes: str) -> None:
+        """通过 GitHub REST API 创建 Release，上传安装程序资产。"""
         print("[6] 创建 GitHub Release...")
 
         if self.dry_run:
@@ -1094,12 +1096,13 @@ class ReleaseManager:
         release_id = release_data["id"]
         print(f"  ✓ Release 已创建: {release_data['html_url']}")
 
-        # 3. 上传所有资产文件（zip/tar.gz + Velopack 产物）
+        # 3. 上传所有资产文件
         installers = [a for a in vpk_artifacts if self._is_installer(a["fileName"])]
+        # GitHub asset upload 用 uploads.github.com，去掉 {?name,label} 模板后缀
+        upload_url = release_data["upload_url"].split("{")[0]
         for f in installers:
             local_path = Path(f["localPath"])
-            asset_url = f"{api_base}/releases/{release_id}/assets"
-            params = {"name": f["fileName"]}
+            asset_url = f"{upload_url}?name={f['fileName']}"
             asset_headers = {
                 **headers,
                 "Content-Type": "application/octet-stream",
@@ -1107,7 +1110,7 @@ class ReleaseManager:
 
             with open(local_path, "rb") as fh:
                 asset_resp = requests.post(
-                    asset_url, params=params, headers=asset_headers, data=fh
+                    asset_url, headers=asset_headers, data=fh
                 )
 
             if asset_resp.status_code == 201:
@@ -1352,7 +1355,7 @@ class ReleaseManager:
                     self.skip_oss = True
                     self.skip_github = True
 
-            # [5] 归档安装程序（版本化文件名，先于上传）
+            # [5] 归档安装程序（版本化文件名，更新 localPath 供后续上传使用）
             if vpk_artifacts:
                 self._organize_artifacts(vpk_artifacts)
 
