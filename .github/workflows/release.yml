@@ -69,7 +69,7 @@ jobs:
           echo "version=$V" >> $GITHUB_OUTPUT
           echo "Version: $V"
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
 
