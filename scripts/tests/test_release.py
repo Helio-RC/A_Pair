@@ -7,6 +7,7 @@ release.py 单元测试。
 
 import hashlib
 import json
+import os
 import shutil
 import sys
 import tempfile
@@ -64,14 +65,18 @@ class TestSha256File(unittest.TestCase):
     """SHA256 计算测试。"""
 
     def test_known_content(self):
-        path = Path(tempfile.mktemp())
+        fd, tmp_path = tempfile.mkstemp()
+        os.close(fd)
+        path = Path(tmp_path)
         path.write_bytes(b"hello world")
         expected = hashlib.sha256(b"hello world").hexdigest()
         self.assertEqual(sha256_file(path), expected)
         path.unlink()
 
     def test_empty_file(self):
-        path = Path(tempfile.mktemp())
+        fd, tmp_path = tempfile.mkstemp()
+        os.close(fd)
+        path = Path(tmp_path)
         path.write_bytes(b"")
         expected = hashlib.sha256(b"").hexdigest()
         self.assertEqual(sha256_file(path), expected)
