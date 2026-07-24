@@ -104,7 +104,7 @@
   </Target>
 
   <!-- 编译前从所有项目收集 PackageReference 版本号，生成 PackageVersions.g.cs -->
-  <Target Name="GeneratePackageVersions" BeforeTargets="BeforeBuild">
+  <Target Name="GeneratePackageVersions" BeforeTargets="CoreCompile" DependsOnTargets="ResolveProjectReferences">
     <!-- 从其他源项目收集 PackageReference -->
     <MSBuild Projects="..\SeatFlow.Infrastructure\SeatFlow.Infrastructure.csproj;..\SeatFlow.Application\SeatFlow.Application.csproj;..\SeatFlow.Core\SeatFlow.Core.csproj" Targets="_GetPackageRefs" BuildInParallel="false">
       <Output TaskParameter="TargetOutputs" ItemName="_ExtPkgs" />
