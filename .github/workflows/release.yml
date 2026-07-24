@@ -175,17 +175,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Resolve version
-        id: version
-        run: |
-          V="${{ needs.build.outputs.version }}"
-          echo "version=$V" >> $GITHUB_OUTPUT
-          echo "Version: $V"
-
       - name: Install dependencies
         run: pip install oss2 packaging
 
