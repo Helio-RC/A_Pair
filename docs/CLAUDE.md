@@ -551,9 +551,9 @@ python3 scripts/version.py sync --force
 
 ### 版本真相源 (`version.json`)
 
-**路径**: `version.json`（项目根目录）。App 版本号的唯一来源。字段：`version`, `releaseTag`, `commitId`, `buildDate`。
+**路径**: `version.json`（项目根目录）。App 版本号的唯一来源。字段：`version`, `commitId`, `buildDate`。
 
-- `version` / `releaseTag` → 由 `version.py bump-app` 管理
+- `version` → 由 `version.py bump-app` 管理
 - `commitId` / `buildDate` → 编译时由 `update_version_info.py` 从 git 实时获取，生成 `VersionInfo.g.cs` 供 C# 使用
 - `AboutViewModel` 使用 `VersionInfo.Version` + `VersionInfo.CommitId` 显示版本
 

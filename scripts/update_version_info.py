@@ -56,7 +56,6 @@ def generate_version_info(
         data = json.load(f)
 
     version = data.get("version", "0.0.0")
-    release_tag = data.get("releaseTag", f"v{version}")
 
     # 2. 获取 commit hash（从 git 实时获取，不读 version.json）
     commit_id = get_git_commit(root)
@@ -71,7 +70,7 @@ namespace SeatFlow.Presentation.Avalonia;
 internal static class VersionInfo
 {{
     public const string Version = "{version}";
-    public const string ReleaseTag = "{release_tag}";
+    public const string ReleaseTag = "v" + Version;
     public const string CommitId = "{commit_id}";
     public const string BuildDate = "{build_date}";
 }}
