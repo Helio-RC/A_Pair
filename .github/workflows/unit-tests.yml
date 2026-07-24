@@ -28,7 +28,7 @@ jobs:
             pres:       ['SeatFlow.Presentation.Avalonia/**']
             plugins:    ['SeatFlow.Plugins.Sdk/**']
             tests-core: ['SeatFlow.Core.Tests/**']
-            tests-infra:['SeatFlow.Infrastructure.Tests/**']
+            tests-infra: ['SeatFlow.Infrastructure.Tests/**']
             tests-app:  ['SeatFlow.Application.Tests/**']
 
       - uses: actions/setup-dotnet@v4
