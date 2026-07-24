@@ -17,6 +17,7 @@
 
 ### Fixed
 - CSV 导入空白行被 `IgnoreBlankLines` 丢弃导致行号偏移——添加 `FullReadConfig` 保留空白行
+- 不对称双列名单（`|姓名|性别|姓名|需要前排|`）分组错误——`ComputeColumnGroups` 改为按列空间位置（锚点边界）分配组，替代原有按列表索引分配
 
 ## [1.4.0] — 2026-07-24
 
