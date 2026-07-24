@@ -348,6 +348,26 @@ public partial class MemberManagementViewModel : ViewModelBase, IFileDropHandler
         finally { await Task.Delay(150 , CancellationToken.None); Interlocked.Exchange(ref _dialogLock , 0); }
     }
 
+    /// <summary>70×70 自动扫描阈值。</summary>
+    private const int MaxAutoScanSize = 70;
+
+    /// <summary>打开用户文档中的人员管理导入帮助页面。</summary>
+    private static void OpenHelpDocs ()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "https://seatflow.work/docs/user/03-member-management#section-7" ,
+                UseShellExecute = true
+            });
+        }
+        catch
+        {
+            // 无法打开浏览器时静默忽略
+        }
+    }
+
     /// <summary>从指定路径导入学生数据（跳过文件对话框）。供 ImportAsync 和拖放使用。</summary>
     /// <returns>true 表示导入成功（至少有一条有效数据）。</returns>
     private async Task<bool> ImportFromPathAsync (string filePath , CancellationToken ct)
@@ -362,7 +382,44 @@ public partial class MemberManagementViewModel : ViewModelBase, IFileDropHandler
             ErrorMessage = string.Empty;
             StatusMessage = Resources.Member_Importing;
 
-            var students = await _facade.LoadStudentsAsync(FilePath , ct);
+            // Phase 1: 检查数据范围，超出阈值则弹窗询问
+            int scanRows, scanCols;
+            try
+            {
+                var (totalRows , totalCols) = await _facade.GetDataSourceDimensionsAsync(FilePath , ct);
+                if (totalRows > MaxAutoScanSize || totalCols > MaxAutoScanSize)
+                {
+                    var choice = await Dialog.ShowMultiOptionAsync(
+                        Resources.Member_ImportRangeTooLarge ,
+                        string.Format(Resources.Member_ImportRangeTooLargeMsg , totalRows , totalCols) ,
+                        Resources.Member_ImportFullScan ,
+                        Resources.Member_ImportLimitedScan);
+                    if (choice == 0) // 完全扫描
+                    {
+                        scanRows = totalRows;
+                        scanCols = totalCols;
+                    }
+                    else // 仅扫描前 70×70（或取消）
+                    {
+                        scanRows = Math.Min(totalRows , MaxAutoScanSize);
+                        scanCols = Math.Min(totalCols , MaxAutoScanSize);
+                    }
+                }
+                else
+                {
+                    scanRows = totalRows;
+                    scanCols = totalCols;
+                }
+            }
+            catch
+            {
+                // 维度读取失败时使用默认值，让 LoadStudentsAsync 自行处理
+                scanRows = MaxAutoScanSize;
+                scanCols = MaxAutoScanSize;
+            }
+
+            // Phase 2: 加载学生数据（使用 Phase 1 确定的范围）
+            var students = await _facade.LoadStudentsAsync(FilePath , scanRows , scanCols , ct);
 
             Students = new ObservableCollection<Student>(students);
             StudentCount = Students.Count;
@@ -382,7 +439,7 @@ public partial class MemberManagementViewModel : ViewModelBase, IFileDropHandler
             if (IsEmpty)
             {
                 errorTitle = Resources.Member_ImportResult;
-                errorMsg = Resources.Member_NoValidMembers;
+                errorMsg = Resources.Member_NoNameField;
             }
 
             return !IsEmpty;
@@ -400,7 +457,15 @@ public partial class MemberManagementViewModel : ViewModelBase, IFileDropHandler
         {
             IsLoading = false;
             if (errorTitle != null)
-                await _dialog.ShowErrorAsync(errorTitle , errorMsg!);
+            {
+                // 导入失败：显示带帮助按钮的对话框
+                var choice = await Dialog.ShowMultiOptionAsync(
+                    errorTitle , errorMsg! ,
+                    Resources.Common_OK ,
+                    Resources.Member_ViewHelp);
+                if (choice == 1) // 查看帮助
+                    OpenHelpDocs();
+            }
         }
     }
 

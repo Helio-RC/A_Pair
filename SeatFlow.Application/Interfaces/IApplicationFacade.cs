@@ -18,6 +18,12 @@ namespace SeatFlow.Application.Interfaces
         /// <summary>从指定数据源加载学生列表。</summary>
         Task<List<Student>> LoadStudentsAsync (string source , CancellationToken cancellationToken = default);
 
+        /// <summary>从指定数据源加载学生列表，可限制最大扫描行列（0 = 不限制）。</summary>
+        Task<List<Student>> LoadStudentsAsync (string source , int maxRows , int maxCols , CancellationToken ct = default);
+
+        /// <summary>获取数据源文件的维度（行数 × 列数），用于导入前的范围判断。</summary>
+        Task<(int Rows , int Cols)> GetDataSourceDimensionsAsync (string source , CancellationToken ct = default);
+
         /// <summary>
         /// 生成座位安排。
         /// 流程：加载学生 → 构建布局 → 执行策略管道 → 解决冲突 → 保存快照。

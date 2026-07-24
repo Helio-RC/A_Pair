@@ -122,6 +122,25 @@ namespace SeatFlow.Application.Services
         }
 
         /// <inheritdoc />
+        public async Task<List<Student>> LoadStudentsAsync (string source , int maxRows , int maxCols , CancellationToken ct = default)
+        {
+            var provider = _serviceProvider.GetService<IStudentProvider>();
+            if (provider == null) return new List<Student>();
+            return await provider.LoadAsync(source , maxRows , maxCols , ct);
+        }
+
+        /// <inheritdoc />
+        public async Task<(int Rows , int Cols)> GetDataSourceDimensionsAsync (string source , CancellationToken ct = default)
+        {
+            if (string.IsNullOrEmpty(source) || !File.Exists(source))
+                return (0 , 0);
+
+            var provider = _serviceProvider.GetService<IStudentProvider>();
+            if (provider == null) return (0 , 0);
+            return await provider.GetDimensionsAsync(source , ct);
+        }
+
+        /// <inheritdoc />
         public async Task ExportStudentsAsync (string path , IEnumerable<Student> students , ExportFormat format , CancellationToken cancellationToken = default)
         {
             var writers = _serviceProvider.GetServices<IStudentWriter>();

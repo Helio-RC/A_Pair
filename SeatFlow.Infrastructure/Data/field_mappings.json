@@ -1,0 +1,49 @@
+{
+  "version": "1.0",
+  "description": "学生数据导入时的字段名→属性名映射配置。labels 中的任意一项在表格中被命中时，即识别为该字段。",
+  "fieldMappings": {
+    "Name": {
+      "labels": [
+        "姓名",
+        "Name",
+        "name",
+        "名字",
+        "学生姓名",
+        "学生",
+        "名称"
+      ],
+      "description": "学生姓名"
+    },
+    "Height": {
+      "labels": [
+        "身高",
+        "Height",
+        "height",
+        "高度",
+        "身高(cm)",
+        "身高（cm）"
+      ],
+      "description": "身高（厘米）"
+    },
+    "Gender": {
+      "labels": [
+        "性别",
+        "Gender",
+        "gender",
+        "性別"
+      ],
+      "description": "性别"
+    },
+    "NeedsFrontRow": {
+      "labels": [
+        "需要前排",
+        "NeedsFrontRow",
+        "needsFrontRow",
+        "前排",
+        "前排需求",
+        "是否前排"
+      ],
+      "description": "是否需要前排座位"
+    }
+  }
+}

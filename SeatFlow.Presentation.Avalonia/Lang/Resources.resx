@@ -416,6 +416,18 @@
   <data name="Member_ImportFromFile" xml:space="preserve">
     <value>从文件导入</value>
   </data>
+  <data name="Member_ImportFullScan" xml:space="preserve">
+    <value>完全扫描</value>
+  </data>
+  <data name="Member_ImportLimitedScan" xml:space="preserve">
+    <value>仅扫描前70×70</value>
+  </data>
+  <data name="Member_ImportRangeTooLarge" xml:space="preserve">
+    <value>数据范围较大</value>
+  </data>
+  <data name="Member_ImportRangeTooLargeMsg" xml:space="preserve">
+    <value>当前表格数据范围为 {0}×{1}，超出自动扫描范围。是否进行完全扫描？</value>
+  </data>
   <data name="Member_ImportResult" xml:space="preserve">
     <value>导入结果</value>
   </data>
@@ -460,6 +472,9 @@
   </data>
   <data name="Member_NoImport" xml:space="preserve">
     <value>未导入任何数据</value>
+  </data>
+  <data name="Member_NoNameField" xml:space="preserve">
+    <value>未在表格中找到必须字段「姓名」或文件中无有效数据。请检查文件格式。</value>
   </data>
   <data name="Member_NoValidMembers" xml:space="preserve">
     <value>文件中没有读取到有效的数据，请检查文件格式是否正确。</value>
@@ -797,6 +812,9 @@
   </data>
   <data name="Member_UpdateFromFile" xml:space="preserve">
     <value>从文件更新</value>
+  </data>
+  <data name="Member_ViewHelp" xml:space="preserve">
+    <value>查看帮助</value>
   </data>
   <data name="Nav_About" xml:space="preserve">
     <value>关于</value>
