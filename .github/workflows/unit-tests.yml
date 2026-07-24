@@ -22,14 +22,16 @@ jobs:
         id: filter
         with:
           filters: |
-            core:       ['SeatFlow.Core/**', 'SeatFlow.Contracts/**']
-            infra:      ['SeatFlow.Infrastructure/**']
-            app:        ['SeatFlow.Application/**']
-            pres:       ['SeatFlow.Presentation.Avalonia/**']
-            plugins:    ['SeatFlow.Plugins.Sdk/**']
-            tests-core: ['SeatFlow.Core.Tests/**']
-            tests-infra: ['SeatFlow.Infrastructure.Tests/**']
-            tests-app:  ['SeatFlow.Application.Tests/**']
+            {
+              "core": ["SeatFlow.Core/**", "SeatFlow.Contracts/**"],
+              "infra": ["SeatFlow.Infrastructure/**"],
+              "app": ["SeatFlow.Application/**"],
+              "pres": ["SeatFlow.Presentation.Avalonia/**"],
+              "plugins": ["SeatFlow.Plugins.Sdk/**"],
+              "tests-core": ["SeatFlow.Core.Tests/**"],
+              "tests-infra": ["SeatFlow.Infrastructure.Tests/**"],
+              "tests-app": ["SeatFlow.Application.Tests/**"]
+            }
 
       - uses: actions/setup-dotnet@v4
         with:
