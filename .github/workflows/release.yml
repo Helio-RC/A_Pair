@@ -4,7 +4,6 @@ on:
   push:
     branches: ['main']
     paths: ['version.json']
-  workflow_dispatch:
 
 env:
   DOTNET_NOLOGO: 'true'
@@ -65,6 +64,7 @@ jobs:
 
       - name: Resolve version
         id: version
+        shell: bash
         run: |
           V=$(python3 -c "import json; print(json.load(open('version.json'))['version'])")
           echo "version=$V" >> $GITHUB_OUTPUT
@@ -136,45 +136,11 @@ jobs:
 
       - name: Resolve version
         id: version
+        shell: bash
         run: |
           V="${{ needs.build.outputs.version }}"
           echo "version=$V" >> $GITHUB_OUTPUT
           echo "Version: $V"
-
-      - name: Install dependencies
-        run: pip install oss2 packaging
-
-      - name: Pre-flight checks
-        run: |
-          V="${{ steps.version.outputs.version }}"
-          TAG="v${V}"
-          echo "Target: $TAG"
-
-          # 1. 禁止发布已存在的 Release
-          if gh release view "$TAG" --repo "${{ github.repository }}" &>/dev/null; then
-            echo "✗ Release $TAG already exists. Abort."
-            exit 1
-          fi
-
-          # 2. 版本号必须大于当前最大 Release tag
-          LATEST_TAG=$(gh release list --repo "${{ github.repository }}" -L 1 --order desc --exclude-pre-releases --json tagName -q '.[0].tagName' 2>/dev/null || echo "")
-          if [[ -n "$LATEST_TAG" ]]; then
-            LATEST=${LATEST_TAG#v}
-            echo "Latest release: $LATEST_TAG"
-            RESULT=$(python3 -c "
-          from packaging.version import Version
-          print('ok' if Version('$V') > Version('$LATEST') else 'fail')
-          ")
-            if [[ "$RESULT" == "fail" ]]; then
-              echo "✗ Version $V is not greater than latest $LATEST. Abort."
-              exit 1
-            fi
-            echo "✓ Version $V > $LATEST"
-          else
-            echo "No existing releases — first release, proceeding."
-          fi
-        env:
-          GH_TOKEN: ${{ github.token }}
 
       - name: Install dependencies
         run: pip install oss2 packaging
