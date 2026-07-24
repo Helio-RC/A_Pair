@@ -416,6 +416,18 @@ This cannot be undone.</value>
   <data name="Member_ImportFromFile" xml:space="preserve">
     <value>Import from...</value>
   </data>
+  <data name="Member_ImportFullScan" xml:space="preserve">
+    <value>Full Scan</value>
+  </data>
+  <data name="Member_ImportLimitedScan" xml:space="preserve">
+    <value>Scan 70x70 Only</value>
+  </data>
+  <data name="Member_ImportRangeTooLarge" xml:space="preserve">
+    <value>Large Data Range</value>
+  </data>
+  <data name="Member_ImportRangeTooLargeMsg" xml:space="preserve">
+    <value>The spreadsheet data range is {0}x{1}, exceeding the auto-scan limit. Perform a full scan?</value>
+  </data>
   <data name="Member_ImportResult" xml:space="preserve">
     <value>Import result</value>
   </data>
@@ -460,6 +472,9 @@ This cannot be undone.</value>
   </data>
   <data name="Member_NoImport" xml:space="preserve">
     <value>No data imported</value>
+  </data>
+  <data name="Member_NoNameField" xml:space="preserve">
+    <value>Required field Name not found in the spreadsheet or no valid data. Check the file format.</value>
   </data>
   <data name="Member_NoValidMembers" xml:space="preserve">
     <value>No valid data found in file. Check the file format.</value>
@@ -797,6 +812,9 @@ This cannot be undone.</value>
   </data>
   <data name="Member_UpdateFromFile" xml:space="preserve">
     <value>Update from file</value>
+  </data>
+  <data name="Member_ViewHelp" xml:space="preserve">
+    <value>View Help</value>
   </data>
   <data name="Nav_About" xml:space="preserve">
     <value>About</value>

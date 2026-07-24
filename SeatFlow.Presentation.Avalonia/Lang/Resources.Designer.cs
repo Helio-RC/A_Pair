@@ -144,6 +144,10 @@ public class Resources
     public static string Member_ImportErrorFmt => ResourceManager.GetString("Member_ImportErrorFmt", Culture)!;
     public static string Member_ImportFailed => ResourceManager.GetString("Member_ImportFailed", Culture)!;
     public static string Member_ImportFromFile => ResourceManager.GetString("Member_ImportFromFile", Culture)!;
+    public static string Member_ImportFullScan => ResourceManager.GetString("Member_ImportFullScan", Culture)!;
+    public static string Member_ImportLimitedScan => ResourceManager.GetString("Member_ImportLimitedScan", Culture)!;
+    public static string Member_ImportRangeTooLarge => ResourceManager.GetString("Member_ImportRangeTooLarge", Culture)!;
+    public static string Member_ImportRangeTooLargeMsg => ResourceManager.GetString("Member_ImportRangeTooLargeMsg", Culture)!;
     public static string Member_ImportResult => ResourceManager.GetString("Member_ImportResult", Culture)!;
     public static string Member_Importing => ResourceManager.GetString("Member_Importing", Culture)!;
     public static string Data_JSONFile => ResourceManager.GetString("Data_JSONFile", Culture)!;
@@ -159,6 +163,7 @@ public class Resources
     public static string Member_NewRowPendingTitle => ResourceManager.GetString("Member_NewRowPendingTitle", Culture)!;
     public static string Member_NoDataToExport => ResourceManager.GetString("Member_NoDataToExport", Culture)!;
     public static string Member_NoImport => ResourceManager.GetString("Member_NoImport", Culture)!;
+    public static string Member_NoNameField => ResourceManager.GetString("Member_NoNameField", Culture)!;
     public static string Member_NoValidMembers => ResourceManager.GetString("Member_NoValidMembers", Culture)!;
     public static string Member_Operations => ResourceManager.GetString("Member_Operations", Culture)!;
     public static string Member_PersonCountFmt => ResourceManager.GetString("Member_PersonCountFmt", Culture)!;
@@ -271,6 +276,7 @@ public class Resources
     public static string Lang_enUS => ResourceManager.GetString("Lang_enUS", Culture)!;
     public static string Lang_zhCN => ResourceManager.GetString("Lang_zhCN", Culture)!;
     public static string Member_UpdateFromFile => ResourceManager.GetString("Member_UpdateFromFile", Culture)!;
+    public static string Member_ViewHelp => ResourceManager.GetString("Member_ViewHelp", Culture)!;
     public static string Nav_About => ResourceManager.GetString("Nav_About", Culture)!;
     public static string Nav_AppShort => ResourceManager.GetString("Nav_AppShort", Culture)!;
     public static string Nav_CollapseSidebar => ResourceManager.GetString("Nav_CollapseSidebar", Culture)!;
