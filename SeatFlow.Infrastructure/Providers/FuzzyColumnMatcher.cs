@@ -271,28 +271,54 @@ internal static partial class FuzzyColumnMatcher
 
     /// <summary>
     /// 构建列组——用于双列/多列名单聚合。
-    /// 每组包含各属性的列映射，不完整的属性在后续组中缺失。
+    /// 以重复次数最多的字段列作为锚点划定组边界，按列的空间位置分配。
     /// </summary>
     private static List<List<(string Property , int Col)>> ComputeColumnGroups (
         Dictionary<string , List<int>> propertyColumns)
     {
-        int maxGroups = propertyColumns.Values.Max(cols => cols.Count);
+        if (propertyColumns.Count == 0)
+            return [];
+
+        // 1. 找锚点字段（列数最多的属性）
+        var anchorEntry = propertyColumns.MaxBy(kv => kv.Value.Count);
+        var anchorCols = anchorEntry.Value; // 已排序
+
+        // 2. 初始化空组
+        int maxGroups = anchorCols.Count;
         var groups = new List<List<(string Property , int Col)>>();
-
         for (int g = 0; g < maxGroups; g++)
-        {
-            var group = new List<(string Property , int Col)>();
-            foreach (var (prop , cols) in propertyColumns)
-            {
-                if (g < cols.Count)
-                    group.Add((prop , cols[g]));
-            }
+            groups.Add([]);
 
-            if (group.Count > 0)
-                groups.Add(group);
+        // 3. 将所有 (属性, 列) 按空间位置分配到对应组
+        foreach (var (prop , cols) in propertyColumns)
+        {
+            foreach (var col in cols)
+            {
+                int groupIndex = FindGroupIndex(col , anchorCols);
+                groups[groupIndex].Add((prop , col));
+            }
         }
 
-        return groups;
+        // 4. 移除空组
+        return groups.Where(g => g.Count > 0).ToList();
+    }
+
+    /// <summary>
+    /// 根据锚点边界确定列/行所属的组索引。
+    /// 列在锚点之间 → 前一个锚点的组；在第一锚点之前 → Group 0；在最后锚点之后 → 最后一组。
+    /// </summary>
+    private static int FindGroupIndex (int pos , List<int> anchorPositions)
+    {
+        if (pos < anchorPositions[0])
+            return 0;
+
+        for (int g = 0; g < anchorPositions.Count - 1; g++)
+        {
+            if (pos >= anchorPositions[g] && pos < anchorPositions[g + 1])
+                return g;
+        }
+
+        return anchorPositions.Count - 1;
     }
 
     /// <summary>
@@ -326,17 +352,6 @@ internal static partial class FuzzyColumnMatcher
                     continue;
 
                 allExhausted = false;
-
-                if (col >= totalCols)
-                {
-                    // 列超出范围 → 视为空
-                    colConsecutiveEmpty.TryGetValue(col , out var cnt);
-                    colConsecutiveEmpty[col] = cnt + 1;
-                    if (cnt + 1 >= 2)
-                        colExhausted.Add(col);
-                    colValues[col].Add(null);
-                    continue;
-                }
 
                 var value = cells[r , col];
                 if (string.IsNullOrWhiteSpace(value))

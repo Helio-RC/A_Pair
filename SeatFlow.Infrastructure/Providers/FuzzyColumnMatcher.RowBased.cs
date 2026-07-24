@@ -34,22 +34,29 @@ internal static partial class FuzzyColumnMatcher
         if (dataStartCol < totalCols && IsNearlyEmptyCol(cells , dataStartCol , totalRows))
             dataStartCol++;
 
-        // 构建行组（双组聚合）
-        int maxGroups = propertyRows.Values.Max(rs => rs.Count);
+        // 构建行组（双组聚合）——以重复次数最多的字段行作为锚点，按空间位置分配
+        if (propertyRows.Count == 0)
+            return [];
+
+        var anchorEntry = propertyRows.MaxBy(kv => kv.Value.Count);
+        var anchorRows = anchorEntry.Value; // 已排序
+        int maxGroups = anchorRows.Count;
         var rowGroups = new List<List<(string Property , int Row)>>();
 
         for (int g = 0; g < maxGroups; g++)
-        {
-            var group = new List<(string Property , int Row)>();
-            foreach (var (prop , rows) in propertyRows)
-            {
-                if (g < rows.Count)
-                    group.Add((prop , rows[g]));
-            }
+            rowGroups.Add([]);
 
-            if (group.Count > 0)
-                rowGroups.Add(group);
+        foreach (var (prop , rows) in propertyRows)
+        {
+            foreach (var row in rows)
+            {
+                int groupIndex = FindGroupIndex(row , anchorRows);
+                rowGroups[groupIndex].Add((prop , row));
+            }
         }
+
+        // 移除空组
+        rowGroups = rowGroups.Where(g => g.Count > 0).ToList();
 
         if (rowGroups.Count == 0)
             return [];
@@ -78,16 +85,6 @@ internal static partial class FuzzyColumnMatcher
                     continue;
 
                 allExhausted = false;
-
-                if (row >= totalRows)
-                {
-                    rowConsecutiveEmpty.TryGetValue(row , out var cnt);
-                    rowConsecutiveEmpty[row] = cnt + 1;
-                    if (cnt + 1 >= 2)
-                        rowExhausted.Add(row);
-                    rowValues[row].Add(null);
-                    continue;
-                }
 
                 var value = cells[row , c];
                 if (string.IsNullOrWhiteSpace(value))

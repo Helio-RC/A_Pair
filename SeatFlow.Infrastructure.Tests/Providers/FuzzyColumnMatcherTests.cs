@@ -189,12 +189,13 @@ public class FuzzyColumnMatcherTests
 
         var result = FuzzyColumnMatcher.TryParse(grid , 3 , 4);
 
-        // 不规则模式：Alice 得到全部三个属性（Group 0），Bob 仅 Name（Group 1），Charlie 有 Name+Height
+        // 空间位置分组：G0=[col0-1]=(Name,Height), G1=[col2-∞]=(Name,Gender)
+        // Alice(0,1)→G0, Bob(2,3)→G1, Charlie(0,1)→G0
         result.Students.Should().HaveCount(3);
         result.Students![0].Name.Should().Be("Alice");
         result.Students[0].Height.Should().Be(165);
-        result.Students[0].Gender.Should().Be(Core.Enums.Gender.Male);  // col 3 的 Gender 在 Group 0
-        result.Students[1].Name.Should().Be("Bob");                     // col 2 在 Group 1（仅 Name）
+        result.Students[1].Name.Should().Be("Bob");
+        result.Students[1].Gender.Should().Be(Core.Enums.Gender.Male);  // col 3 的 Gender 现在在 Group 1
         result.Students[2].Name.Should().Be("Charlie");
         result.Students[2].Height.Should().Be(170);
     }
@@ -410,7 +411,7 @@ public class FuzzyColumnMatcherTests
         var grid = new string?[7 , 2];
         grid[2 , 0] = "姓名";
         grid[2 , 1] = "身高";
-        grid[3 , 0] = "";        // 全空注释行（会被 IsMostlyEmptyRow 跳过）
+        grid[3 , 0] = "";        // 全空注释行（会被 IsCompletelyEmptyRow 跳过）
         grid[3 , 1] = "";
         grid[4 , 0] = "Alice";
         grid[4 , 1] = "165";
