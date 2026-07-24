@@ -61,9 +61,6 @@ namespace SeatFlow.Core.Models
         /// <summary>键盘快捷键配置。</summary>
         public KeyboardShortcutConfig KeyboardShortcuts { get; set; } = new();
 
-        /// <summary>键盘快捷键配置。</summary>
-        public KeyboardShortcutConfig KeyboardShortcuts { get; set; } = new();
-
     }
 
     /// <summary>
