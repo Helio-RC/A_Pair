@@ -266,9 +266,8 @@ class ReleaseManager:
             raise FileNotFoundError(f"version.json 不存在: {self.version_json_path}")
 
         data = read_json(self.version_json_path)
-        for key in ("version", "releaseTag"):
-            if not data.get(key):
-                raise ValueError(f"version.json: '{key}' 字段缺失")
+        if not data.get("version"):
+            raise ValueError("version.json: 'version' 字段缺失")
         return data
 
     # ── 步骤 1: 构建 ──────────────────────────
@@ -1062,7 +1061,7 @@ class ReleaseManager:
         gh_cfg = self.config["github"]
         repo = gh_cfg["repo"]
         token = gh_cfg["token"]
-        tag = self.version_info["releaseTag"]
+        tag = f"v{self.version}"
 
         api_base = f"https://api.github.com/repos/{repo}"
         headers = {

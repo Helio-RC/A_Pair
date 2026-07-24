@@ -1,261 +1,353 @@
-name: Release
+name: Release SeatFlow
 
 on:
+  push:
+    branches: ['main', 'develop']
+    paths: ['version.json']
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (must match version.json)'
-        required: true
+        description: 'Version (override version.json, e.g. 1.4.1)'
+        required: false
         type: string
-      skip-oss:
-        description: 'Skip Aliyun OSS upload'
-        type: boolean
-        default: false
 
 env:
-  DOTNET_CLI_TELEMETRY_OPTOUT: 1
-  DOTNET_NOLOGO: 1
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  PROJECT_PATH: 'SeatFlow.Presentation.Avalonia'
+  CONFIGURATION: 'Release'
 
 jobs:
-  # ── 多平台并行构建 + vpk 打包 ───────────────────
+  # ──────────────────────────────────────────────
+  # Job 1: 多平台构建 + vpk 打包
+  # ──────────────────────────────────────────────
   build:
-    name: ${{ matrix.rid }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { rid: win-x64,   os: ubuntu-24.04, vpk: win,   exe: SeatFlow.exe }
-          - { rid: linux-x64, os: ubuntu-24.04, vpk: linux, exe: SeatFlow }
-          - { rid: osx-x64,   os: macos-14,     vpk: osx,   exe: SeatFlow }
-          - { rid: osx-arm64, os: macos-14,     vpk: osx,   exe: SeatFlow }
+          - rid: win-x64
+            os: windows-latest
+            vpk-directive: "[win]"
+            main-exe: "SeatFlow.exe"
+            icon: "Assets/installer.ico"
+            extra-args: "--noPortable"
+
+          - rid: linux-x64
+            os: ubuntu-latest
+            vpk-directive: "[linux]"
+            main-exe: "SeatFlow"
+            icon: "Assets/SF_icon_mini_background.png"
+            extra-args: ""
+
+          # TODO: macOS 暂不支持，后续启用
+          # - rid: osx-x64
+          #   os: macos-latest
+          #   vpk-directive: "[osx]"
+          #   main-exe: "SeatFlow"
+          #   icon: "Assets/installer.png"
+          #   extra-args: ""
+
+          # - rid: osx-arm64
+          #   os: macos-latest
+          #   vpk-directive: "[osx]"
+          #   main-exe: "SeatFlow"
+          #   icon: "Assets/installer.png"
+          #   extra-args: ""
 
     runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.version }}" ]]; then
+            python3 -c "
+          import json
+          with open('version.json') as f:
+              data = json.load(f)
+          data['version'] = '${{ inputs.version }}'
+          with open('version.json', 'w') as f:
+              json.dump(data, f, indent=2)
+            "
+          fi
+          V=$(python3 -c "import json; print(json.load(open('version.json'))['version'])")
+          echo "version=$V" >> $GITHUB_OUTPUT
+          echo "Version: $V"
 
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
 
-      - name: Install squashfs-tools (Linux)
+      - name: Install vpk system dependencies (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y squashfs-tools
+        run: sudo apt-get update && sudo apt-get install -y squashfs-tools zstd
 
       - name: Restore dotnet tools
         run: dotnet tool restore
 
-      - name: Validate version.json
-        run: |
-          ACTUAL=$(python3 -c "import json; print(json.load(open('version.json'))['version'])")
-          EXPECTED="${{ github.event.inputs.version }}"
-          if [ "$ACTUAL" != "$EXPECTED" ]; then
-            echo "version.json ($ACTUAL) != input ($EXPECTED)"
-            exit 1
-          fi
-          echo "✓ Version $ACTUAL matches"
-
       - name: dotnet publish
         run: |
-          dotnet publish SeatFlow.Presentation.Avalonia \
-            -c Release \
+          dotnet publish ${{ env.PROJECT_PATH }} \
+            -c ${{ env.CONFIGURATION }} \
             -r ${{ matrix.rid }} \
             --self-contained true \
-            -o publish/
+            -o publish/tmp
 
       - name: vpk pack
         run: |
-          EXTRA=()
-          if [ -f RELEASE.md ]; then
-            EXTRA=(--releaseNotes RELEASE.md)
-          fi
-          dotnet vpk "[${{ matrix.vpk }}]" pack \
+          dotnet vpk ${{ matrix.vpk-directive }} pack \
             --packId SeatFlow \
-            --packVersion "${{ github.event.inputs.version }}" \
-            --packDir publish/ \
-            --mainExe "${{ matrix.exe }}" \
-            --channel "${{ matrix.rid }}" \
-            --outputDir artifacts/ \
+            --packVersion ${{ steps.version.outputs.version }} \
+            --packDir publish/tmp \
+            --mainExe ${{ matrix.main-exe }} \
+            --runtime ${{ matrix.rid }} \
+            --channel ${{ matrix.rid }} \
+            --outputDir publish/out \
             --packTitle "SeatFlow" \
             --packAuthors "Helio-RC" \
-            "${EXTRA[@]}"
+            --icon ${{ matrix.icon }} \
+            --delta BestSpeed \
+            ${{ matrix.extra-args }}
 
-      - name: Filter distributable artifacts
-        run: |
-          mkdir -p staging
-          for f in artifacts/*; do
-            [ -f "$f" ] || continue
-            name=$(basename "$f")
-            case "$name" in
-              assets.*.json|*-portable.*) echo "  SKIP $name"; continue ;;
-            esac
-            cp "$f" "staging/$name"
-            echo "  KEEP $name"
-          done
-          ls -lh staging/
-
-      - uses: actions/upload-artifact@v4
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.rid }}
-          path: staging/
+          name: release-${{ matrix.rid }}
+          path: |
+            publish/out/*.exe
+            publish/out/*.AppImage
+            publish/out/*.pkg
+            publish/out/*.dmg
+            publish/out/*.nupkg
+            publish/out/releases.*.json
+            publish/out/RELEASES-*
+          if-no-files-found: error
 
-  # ── 汇总产物 → GitHub Release + OSS 上传 ──────
+  # ──────────────────────────────────────────────
+  # Job 3: GitHub Release + OSS 上传
+  # ──────────────────────────────────────────────
   release:
-    name: Release
     needs: build
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     permissions:
       contents: write
-
     steps:
       - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: version
+        run: |
+          V=$(python3 -c "import json; print(json.load(open('version.json'))['version'])")
+          echo "version=$V" >> $GITHUB_OUTPUT
+          echo "Version: $V"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install OSS SDK
+        run: pip install oss2
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: '*'
-          path: all-artifacts/
+          pattern: 'release-*'
+          path: all-artifacts
           merge-multiple: true
 
-      - name: Compute SHA256 checksums
+      - name: List artifacts
+        run: ls -la all-artifacts/
+
+      # ── 1. 构建 Release body（RELEASE.md + SHA256 表格） ──
+      - name: Build release body
+        id: body
         run: |
           {
+            cat RELEASE.md
+            echo ""
             echo "### SHA256 Checksums"
             echo ""
             echo "| File | SHA256 |"
             echo "|------|--------|"
-            for f in all-artifacts/*; do
+            for f in all-artifacts/*.exe all-artifacts/*.AppImage all-artifacts/*.pkg all-artifacts/*.dmg; do
               [ -f "$f" ] || continue
-              name=$(basename "$f")
-              hash=$(sha256sum "$f" | awk '{print $1}')
-              echo "| $name | $hash |"
+              SHA=$(sha256sum "$f" | awk '{print $1}')
+              NAME=$(basename "$f")
+              echo "| $NAME | $SHA |"
             done
-          } > sha256.md
-          cat sha256.md
+          } > /tmp/release-body.md
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          cat /tmp/release-body.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Build release body
-        run: |
-          {
-            if [ -f RELEASE.md ]; then
-              cat RELEASE.md
-            else
-              echo "# SeatFlow ${{ github.event.inputs.version }}"
-            fi
-            echo ""
-            cat sha256.md
-          } > release-body.md
-
-      - name: Read release tag
-        id: tag
-        run: |
-          TAG=$(python3 -c "import json; print(json.load(open('version.json'))['releaseTag'])")
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "Tag: $TAG"
-
+      # ── 2. 创建 GitHub Release ──
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.tag.outputs.tag }}
-          name: SeatFlow ${{ github.event.inputs.version }}
-          body_path: release-body.md
-          files: |
-            all-artifacts/*.exe
-            all-artifacts/*.AppImage
-            all-artifacts/*.pkg
-            all-artifacts/*.dmg
-          fail_on_unmatched_files: false
-
-      # ── OSS 上传 ─────────────────────────────
-      - name: Install OSS dependencies
-        if: ${{ !github.event.inputs.skip-oss }}
-        run: pip install oss2 requests
-
-      - name: Upload to Aliyun OSS
-        if: ${{ !github.event.inputs.skip-oss }}
-        env:
-          OSS_KEY_ID: ${{ secrets.OSS_ACCESS_KEY_ID }}
-          OSS_KEY_SECRET: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
-          OSS_ENDPOINT: ${{ secrets.OSS_ENDPOINT }}
-          OSS_BUCKET: ${{ secrets.OSS_BUCKET }}
         run: |
-          python3 scripts/release/ci_oss_upload.py \
-            --version "${{ github.event.inputs.version }}" \
-            --artifacts-dir all-artifacts/ \
-            --release-md RELEASE.md \
-            --commit-id "${{ github.sha }}"
-
-      # ── Cloudflare Worker Secret 轮换 ────────
-      - name: Rotate Cloudflare Worker secrets
-        if: ${{ !github.event.inputs.skip-oss }}
+          VERSION="${{ steps.version.outputs.version }}"
+          gh release create "v${VERSION}" \
+            --repo "${{ github.repository }}" \
+            --title "SeatFlow ${VERSION}" \
+            --notes-file /tmp/release-body.md \
+            all-artifacts/*.exe \
+            all-artifacts/*.AppImage \
+            all-artifacts/*.pkg \
+            all-artifacts/*.dmg \
+            || echo "::warning::Release may already exist (non-fatal)"
         env:
-          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
-          CF_WORKER_SCRIPT: ${{ secrets.CF_WORKER_SCRIPT }}
-          CF_OSS_KEY_ID: ${{ secrets.CF_OSS_KEY_ID }}
-          CF_OSS_KEY_SECRET: ${{ secrets.CF_OSS_KEY_SECRET }}
-        run: |
-          # 检查所有必需的环境变量
-          MISSING=0
-          for v in CF_API_TOKEN CF_ACCOUNT_ID CF_WORKER_SCRIPT CF_OSS_KEY_ID CF_OSS_KEY_SECRET; do
-            if [ -z "${!v}" ]; then
-              echo "! $v 未配置"
-              MISSING=1
-            fi
-          done
-          if [ "$MISSING" = "1" ]; then
-            echo "→ 跳过: Cloudflare 凭证不完整"
-            exit 0
-          fi
+          GH_TOKEN: ${{ github.token }}
 
-          python3 -c "
-          import json, os
-          payload = {
-              'OSS_ACCESS_KEY_ID':     {'name': 'OSS_ACCESS_KEY_ID',     'text': os.environ['CF_OSS_KEY_ID'],     'type': 'secret_text'},
-              'OSS_ACCESS_KEY_SECRET': {'name': 'OSS_ACCESS_KEY_SECRET', 'text': os.environ['CF_OSS_KEY_SECRET'], 'type': 'secret_text'},
+      # ── 3. OSS 上传（与 release.py 行为严格一致） ──
+      - name: Upload to OSS
+        run: |
+          python3 << 'PYEOF'
+          import hashlib, json, os, sys
+          from datetime import datetime, timezone
+          from pathlib import Path
+          import oss2
+
+          VERSION = "${{ steps.version.outputs.version }}"
+          ARTIFACTS_DIR = Path("all-artifacts")
+          RELEASE_MD = Path("RELEASE.md")
+          COMMIT_ID = "${{ github.sha }}"
+
+          def is_installer(name):
+              """_is_installer() — 可下载的安装程序"""
+              n = name.lower()
+              return n.endswith(('.exe', '.appimage', '.pkg', '.dmg'))
+
+          def should_distribute(name):
+              """_should_distribute() — 过滤 vpk 内部元数据"""
+              n = name.lower()
+              if n.startswith('assets.') and n.endswith('.json'):
+                  return False
+              return True
+
+          def sha256_file(path):
+              h = hashlib.sha256()
+              with open(path, 'rb') as f:
+                  while chunk := f.read(8192):
+                      h.update(chunk)
+              return h.hexdigest()
+
+          def guess_platform(name):
+              n = name.lower()
+              if 'win' in n or n.endswith('.exe'):
+                  return 'windows'
+              if 'linux' in n or n.endswith('.appimage'):
+                  return 'linux'
+              if 'osx-arm64' in n or 'macos-arm64' in n:
+                  return 'macos-arm64'
+              if 'osx' in n or 'macos' in n or n.endswith(('.pkg', '.dmg')):
+                  return 'macos-x64'
+              return 'unknown'
+
+          # ── OSS 连接 ──
+          auth = oss2.Auth(os.environ['OSS_KEY_ID'], os.environ['OSS_KEY_SECRET'])
+          bucket = oss2.Bucket(auth, os.environ['OSS_ENDPOINT'], os.environ['OSS_BUCKET'])
+
+          # 扫描 + 过滤产物
+          all_files = sorted(
+              [f for f in ARTIFACTS_DIR.iterdir() if f.is_file() and should_distribute(f.name)],
+              key=lambda f: f.name,
+          )
+          if not all_files:
+              print("No artifacts found, skipping OSS upload.")
+              sys.exit(0)
+
+          installers = [f for f in all_files if is_installer(f.name)]
+          updates = [f for f in all_files if not is_installer(f.name)]
+          print(f"Artifacts: {len(installers)} installers + {len(updates)} updates")
+
+          prefix = f"releases/{VERSION}"
+
+          # ── 1. 上传 RELEASE.md ──
+          if RELEASE_MD.exists():
+              release_notes = RELEASE_MD.read_text(encoding='utf-8')
+              bucket.put_object(f"{prefix}/RELEASE.md", release_notes.encode('utf-8'),
+                                headers={'Content-Type': 'text/markdown'})
+              print(f"  ✓ {prefix}/RELEASE.md")
+          else:
+              release_notes = ""
+
+          # ── 2. 上传安装包 → releases/{version}/（已存在则跳过） ──
+          if installers:
+              print(f"  [安装包 → {prefix}/]")
+              for f in installers:
+                  key = f"{prefix}/{f.name}"
+                  if bucket.object_exists(key):
+                      print(f"    - {key} (已存在，跳过)")
+                      continue
+                  bucket.put_object_from_file(key, str(f))
+                  size_mb = f.stat().st_size / (1024 * 1024)
+                  print(f"    ✓ {key} ({size_mb:.1f} MiB)")
+
+          # ── 3. 上传更新包 → updates/ ──
+          # nupkg → 已存在则跳过；通道元数据 → 每次覆盖
+          if updates:
+              print("  [更新包 → updates/]")
+              for f in updates:
+                  key = f"updates/{f.name}"
+                  name_lower = f.name.lower()
+                  if name_lower.endswith('.nupkg'):
+                      if bucket.object_exists(key):
+                          print(f"    - {key} (已存在，跳过)")
+                          continue
+                  bucket.put_object_from_file(key, str(f))
+                  size_mb = f.stat().st_size / (1024 * 1024)
+                  print(f"    ✓ {key} ({size_mb:.1f} MiB)")
+
+          # ── 4. 更新 releases.json 索引 ──
+          index_key = "releases/releases.json"
+          existing = None
+          try:
+              result = bucket.get_object(index_key)
+              existing = json.loads(result.read())
+          except Exception:
+              print("  releases.json 不存在，将创建新的版本索引。")
+
+          if existing is None:
+              existing = {"latest": VERSION, "versions": []}
+
+          # 检查版本是否已存在
+          for v in existing.get("versions", []):
+              if v["version"] == VERSION:
+                  raise ValueError(
+                      f"版本 {VERSION} 已存在于 releases.json 中。"
+                      f"禁止覆盖已发布版本。"
+                  )
+
+          # 构建新条目（插入到头部）
+          release_date = datetime.now(timezone.utc).astimezone().isoformat()
+          entry = {
+              "version": VERSION,
+              "commitId": COMMIT_ID,
+              "releaseDate": release_date,
+              "notes": release_notes.strip(),
+              "files": [
+                  {
+                      "platform": guess_platform(f.name),
+                      "fileName": f.name,
+                      "size": f.stat().st_size,
+                      "sha256": sha256_file(f),
+                  }
+                  for f in installers
+              ],
           }
-          with open('/tmp/cf_payload.json', 'w') as f:
-              json.dump(payload, f)
-          "
 
-          HTTP_CODE=$(curl -s -o /tmp/cf_response.json -w '%{http_code}' -X PATCH \
-            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/workers/scripts/$CF_WORKER_SCRIPT/secrets-bulk" \
-            -H "Authorization: Bearer $CF_API_TOKEN" \
-            -H "Content-Type: application/merge-patch+json" \
-            -d @/tmp/cf_payload.json)
+          existing["versions"].insert(0, entry)
+          existing["latest"] = VERSION
 
-          if [ "$HTTP_CODE" = "200" ]; then
-            echo "✓ Worker secrets rotated"
-          else
-            echo "✗ CF API returned HTTP $HTTP_CODE"
-            cat /tmp/cf_response.json
-          fi
-
-  # ── 结果汇总 ──────────────────────────────────
-  summary:
-    name: Summary
-    needs: [build, release]
-    if: always()
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Print summary
-        run: |
-          echo "=== SeatFlow Release v${{ github.event.inputs.version }} ==="
-          echo ""
-          echo "Build matrix:"
-          echo "  win-x64    → ubuntu-24.04"
-          echo "  linux-x64  → ubuntu-24.04"
-          echo "  osx-x64    → macos-14"
-          echo "  osx-arm64  → macos-14"
-          echo ""
-          if [ "${{ needs.build.result }}" = "success" ]; then
-            echo "✓ Build: ${{ needs.build.result }}"
-          else
-            echo "✗ Build: ${{ needs.build.result }}"
-          fi
-          if [ "${{ needs.release.result }}" = "success" ]; then
-            echo "✓ Release: ${{ needs.release.result }}"
-          else
-            echo "✗ Release: ${{ needs.release.result }}"
-          fi
+          # 上传
+          data = json.dumps(existing, ensure_ascii=False, indent=2).encode("utf-8")
+          bucket.put_object(index_key, data, headers={"Content-Type": "application/json"})
+          print(f"  ✓ {index_key} (latest: {VERSION})")
+          print("OSS upload complete.")
+          PYEOF
+        env:
+          OSS_KEY_ID: ${{ secrets.OSS_KEY_ID }}
+          OSS_KEY_SECRET: ${{ secrets.OSS_KEY_SECRET }}
+          OSS_ENDPOINT: ${{ vars.OSS_ENDPOINT }}
+          OSS_BUCKET: ${{ vars.OSS_BUCKET }}

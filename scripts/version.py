@@ -258,10 +258,6 @@ class VersionManager:
         if self.version_json_path.exists():
             data = read_json(self.version_json_path)
             ver = data.get("version", "")
-            tag = data.get("releaseTag", "")
-            expected_tag = f"v{ver}"
-            if tag != expected_tag:
-                issues.append({"level": "ERROR", "msg": f"version.json: releaseTag '{tag}' != 'v{ver}'"})
             if ver and not APP_VERSION_RE.match(ver):
                 issues.append({"level": "ERROR", "msg": f"App 版本 '{ver}' 格式不正确 (应为 X.Y.Z)"})
 
@@ -342,7 +338,6 @@ class VersionManager:
             raise ValueError("必须指定 --set 或 bump 级别")
 
         data["version"] = new_ver
-        data["releaseTag"] = f"v{new_ver}"
         return {
             "version.json": {"from": current, "to": new_ver},
             "_version_data": data,

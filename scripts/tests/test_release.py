@@ -30,7 +30,6 @@ def make_version_json(path: Path, version: str = "1.2.0"):
     """创建测试用 version.json。"""
     data = {
         "version": version,
-        "releaseTag": f"v{version}",
         "commitId": "test1234",
         "buildDate": "2026-01-01T00:00:00+08:00",
     }
@@ -152,7 +151,6 @@ class TestReleaseManager(unittest.TestCase):
     def test_load_version_info(self):
         v = self.mgr.version_info
         self.assertEqual(v["version"], "1.2.0")
-        self.assertEqual(v["releaseTag"], "v1.2.0")
 
     def test_version_info_missing_field(self):
         bad_path = self.root / "bad_version.json"

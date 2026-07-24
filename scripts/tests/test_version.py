@@ -32,7 +32,6 @@ def make_version_json(path: Path, version: str):
     """创建 version.json。"""
     data = {
         "version": version,
-        "releaseTag": f"v{version}",
         "commitId": "test1234",
         "buildDate": "2026-01-01T00:00:00+08:00",
     }
@@ -215,16 +214,6 @@ public class StrategyManifestProvider
         issues = self.mgr.check()
         self.assertEqual(issues, [])
 
-    def test_check_detects_release_tag_mismatch(self):
-        data = json.loads(self.mgr.version_json_path.read_text(encoding="utf-8"))
-        data["releaseTag"] = "v9.9.9"
-        with open(self.mgr.version_json_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-
-        issues = self.mgr.check()
-        errors = [i for i in issues if i["level"] == "ERROR" and "releaseTag" in i["msg"]]
-        self.assertTrue(len(errors) > 0, f"应检测到 releaseTag 与 version 不一致, got: {errors}")
-
     def test_check_detects_model_mismatch(self):
         path = self.root / "SeatFlow.Core/Models/StrategyConfig.cs"
         path.write_text('public string Version { get; set; } = "9.9";', encoding="utf-8")
@@ -249,7 +238,6 @@ public class StrategyManifestProvider
         self.mgr.apply_changes(changes)
         data = json.loads(self.mgr.version_json_path.read_text(encoding="utf-8"))
         self.assertEqual(data["version"], "1.2.1")
-        self.assertEqual(data["releaseTag"], "v1.2.1")
 
     # ── bump-file ──
 
