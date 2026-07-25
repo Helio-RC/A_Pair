@@ -18,6 +18,7 @@ jobs:
   # Job 1: 多平台构建 + vpk 打包
   # ──────────────────────────────────────────────
   build:
+    timeout-minutes: 45
     outputs:
       version: ${{ steps.version.outputs.version }}
     strategy:
@@ -77,8 +78,8 @@ jobs:
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y squashfs-tools zstd
 
-      - name: Install vpk
-        run: dotnet tool install -g vpk && echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+      - name: Restore dotnet tools
+        run: dotnet tool restore
 
       - name: dotnet publish
         run: |
@@ -123,6 +124,7 @@ jobs:
   # ──────────────────────────────────────────────
   release:
     needs: build
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -198,7 +200,6 @@ jobs:
 
       # ── 1. 构建 Release body（RELEASE.md + SHA256 表格） ──
       - name: Build release body
-        id: body
         shell: bash
         run: |
           shopt -s nullglob
@@ -218,31 +219,7 @@ jobs:
             done
           } > /tmp/release-body.md
 
-      # ── 2. 创建 GitHub Release ──
-      - name: Create GitHub Release
-        shell: bash
-        run: |
-          shopt -s nullglob
-          V="${{ steps.version.outputs.version }}"
-          ASSETS=()
-          for ext in exe AppImage pkg dmg; do
-            for f in all-artifacts/*.$ext; do
-              ASSETS+=("$f")
-            done
-          done
-          if [ ${#ASSETS[@]} -eq 0 ]; then
-            echo "✗ No release assets found!"
-            exit 1
-          fi
-          gh release create "v${V}" \
-            --repo "${{ github.repository }}" \
-            --title "SeatFlow ${V}" \
-            --notes-file /tmp/release-body.md \
-            "${ASSETS[@]}"
-        env:
-          GH_TOKEN: ${{ github.token }}
-
-      # ── 3. OSS 上传（先校验索引，再上传文件，保证原子性） ──
+      # ── 2. OSS 上传（先校验索引，再上传文件，保证原子性；必须在 GitHub Release 之前，失败则不创建 Release） ──
       - name: Upload to OSS
         run: |
           python3 << 'PYEOF'
@@ -382,3 +359,27 @@ jobs:
           OSS_KEY_SECRET: ${{ secrets.OSS_KEY_SECRET }}
           OSS_ENDPOINT: ${{ vars.OSS_ENDPOINT }}
           OSS_BUCKET: ${{ vars.OSS_BUCKET }}
+
+      # ── 3. 创建 GitHub Release（OSS 已成功，可以安全创建） ──
+      - name: Create GitHub Release
+        shell: bash
+        run: |
+          shopt -s nullglob
+          V="${{ steps.version.outputs.version }}"
+          ASSETS=()
+          for ext in exe AppImage pkg dmg; do
+            for f in all-artifacts/*.$ext; do
+              ASSETS+=("$f")
+            done
+          done
+          if [ ${#ASSETS[@]} -eq 0 ]; then
+            echo "✗ No release assets found!"
+            exit 1
+          fi
+          gh release create "v${V}" \
+            --repo "${{ github.repository }}" \
+            --title "SeatFlow ${V}" \
+            --notes-file /tmp/release-body.md \
+            "${ASSETS[@]}"
+        env:
+          GH_TOKEN: ${{ github.token }}
