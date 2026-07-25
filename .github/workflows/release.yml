@@ -78,8 +78,8 @@ jobs:
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y squashfs-tools zstd
 
-      - name: Restore dotnet tools
-        run: dotnet tool restore
+      - name: Install vpk
+        run: dotnet tool install -g vpk && echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
 
       - name: dotnet publish
         run: |
@@ -91,7 +91,7 @@ jobs:
 
       - name: vpk pack
         run: |
-          dotnet vpk ${{ matrix.vpk-directive }} pack \
+          vpk ${{ matrix.vpk-directive }} pack \
             --packId SeatFlow \
             --packVersion ${{ steps.version.outputs.version }} \
             --packDir publish/tmp \
