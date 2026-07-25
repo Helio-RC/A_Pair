@@ -11,6 +11,9 @@ env:
   PROJECT_PATH: 'SeatFlow.Presentation.Avalonia'
   CONFIGURATION: 'Release'
 
+permissions:
+  contents: read
+
 concurrency: release-${{ github.ref }}
 
 jobs:
