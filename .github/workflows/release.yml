@@ -4,12 +4,15 @@ on:
   push:
     branches: ['main']
     paths: ['version.json']
-
+  workflow_dispatch:
 env:
   DOTNET_NOLOGO: 'true'
   DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
   PROJECT_PATH: 'SeatFlow.Presentation.Avalonia'
   CONFIGURATION: 'Release'
+
+permissions:
+  contents: read
 
 concurrency: release-${{ github.ref }}
 
@@ -18,6 +21,7 @@ jobs:
   # Job 1: 多平台构建 + vpk 打包
   # ──────────────────────────────────────────────
   build:
+    timeout-minutes: 45
     outputs:
       version: ${{ steps.version.outputs.version }}
     strategy:
@@ -25,7 +29,7 @@ jobs:
       matrix:
         include:
           - rid: win-x64
-            os: windows-latest
+            os: ubuntu-latest
             vpk-directive: "[win]"
             main-exe: "SeatFlow.exe"
             icon: "Assets/installer.ico"
@@ -56,29 +60,29 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
       - name: Resolve version
         id: version
+        shell: bash
         run: |
           V=$(python3 -c "import json; print(json.load(open('version.json'))['version'])")
           echo "version=$V" >> $GITHUB_OUTPUT
           echo "Version: $V"
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
 
-      - name: Install vpk system dependencies (Linux)
-        if: runner.os == 'Linux'
+      - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y squashfs-tools zstd
 
-      - name: Restore dotnet tools
-        run: dotnet tool restore
+      - name: Install vpk
+        run: dotnet tool install -g vpk && echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
 
       - name: dotnet publish
         run: |
@@ -90,7 +94,7 @@ jobs:
 
       - name: vpk pack
         run: |
-          dotnet vpk ${{ matrix.vpk-directive }} pack \
+          vpk ${{ matrix.vpk-directive }} pack \
             --packId SeatFlow \
             --packVersion ${{ steps.version.outputs.version }} \
             --packDir publish/tmp \
@@ -105,7 +109,7 @@ jobs:
             ${{ matrix.extra-args }}
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-${{ matrix.rid }}
           path: |
@@ -123,24 +127,29 @@ jobs:
   # ──────────────────────────────────────────────
   release:
     needs: build
+    timeout-minutes: 15
     runs-on: ubuntu-latest
+    environment: OSS
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
       - name: Resolve version
         id: version
+        shell: bash
         run: |
           V="${{ needs.build.outputs.version }}"
           echo "version=$V" >> $GITHUB_OUTPUT
           echo "Version: $V"
 
       - name: Install dependencies
+        env:
+          PIP_BREAK_SYSTEM_PACKAGES: '1'
         run: pip install oss2 packaging
 
       - name: Pre-flight checks
@@ -185,6 +194,26 @@ jobs:
       - name: List artifacts
         run: ls -la all-artifacts/
 
+      - name: Version installer filenames
+        shell: bash
+        run: |
+          V="${{ steps.version.outputs.version }}"
+          echo "Versioning installer files with ${V}..."
+          shopt -s nullglob
+          for f in all-artifacts/*.exe all-artifacts/*.AppImage all-artifacts/*.pkg all-artifacts/*.dmg; do
+            name=$(basename "$f")
+            stem="${name%.*}"
+            ext="${name##*.}"
+            # 已有版本号则跳过
+            if [[ "$stem" == *"-${V}"* ]] || [[ "$stem" == *"_${V}"* ]]; then
+              echo "  - ${name} (已包含版本号，跳过)"
+              continue
+            fi
+            newname="all-artifacts/${stem}-${V}.${ext}"
+            mv "$f" "$newname"
+            echo "  ✓ ${name} → $(basename "$newname")"
+          done
+
       - name: Validate RELEASE.md
         run: |
           if [ ! -f RELEASE.md ]; then
@@ -195,7 +224,6 @@ jobs:
 
       # ── 1. 构建 Release body（RELEASE.md + SHA256 表格） ──
       - name: Build release body
-        id: body
         shell: bash
         run: |
           shopt -s nullglob
@@ -214,42 +242,16 @@ jobs:
               done
             done
           } > /tmp/release-body.md
-          echo "body<<EOF" >> $GITHUB_OUTPUT
-          cat /tmp/release-body.md >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
 
-      # ── 2. 创建 GitHub Release ──
-      - name: Create GitHub Release
-        shell: bash
-        run: |
-          shopt -s nullglob
-          V="${{ steps.version.outputs.version }}"
-          ASSETS=()
-          for ext in exe AppImage pkg dmg; do
-            for f in all-artifacts/*.$ext; do
-              ASSETS+=("$f")
-            done
-          done
-          if [ ${#ASSETS[@]} -eq 0 ]; then
-            echo "✗ No release assets found!"
-            exit 1
-          fi
-          gh release create "v${V}" \
-            --repo "${{ github.repository }}" \
-            --title "SeatFlow ${V}" \
-            --notes-file /tmp/release-body.md \
-            "${ASSETS[@]}"
-        env:
-          GH_TOKEN: ${{ github.token }}
-
-      # ── 3. OSS 上传（先校验索引，再上传文件，保证原子性） ──
+      # ── 2. OSS 上传（先校验索引，再上传文件，保证原子性；必须在 GitHub Release 之前，失败则不创建 Release） ──
       - name: Upload to OSS
         run: |
           python3 << 'PYEOF'
           import hashlib, json, os, sys
-          from datetime import datetime, timezone
+          from datetime import datetime, timezone, timedelta
           from pathlib import Path
           import oss2
+          import oss2.exceptions
 
           VERSION = "${{ steps.version.outputs.version }}"
           ARTIFACTS_DIR = Path("all-artifacts")
@@ -279,9 +281,21 @@ jobs:
                   return 'macos-x64'
               return 'unknown'
 
+          # ── OSS 凭证预检 ──
+          oss_vars = {
+              'OSS_KEY_ID': os.environ.get('OSS_KEY_ID', ''),
+              'OSS_KEY_SECRET': os.environ.get('OSS_KEY_SECRET', ''),
+              'OSS_ENDPOINT': os.environ.get('OSS_ENDPOINT', ''),
+              'OSS_BUCKET': os.environ.get('OSS_BUCKET', ''),
+          }
+          if not all(oss_vars.values()):
+              missing = [k for k, v in oss_vars.items() if not v]
+              print(f"OSS credentials not configured ({', '.join(missing)} empty), skipping OSS upload.")
+              sys.exit(0)
+
           # ── OSS 连接 ──
-          auth = oss2.Auth(os.environ['OSS_KEY_ID'], os.environ['OSS_KEY_SECRET'])
-          bucket = oss2.Bucket(auth, os.environ['OSS_ENDPOINT'], os.environ['OSS_BUCKET'])
+          auth = oss2.Auth(oss_vars['OSS_KEY_ID'], oss_vars['OSS_KEY_SECRET'])
+          bucket = oss2.Bucket(auth, oss_vars['OSS_ENDPOINT'], oss_vars['OSS_BUCKET'])
 
           all_files = sorted([f for f in ARTIFACTS_DIR.iterdir() if f.is_file()],
                              key=lambda f: f.name)
@@ -299,7 +313,7 @@ jobs:
           try:
               result = bucket.get_object(index_key)
               existing = json.loads(result.read())
-          except Exception:
+          except oss2.exceptions.NoSuchKey:
               print("  releases.json not found, will create.")
 
           if existing is None:
@@ -351,7 +365,7 @@ jobs:
                   print(f"    ✓ {key} ({size_mb:.1f} MiB)")
 
           # ── 4. 写入 releases.json（前面的预检已确保版本不重复） ──
-          release_date = datetime.now(timezone.utc).astimezone().isoformat()
+          release_date = datetime.now(timezone(timedelta(hours=8))).isoformat()
           entry = {
               "version": VERSION,
               "commitId": COMMIT_ID,
@@ -381,3 +395,27 @@ jobs:
           OSS_KEY_SECRET: ${{ secrets.OSS_KEY_SECRET }}
           OSS_ENDPOINT: ${{ vars.OSS_ENDPOINT }}
           OSS_BUCKET: ${{ vars.OSS_BUCKET }}
+
+      # ── 3. 创建 GitHub Release（OSS 已成功，可以安全创建） ──
+      - name: Create GitHub Release
+        shell: bash
+        run: |
+          shopt -s nullglob
+          V="${{ steps.version.outputs.version }}"
+          ASSETS=()
+          for ext in exe AppImage pkg dmg; do
+            for f in all-artifacts/*.$ext; do
+              ASSETS+=("$f")
+            done
+          done
+          if [ ${#ASSETS[@]} -eq 0 ]; then
+            echo "✗ No release assets found!"
+            exit 1
+          fi
+          gh release create "v${V}" \
+            --repo "${{ github.repository }}" \
+            --title "SeatFlow ${V}" \
+            --notes-file /tmp/release-body.md \
+            "${ASSETS[@]}"
+        env:
+          GH_TOKEN: ${{ github.token }}
