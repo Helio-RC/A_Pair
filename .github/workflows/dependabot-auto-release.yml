@@ -27,7 +27,7 @@ jobs:
     if: |
       github.event.action != 'closed' &&
       github.event.pull_request.user.login == 'dependabot[bot]' &&
-      contains(github.event.pull_request.body, 'GHSA-')
+      contains(github.event.pull_request.body, '<summary>Vulnerability details</summary>')
     runs-on: ubuntu-latest
     concurrency:
       group: auto-merge-${{ github.event.pull_request.number }}
@@ -53,7 +53,7 @@ jobs:
       github.event.action == 'closed' &&
       github.event.pull_request.merged == true &&
       github.event.pull_request.user.login == 'dependabot[bot]' &&
-      contains(github.event.pull_request.body, 'GHSA-')
+      contains(github.event.pull_request.body, '<summary>Vulnerability details</summary>')
     runs-on: ubuntu-latest
     concurrency:
       group: prepare-release-${{ github.event.pull_request.number }}
@@ -82,8 +82,9 @@ jobs:
           FROM_VER=$(echo "$TITLE" | sed -n 's/^Bump .* from \(.*\) to .*/\1/p')
           TO_VER=$(echo "$TITLE" | sed -n 's/^Bump .* from .* to \(.*\)/\1/p' | sed 's/ in \/.*//')
 
-          # 提取 GHSA ID
-          GHSA=$(echo "$BODY" | grep -oP 'GHSA-[a-z0-9]+-[a-z0-9]+-[a-z0-9]+' | head -1)
+          # 在 Vulnerability details 段落中提取 GHSA（排除 changelog 历史引用）
+          VULN_SECTION=$(echo "$BODY" | sed -n '/<summary>Vulnerability details<\/summary>/,/<\/details>/p')
+          GHSA=$(echo "$VULN_SECTION" | grep -oP 'GHSA-[a-z0-9]+-[a-z0-9]+-[a-z0-9]+' | head -1)
 
           if [ -z "$PACKAGE" ] || [ -z "$FROM_VER" ] || [ -z "$TO_VER" ]; then
             echo "::error::Failed to parse PR title: $TITLE"
@@ -91,7 +92,7 @@ jobs:
           fi
 
           if [ -z "$GHSA" ]; then
-            echo "::error::No GHSA ID found in PR body"
+            echo "::error::No GHSA ID found in Vulnerability details section"
             exit 1
           fi
 
