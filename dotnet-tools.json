@@ -8,13 +8,6 @@
         "avdt"
       ],
       "rollForward": false
-    },
-    "vpk": {
-      "version": "1.2.0",
-      "commands": [
-        "vpk"
-      ],
-      "rollForward": false
     }
   }
 }
