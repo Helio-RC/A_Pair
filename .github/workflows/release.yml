@@ -126,6 +126,7 @@ jobs:
     needs: build
     timeout-minutes: 15
     runs-on: ubuntu-latest
+    environment: OSS
     permissions:
       contents: write
     steps:
@@ -257,9 +258,21 @@ jobs:
                   return 'macos-x64'
               return 'unknown'
 
+          # ── OSS 凭证预检 ──
+          oss_vars = {
+              'OSS_KEY_ID': os.environ.get('OSS_KEY_ID', ''),
+              'OSS_KEY_SECRET': os.environ.get('OSS_KEY_SECRET', ''),
+              'OSS_ENDPOINT': os.environ.get('OSS_ENDPOINT', ''),
+              'OSS_BUCKET': os.environ.get('OSS_BUCKET', ''),
+          }
+          if not all(oss_vars.values()):
+              missing = [k for k, v in oss_vars.items() if not v]
+              print(f"OSS credentials not configured ({', '.join(missing)} empty), skipping OSS upload.")
+              sys.exit(0)
+
           # ── OSS 连接 ──
-          auth = oss2.Auth(os.environ['OSS_KEY_ID'], os.environ['OSS_KEY_SECRET'])
-          bucket = oss2.Bucket(auth, os.environ['OSS_ENDPOINT'], os.environ['OSS_BUCKET'])
+          auth = oss2.Auth(oss_vars['OSS_KEY_ID'], oss_vars['OSS_KEY_SECRET'])
+          bucket = oss2.Bucket(auth, oss_vars['OSS_ENDPOINT'], oss_vars['OSS_BUCKET'])
 
           all_files = sorted([f for f in ARTIFACTS_DIR.iterdir() if f.is_file()],
                              key=lambda f: f.name)
