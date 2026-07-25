@@ -1,0 +1,308 @@
+name: Dependabot Auto-Merge & Emergency Release
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, closed]
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+jobs:
+  # ══════════════════════════════════════════════════════════════════
+  # Job 0: CI 门禁 — 复用现有 unit-tests.yml
+  # 仅在 PR 未关闭时运行（merged/closed 不需要测试）
+  # ══════════════════════════════════════════════════════════════════
+  ci:
+    if: github.event.action != 'closed'
+    uses: ./.github/workflows/unit-tests.yml
+
+  # ══════════════════════════════════════════════════════════════════
+  # Job 1: 自动审批 + 启用 auto-merge（CI 通过后执行）
+  # ══════════════════════════════════════════════════════════════════
+  auto-merge:
+    needs: ci
+    if: |
+      github.event.action != 'closed' &&
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      contains(github.event.pull_request.body, 'GHSA-')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: auto-merge-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    steps:
+      - name: Auto-approve
+        run: gh pr review "$PR_URL" --approve
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Enable auto-merge
+        run: gh pr merge "$PR_URL" --auto --squash
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ github.token }}
+
+  # ══════════════════════════════════════════════════════════════════
+  # Job 2: 合并后生成文档 + bump 版本 + 触发发布
+  # ══════════════════════════════════════════════════════════════════
+  prepare-release:
+    if: |
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      contains(github.event.pull_request.body, 'GHSA-')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: prepare-release-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v7
+        with:
+          token: ${{ github.token }}
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      # ── 1. 从 PR 标题提取包名和版本 ──
+      - name: Extract PR metadata
+        id: pr
+        shell: bash
+        run: |
+          set -euo pipefail
+          TITLE="${{ github.event.pull_request.title }}"
+          BODY="${{ github.event.pull_request.body }}"
+
+          # 提取包名和版本范围 (e.g. "Bump X from A to B in /" or "Bump X from A to B")
+          PACKAGE=$(echo "$TITLE" | sed -n 's/^Bump \(.*\) from .* to .*/\1/p')
+          FROM_VER=$(echo "$TITLE" | sed -n 's/^Bump .* from \(.*\) to .*/\1/p')
+          TO_VER=$(echo "$TITLE" | sed -n 's/^Bump .* from .* to \(.*\)/\1/p' | sed 's/ in \/.*//')
+
+          # 提取 GHSA ID
+          GHSA=$(echo "$BODY" | grep -oP 'GHSA-[a-z0-9]+-[a-z0-9]+-[a-z0-9]+' | head -1)
+
+          if [ -z "$PACKAGE" ] || [ -z "$FROM_VER" ] || [ -z "$TO_VER" ]; then
+            echo "::error::Failed to parse PR title: $TITLE"
+            exit 1
+          fi
+
+          if [ -z "$GHSA" ]; then
+            echo "::error::No GHSA ID found in PR body"
+            exit 1
+          fi
+
+          echo "package=${PACKAGE}"      >> $GITHUB_OUTPUT
+          echo "from_version=${FROM_VER}" >> $GITHUB_OUTPUT
+          echo "to_version=${TO_VER}"     >> $GITHUB_OUTPUT
+          echo "ghsa_id=${GHSA}"          >> $GITHUB_OUTPUT
+
+          echo "PR title:  $TITLE"
+          echo "Package:   ${PACKAGE}"
+          echo "Versions:  ${FROM_VER} → ${TO_VER}"
+          echo "GHSA:      ${GHSA}"
+
+      # ── 2. 获取安全公告详情 ──
+      - name: Fetch advisory details
+        id: advisory
+        shell: bash
+        run: |
+          set -euo pipefail
+          GHSA="${{ steps.pr.outputs.ghsa_id }}"
+
+          # 调用 GitHub Advisory API
+          ADVISORY=$(gh api "/advisories/${GHSA}" --jq '.' 2>&1) || true
+
+          if echo "$ADVISORY" | jq -e '.severity' > /dev/null 2>&1; then
+            SEVERITY=$(echo "$ADVISORY" | jq -r '.severity')
+            CVSS=$(echo "$ADVISORY" | jq -r '.cvss.score // "N/A"')
+            SUMMARY=$(echo "$ADVISORY" | jq -r '.summary // .description')
+          else
+            echo "::error::GitHub Advisory API returned no data for ${GHSA}"
+            echo "::error::Raw response: ${ADVISORY}"
+            echo "::warning::Cannot proceed with emergency release without advisory data"
+            exit 1
+          fi
+
+          # 严重等级中文映射
+          case "$SEVERITY" in
+            CRITICAL) SEV_LABEL="🔴 严重 (Critical)" ;;
+            HIGH)     SEV_LABEL="🟠 高危 (High)" ;;
+            MODERATE) SEV_LABEL="🟡 中等 (Moderate)" ;;
+            LOW)      SEV_LABEL="🟢 低 (Low)" ;;
+            *)        SEV_LABEL="⚠️ ${SEVERITY}" ;;
+          esac
+
+          # 用 jq 写文件，正确处理特殊字符
+          echo "$ADVISORY" | jq -r '.description'              > /tmp/advisory_desc.txt
+          echo "$ADVISORY" | jq -r '.summary // .description'  > /tmp/advisory_summary.txt
+
+          echo "severity=${SEVERITY}"               >> $GITHUB_OUTPUT
+          echo "severity_label=${SEV_LABEL}"        >> $GITHUB_OUTPUT
+          echo "cvss_score=${CVSS}"                 >> $GITHUB_OUTPUT
+
+          echo "Severity:  ${SEVERITY}"
+          echo "CVSS:      ${CVSS}"
+
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      # ── 2.5 验证 GHSA 确实关联到 Dependabot alert（warning 不阻断） ──
+      - name: Verify Dependabot alert
+        shell: bash
+        run: |
+          set -euo pipefail
+          GHSA="${{ steps.pr.outputs.ghsa_id }}"
+          MATCH=$(gh api "/repos/${{ github.repository }}/dependabot/alerts" \
+            --jq '[.[] | select(.security_advisory.ghsa_id == "'"${GHSA}"'")] | length' 2>/dev/null || echo "0")
+          if [ "$MATCH" -eq 0 ]; then
+            echo "::warning::GHSA ${GHSA} not found in repository Dependabot alerts — may be a cross-repo advisory"
+          else
+            echo "✓ GHSA ${GHSA} confirmed in Dependabot alerts (${MATCH} match(es))"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      # ── 3. Bump 版本号（使用项目 scripts/version.py） ──
+      - name: Bump version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/version.py bump-app patch --force
+          V=$(python3 -c "import json; print(json.load(open('version.json'))['version'])")
+          echo "new_version=${V}" >> $GITHUB_OUTPUT
+          echo "Bumped to v${V}"
+
+      # ── 4. 填充模板 → RELEASE.md ──
+      - name: Generate RELEASE.md
+        shell: bash
+        env:
+          NEW_VERSION: ${{ steps.version.outputs.new_version }}
+          GHSA_ID: ${{ steps.pr.outputs.ghsa_id }}
+          PACKAGE_NAME: ${{ steps.pr.outputs.package }}
+          FROM_VERSION: ${{ steps.pr.outputs.from_version }}
+          TO_VERSION: ${{ steps.pr.outputs.to_version }}
+          SEVERITY_LABEL: ${{ steps.advisory.outputs.severity_label }}
+          CVSS_SCORE: ${{ steps.advisory.outputs.cvss_score }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          python3 << 'PYEOF'
+          import os, sys
+          from datetime import date
+
+          with open('.github/security-release-template.md', encoding='utf-8') as f:
+              template = f.read()
+
+          with open('/tmp/advisory_desc.txt', encoding='utf-8') as f:
+              description = f.read().strip()
+
+          placeholders = {
+              '{version}':        os.environ['NEW_VERSION'],
+              '{ghsa_id}':        os.environ['GHSA_ID'],
+              '{ghsa_url}':       f"https://github.com/advisories/{os.environ['GHSA_ID']}",
+              '{severity_label}': os.environ['SEVERITY_LABEL'],
+              '{cvss_score}':     os.environ['CVSS_SCORE'],
+              '{package_name}':   os.environ['PACKAGE_NAME'],
+              '{from_version}':   os.environ['FROM_VERSION'],
+              '{to_version}':     os.environ['TO_VERSION'],
+              '{release_date}':   date.today().isoformat(),
+              '{repo}':           os.environ['REPO'],
+              '{description}':    description,
+          }
+
+          for placeholder, value in placeholders.items():
+              if placeholder not in template:
+                  print(f"::warning::Template placeholder {placeholder} not found")
+              template = template.replace(placeholder, value)
+
+          # 检查残留占位符
+          import re
+          residual = re.findall(r'\{[a-z_]+\}', template)
+          if residual:
+              print(f"::warning::Unfilled placeholders remain: {residual}")
+
+          with open('RELEASE.md', 'w', encoding='utf-8', newline='\n') as f:
+              f.write(template)
+
+          print("RELEASE.md generated")
+          print("--- first 3 lines ---")
+          for line in template.splitlines()[:3]:
+              print(line)
+          PYEOF
+
+      # ── 5. 更新 CHANGELOG.md ──
+      - name: Update CHANGELOG.md
+        shell: bash
+        env:
+          NEW_VERSION: ${{ steps.version.outputs.new_version }}
+          GHSA_ID: ${{ steps.pr.outputs.ghsa_id }}
+          PACKAGE_NAME: ${{ steps.pr.outputs.package }}
+          FROM_VERSION: ${{ steps.pr.outputs.from_version }}
+          TO_VERSION: ${{ steps.pr.outputs.to_version }}
+          SEVERITY: ${{ steps.advisory.outputs.severity }}
+        run: |
+          set -euo pipefail
+          python3 << 'PYEOF'
+          import os, sys
+          from datetime import date
+
+          with open('/tmp/advisory_summary.txt', encoding='utf-8') as f:
+              summary = f.read().strip()
+
+          entry = f"""\
+          ## [{os.environ['NEW_VERSION']}] — {date.today().isoformat()}
+
+          ### Security
+          - [{os.environ['GHSA_ID']}](https://github.com/advisories/{os.environ['GHSA_ID']}) (**{os.environ['SEVERITY']}**): {summary}
+          - 更新 `{os.environ['PACKAGE_NAME']}` 从 {os.environ['FROM_VERSION']} 到 {os.environ['TO_VERSION']}
+          """
+
+          with open('CHANGELOG.md', 'r+', encoding='utf-8') as f:
+              content = f.read()
+              header = '# Changelog\n'
+              if header not in content:
+                  print("::warning::Changelog header not found, prepending entry")
+                  new_content = '# Changelog\n\n' + entry + '\n' + content
+              else:
+                  pos = content.index(header) + len(header)
+                  new_content = content[:pos] + entry + '\n' + content[pos:]
+              f.seek(0)
+              f.write(new_content)
+              f.truncate()
+
+          print("CHANGELOG.md updated")
+          print(entry)
+          PYEOF
+
+      # ── 6. Commit + Push + 触发 release ──
+      #     合并为一个 step，set -e 确保任何失败都不会继续触发 release
+      - name: Commit, push, and trigger release
+        shell: bash
+        run: |
+          set -euo pipefail
+          V="${{ steps.version.outputs.new_version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add version.json RELEASE.md CHANGELOG.md
+          git commit -m "chore: bump to v${V} for emergency security release
+
+          GHSA: ${{ steps.pr.outputs.ghsa_id }}
+          Package: ${{ steps.pr.outputs.package }} (${{ steps.pr.outputs.from_version }} → ${{ steps.pr.outputs.to_version }})
+          Severity: ${{ steps.advisory.outputs.severity }}
+          Co-Authored-By: Dependabot <dependabot[bot]@users.noreply.github.com>"
+
+          git push
+
+          # GITHUB_TOKEN 的 push 不会自动触发 workflow，需显式触发
+          echo "Push successful, triggering release workflow..."
+          gh workflow run release.yml \
+            --repo "${{ github.repository }}" \
+            --ref main
+        env:
+          GH_TOKEN: ${{ github.token }}

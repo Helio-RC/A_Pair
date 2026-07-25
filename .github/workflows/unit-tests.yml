@@ -5,6 +5,7 @@ on:
     paths: ['**.cs', '**.csproj', '**.slnx', '**.axaml']
   pull_request:
     paths: ['**.cs', '**.csproj', '**.slnx', '**.axaml']
+  workflow_call:
 
 permissions:
   contents: read
