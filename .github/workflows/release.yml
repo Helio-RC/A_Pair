@@ -191,6 +191,26 @@ jobs:
       - name: List artifacts
         run: ls -la all-artifacts/
 
+      - name: Version installer filenames
+        shell: bash
+        run: |
+          V="${{ steps.version.outputs.version }}"
+          echo "Versioning installer files with ${V}..."
+          shopt -s nullglob
+          for f in all-artifacts/*.exe all-artifacts/*.AppImage all-artifacts/*.pkg all-artifacts/*.dmg; do
+            name=$(basename "$f")
+            stem="${name%.*}"
+            ext="${name##*.}"
+            # 已有版本号则跳过
+            if [[ "$stem" == *"-${V}"* ]] || [[ "$stem" == *"_${V}"* ]]; then
+              echo "  - ${name} (已包含版本号，跳过)"
+              continue
+            fi
+            newname="all-artifacts/${stem}-${V}.${ext}"
+            mv "$f" "$newname"
+            echo "  ✓ ${name} → $(basename "$newname")"
+          done
+
       - name: Validate RELEASE.md
         run: |
           if [ ! -f RELEASE.md ]; then
