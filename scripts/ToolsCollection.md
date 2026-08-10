@@ -13,9 +13,9 @@ SeatFlow 项目的 Python 脚本工具集。
 
 管理三文件同步本地化资源：
 
-- `SeatFlow.Presentation.Avalonia/Lang/Resources.resx` — zh-CN（中性语言）
-- `SeatFlow.Presentation.Avalonia/Lang/Resources.en-US.resx` — English
-- `SeatFlow.Presentation.Avalonia/Lang/Resources.Designer.cs` — 强类型访问器
+- `src/SeatFlow.Presentation.Avalonia/Lang/Resources.resx` — zh-CN（中性语言）
+- `src/SeatFlow.Presentation.Avalonia/Lang/Resources.en-US.resx` — English
+- `src/SeatFlow.Presentation.Avalonia/Lang/Resources.Designer.cs` — 强类型访问器
 
 ## 快速开始
 
@@ -287,7 +287,7 @@ scripts/
     ├── test_i18n.py     # i18n 单元测试
     └── test_version.py  # 版本管理单元测试
 
-SeatFlow.Presentation.Avalonia/Lang/
+src/SeatFlow.Presentation.Avalonia/Lang/
 ├── Resources.resx          # zh-CN 资源文件
 ├── Resources.en-US.resx    # en-US 资源文件
 ├── Resources.Designer.cs   # 强类型访问器（由 sync 命令生成）
@@ -343,7 +343,7 @@ python3 version.py sync --force
 
 | 体系 | 文件 |
 |------|------|
-| App 版本 | `SeatFlow.Presentation.Avalonia/Data/about.json` (zh-CN + en-US) |
+| App 版本 | `src/SeatFlow.Presentation.Avalonia/Data/about.json` (zh-CN + en-US) |
 | 文件格式版本 | `file_versions.json` + 7 个 Model C# 类 + `JsonStudentWriter.cs` |
 | 策略清单版本 | 7 个 `Manifests/*.json` |
 | 引导配置版本 | `onboarding_config.json` |

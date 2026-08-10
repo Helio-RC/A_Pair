@@ -161,7 +161,7 @@ while 还有未分配学生 AND 空座位:
 
 ### 决策
 
-引入 **能力声明系统**，集中在 `SeatFlow.Core/Strategies/Capability.cs`：
+引入 **能力声明系统**，集中在 `src/SeatFlow.Core/Strategies/Capability.cs`：
 
 - **`Capability` 静态类**：定义能力标识常量（如 `MarkFixedSeat`），日后新增能力时在此追加 `const` + 对应接口
 - **`IFixedSeatCapability` 接口**：提供 `TryMarkFixed(seatId, studentId, strategyId, displayName, out error)` 方法，由 `SeatingWorkspace` 实现

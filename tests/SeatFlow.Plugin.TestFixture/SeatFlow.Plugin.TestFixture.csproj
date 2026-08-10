@@ -10,7 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\SeatFlow.Plugins.Sdk\SeatFlow.Plugins.Sdk.csproj" />
+    <ProjectReference Include="..\..\src\SeatFlow.Plugins.Sdk\SeatFlow.Plugins.Sdk.csproj" />
   </ItemGroup>
 
   <!-- 契约程序集不随插件输出：避免 ALC 私有加载副本导致类型不匹配 -->

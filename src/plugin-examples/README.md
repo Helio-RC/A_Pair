@@ -13,7 +13,7 @@
 ## 构建与打包
 
 ```bash
-cd examples/plugins
+cd src/plugin-examples
 ./build.sh        # 编译程序集插件并打包所有 .ap-plugin 到 dist/
 ```
 
@@ -48,5 +48,5 @@ cd examples/plugins
 
 ## 在测试中使用
 
-`SeatFlow.Application.Tests` 的插件集成测试从 `dist/` 安装这些包进行端到端验证
+`tests/SeatFlow.Application.Tests` 的插件集成测试从 `dist/` 安装这些包进行端到端验证
 （装配 → 执行 → 配置路由 → ALC 回收）。

@@ -9,7 +9,7 @@ set -euo pipefail
 OLDPWD="$PWD"; trap 'cd "$OLDPWD"' EXIT
 cd ../..
 
-APP_NAME="SeatFlow"; PROJECT="SeatFlow.Presentation.Avalonia"; CONFIG="Release"
+APP_NAME="SeatFlow"; PROJECT="src/SeatFlow.Presentation.Avalonia"; CONFIG="Release"
 RIDS=("win-x64" "linux-x64" "osx-x64" "osx-arm64")
 SUFFIXES=(".exe" "" "" ""); SEL=(0 0 0 0)
 TYPE_IDX=2; TRIM_SEL=0; AOT=0; CLEAN=0; CURSOR=0; SUFFIX=""; VERSION=""; ITEMS=16

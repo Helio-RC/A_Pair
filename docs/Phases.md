@@ -40,7 +40,7 @@
 ```
 SeatFlow/
 ├── SeatFlow.slnx                          # 解决方案文件
-├── SeatFlow.Core/                         # 领域核心（无外部依赖）
+├── src/SeatFlow.Core/                         # 领域核心（无外部依赖）
 │   ├── Enums/                           # Gender, SeatType 等
 │   ├── Models/                          # Student, ClassroomLayoutDefinition 等
 │   ├── Providers/                       # 接口：IStudentProvider, IVenueRepository 等
@@ -49,16 +49,16 @@ SeatFlow/
 │   │   └── Manifests/                   # 声明式配置 JSON
 │   └── Utilities/                       # AttributeBag, CircularHistory
 │
-├── SeatFlow.Contracts/                    # 共享契约（轻量接口）
+├── src/SeatFlow.Contracts/                    # 共享契约（轻量接口）
 │   └── Models/                          # IPluginSeatingStrategy, IPluginStudent 等
 │
-├── SeatFlow.Application/                  # 应用层
+├── src/SeatFlow.Application/                  # 应用层
 │   ├── Interfaces/                      # IApplicationFacade
 │   ├── Services/                        # ApplicationFacade, ServiceCollectionExtensions
 │   ├── Plugins/                         # PluginManager, PluginLoadContext
 │   └── Pipelines/                       # StrategyExecutionPipeline
 │
-├── SeatFlow.Infrastructure/               # 基础设施层
+├── src/SeatFlow.Infrastructure/               # 基础设施层
 │   ├── Providers/                       # Csv/Xlsx/JsonStudentProvider, CompositeStudentProvider
 │   ├── Layouts/                         # GridLayoutBuilder, PolarLayoutBuilder, FreeformLayoutBuilder
 │   ├── Exporters/                       # ExcelSeatingExporter, CsvSeatingExporter, PdfSeatingExporter, ImageSeatingExporter
@@ -66,8 +66,8 @@ SeatFlow/
 │   ├── Writers/                         # JsonStudentWriter, CsvStudentWriter, XlsxStudentWriter
 │   └── Migration/                       # FileMigrationService, IFileMigrator, file_versions.json
 │
-├── SeatFlow.Plugins.Sdk/                  # 插件 SDK（供外部插件引用）
-├── SeatFlow.Presentation.Avalonia/        # Avalonia UI 主程序
+├── src/SeatFlow.Plugins.Sdk/                  # 插件 SDK（供外部插件引用）
+├── src/SeatFlow.Presentation.Avalonia/        # Avalonia UI 主程序
 │   ├── Views/
 │   ├── ViewModels/
 │   ├── Converters/
@@ -77,9 +77,9 @@ SeatFlow/
 │   ├── Data/                            # about.json, page_navigation.json
 │   └── Assets/
 │
-├── SeatFlow.Core.Tests/
-├── SeatFlow.Application.Tests/
-├── SeatFlow.Infrastructure.Tests/
+├── tests/SeatFlow.Core.Tests/
+├── tests/SeatFlow.Application.Tests/
+├── tests/SeatFlow.Infrastructure.Tests/
 │
 ├── docs/                                # 设计文档、ADRs
 │   └── adr/

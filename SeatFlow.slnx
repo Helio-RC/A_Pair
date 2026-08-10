@@ -1,13 +1,15 @@
 <Solution>
   <Folder Name="/解决方案项/" />
-  <Project Path="SeatFlow.Application.Tests/SeatFlow.Application.Tests.csproj" />
-  <Project Path="SeatFlow.Application/SeatFlow.Application.csproj" />
-  <Project Path="SeatFlow.Contracts/SeatFlow.Contracts.csproj" />
-  <Project Path="SeatFlow.Core.Tests/SeatFlow.Core.Tests.csproj" />
-  <Project Path="SeatFlow.Core/SeatFlow.Core.csproj" />
-  <Project Path="SeatFlow.Infrastructure.Tests/SeatFlow.Infrastructure.Tests.csproj" />
-  <Project Path="SeatFlow.Infrastructure/SeatFlow.Infrastructure.csproj" />
-  <Project Path="SeatFlow.Plugin.TestFixture/SeatFlow.Plugin.TestFixture.csproj" />
-  <Project Path="SeatFlow.Plugins.Sdk/SeatFlow.Plugins.Sdk.csproj" />
-  <Project Path="SeatFlow.Presentation.Avalonia/SeatFlow.Presentation.Avalonia.csproj" Id="3ca31cc4-b276-4fff-bbc2-5c3d43f8c251" />
+  <Folder Name="/src/" />
+  <Folder Name="/tests/" />
+  <Project Path="src/SeatFlow.Application/SeatFlow.Application.csproj" />
+  <Project Path="src/SeatFlow.Contracts/SeatFlow.Contracts.csproj" />
+  <Project Path="src/SeatFlow.Core/SeatFlow.Core.csproj" />
+  <Project Path="src/SeatFlow.Infrastructure/SeatFlow.Infrastructure.csproj" />
+  <Project Path="src/SeatFlow.Plugins.Sdk/SeatFlow.Plugins.Sdk.csproj" />
+  <Project Path="src/SeatFlow.Presentation.Avalonia/SeatFlow.Presentation.Avalonia.csproj" Id="3ca31cc4-b276-4fff-bbc2-5c3d43f8c251" />
+  <Project Path="tests/SeatFlow.Application.Tests/SeatFlow.Application.Tests.csproj" />
+  <Project Path="tests/SeatFlow.Core.Tests/SeatFlow.Core.Tests.csproj" />
+  <Project Path="tests/SeatFlow.Infrastructure.Tests/SeatFlow.Infrastructure.Tests.csproj" />
+  <Project Path="tests/SeatFlow.Plugin.TestFixture/SeatFlow.Plugin.TestFixture.csproj" />
 </Solution>

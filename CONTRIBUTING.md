@@ -19,7 +19,7 @@ dotnet restore
 | `dotnet build` | 构建全部 9 个项目 |
 | `dotnet test` | 运行所有测试 |
 | `dotnet test --filter "FullyQualifiedName~TestName"` | 运行单个测试 |
-| `dotnet run --project SeatFlow.Presentation.Avalonia` | 启动桌面应用 |
+| `dotnet run --project src/SeatFlow.Presentation.Avalonia` | 启动桌面应用 |
 
 测试栈：xUnit v3 + FluentAssertions + NSubstitute。测试项目分布在 `*.Core.Tests`、`*.Application.Tests`、`*.Infrastructure.Tests`。
 
@@ -27,15 +27,15 @@ dotnet restore
 
 ```
 SeatFlow.slnx
-├── SeatFlow.Core/                  → 领域核心：实体、策略接口、领域服务
-├── SeatFlow.Contracts/             → 共享契约：跨层接口（插件契约等）
-├── SeatFlow.Application/           → 应用层：外观、策略管道、命令历史、插件管理、DI
-├── SeatFlow.Infrastructure/        → 基础设施：数据提供者、导出器、布局构建器、仓储
-├── SeatFlow.Plugins.Sdk/           → 插件 SDK（供外部插件引用）
-├── SeatFlow.Presentation.Avalonia/ → Avalonia 12 桌面应用
-├── SeatFlow.Core.Tests/
-├── SeatFlow.Application.Tests/
-└── SeatFlow.Infrastructure.Tests/
+├── src/SeatFlow.Core/                  → 领域核心：实体、策略接口、领域服务
+├── src/SeatFlow.Contracts/             → 共享契约：跨层接口（插件契约等）
+├── src/SeatFlow.Application/           → 应用层：外观、策略管道、命令历史、插件管理、DI
+├── src/SeatFlow.Infrastructure/        → 基础设施：数据提供者、导出器、布局构建器、仓储
+├── src/SeatFlow.Plugins.Sdk/           → 插件 SDK（供外部插件引用）
+├── src/SeatFlow.Presentation.Avalonia/ → Avalonia 12 桌面应用
+├── tests/SeatFlow.Core.Tests/
+├── tests/SeatFlow.Application.Tests/
+└── tests/SeatFlow.Infrastructure.Tests/
 ```
 
 **分层依赖**：`Presentation.Avalonia` → `Application` → (`Core`, `Contracts`, `Infrastructure`)
@@ -62,7 +62,7 @@ SeatFlow.slnx
 
 ## 国际化 (i18n)
 
-使用 .NET `.resx` 资源文件，位于 `SeatFlow.Presentation.Avalonia/Lang/`：
+使用 .NET `.resx` 资源文件，位于 `src/SeatFlow.Presentation.Avalonia/Lang/`：
 
 - `Resources.resx` — 中性语言 (zh-CN)，~570 键
 - `Resources.en-US.resx` — 英文卫星资源
@@ -88,7 +88,7 @@ StatusMessage = string.Format(Resources.Snapshot_VenuesLoadedFmt, count);
 
 ## 添加策略配置
 
-内置策略通过 manifest JSON 声明配置 UI（`SeatFlow.Core/Strategies/Manifests/{Id}.json`）。
+内置策略通过 manifest JSON 声明配置 UI（`src/SeatFlow.Core/Strategies/Manifests/{Id}.json`）。
 
 ### 声明策略参数（parameters）
 
@@ -188,7 +188,7 @@ fieldType 在 codeBlock 中额外支持 `StudentPicker`、`SeatPosition`。
 
 ## 文件版本管理
 
-所有持久化 JSON 文件携带 `version` 字段，加载时通过 `FileMigrationService` 自动向前迁移。版本号定义在 `SeatFlow.Infrastructure/Migration/file_versions.json`（嵌入资源）。
+所有持久化 JSON 文件携带 `version` 字段，加载时通过 `FileMigrationService` 自动向前迁移。版本号定义在 `src/SeatFlow.Infrastructure/Migration/file_versions.json`（嵌入资源）。
 
 ### 添加新版本迁移
 

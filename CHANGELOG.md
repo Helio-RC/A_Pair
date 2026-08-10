@@ -9,7 +9,7 @@
 - **插件依赖策略**：新增 `IPluginDependentSeatingStrategy`（Contracts）+ `PluginDependentAdapter`（Core）接入 RandomFill 评估循环（Approve/Reject/Handled 三态），替换原"默认批准所有分配"的 TODO 警告
 - **plugins-manifest.json v2 格式**：`strategies[]` → `plugins[]`（新增 `kind` 字段：`"strategy"` 已实现，`"data-provider"`/`"exporter"` 预留），不再兼容 v1
 - **插件管理页安装通道**："安装插件"按钮 + `.ap-plugin` 拖放安装
-- **示例插件仓库**：`examples/plugins/`（身高排序 / 同桌配对依赖策略 / Lua / C# 脚本 / 多策略包）+ `build.sh` 打包脚本
+- **示例插件仓库**：`src/plugin-examples/`（身高排序 / 同桌配对依赖策略 / Lua / C# 脚本 / 多策略包）+ `build.sh` 打包脚本
 - **插件集成测试**：`Application.Tests/Plugins/Integration/` 端到端验证（装配、执行、配置路由、未知 kind 跳过）；`SeatFlow.Plugin.TestFixture` 测试夹具项目
 
 ### Changed

@@ -114,13 +114,6 @@ class TestReleaseManager(unittest.TestCase):
         dist_dir = self.root / "dist" / "release" / "1.2.0"
         dist_dir.mkdir(parents=True, exist_ok=True)
 
-        # 模拟构建产物
-        for r in [("win-x64", "windows"), ("linux-x64", "linux")]:
-            tmp_dir = dist_dir / f".tmp_{r[0]}"
-            tmp_dir.mkdir(exist_ok=True)
-            exe_name = "SeatFlow.exe" if r[0].startswith("win") else "SeatFlow"
-            (tmp_dir / exe_name).write_bytes(b"fake binary")
-
         config_path = config_dir / "config.json"
         self.mgr = ReleaseManager(self.root, config_path, dry_run=True)
 
@@ -154,7 +147,7 @@ class TestReleaseManager(unittest.TestCase):
 
     def test_version_info_missing_field(self):
         bad_path = self.root / "bad_version.json"
-        bad_path.write_text('{"version": "1.0"}', encoding="utf-8")
+        bad_path.write_text('{"commitId": "abc", "buildDate": "2026-01-01"}', encoding="utf-8")
         mgr = ReleaseManager.__new__(ReleaseManager)
         mgr.version_json_path = bad_path
         with self.assertRaises(ValueError):
@@ -174,46 +167,94 @@ class TestReleaseManager(unittest.TestCase):
 
     # ── 打包 ──
 
-    def test_package_all_windows_zip(self):
-        exe_path = self.mgr.version_dist_dir / ".tmp_win-x64" / "SeatFlow.exe"
-        exe_path.parent.mkdir(parents=True, exist_ok=True)
-        exe_path.write_bytes(b"fake windows binary")
+    def _make_vpk_manager(self):
+        """创建非 dry-run 的 ReleaseManager（用于测试 vpk_pack_all 产物收集）。"""
+        return ReleaseManager(
+            self.root, self.root / "scripts" / "release" / "config.json",
+            dry_run=False, skip_velopack=False, skip_branch_check=True)
 
-        build_outputs = {"win-x64": exe_path}
-        files = self.mgr.package_all(build_outputs)
+    def _make_vpk_output(self, rid: str, files: list[str]) -> Path:
+        """预置 Velopack 输出目录与伪造产物文件。"""
+        out_dir = self.mgr.version_dist_dir / f"velopack_{rid}"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        for name in files:
+            (out_dir / name).write_bytes(b"fake installer")
+        return out_dir
 
-        self.assertEqual(len(files), 1)
+    @patch("release.run_command")
+    def test_vpk_pack_all_windows_collects_artifacts(self, mock_cmd):
+        """vpk [win] pack 成功后应收集安装程序与频道元数据产物。"""
+        mock_cmd.return_value.returncode = 0
+        mock_cmd.return_value.stdout = ""
+        self._make_vpk_output("win-x64", [
+            "SeatFlow-1.2.0-windows.exe",
+            "releases.win-x64.json",
+            "assets.win-x64.json",   # vpk 内部元数据，应被过滤
+        ])
+
+        mgr = self._make_vpk_manager()
+        files = mgr.vpk_pack_all({"win-x64": self.root / "dummy-publish"})
+
+        self.assertEqual(len(files), 2)
         f = files[0]
         self.assertEqual(f["platform"], "windows")
-        self.assertEqual(f["fileName"], "SeatFlow-1.2.0-windows.zip")
-        self.assertTrue(Path(f["localPath"]).exists())
+        self.assertEqual(f["rid"], "win-x64")
         self.assertEqual(len(f["sha256"]), 64)
-
-    def test_package_all_linux_tar_gz(self):
-        exe_path = self.mgr.version_dist_dir / ".tmp_linux-x64" / "SeatFlow"
-        exe_path.parent.mkdir(parents=True, exist_ok=True)
-        exe_path.write_bytes(b"fake linux binary")
-
-        build_outputs = {"linux-x64": exe_path}
-        files = self.mgr.package_all(build_outputs)
-
-        self.assertEqual(len(files), 1)
-        f = files[0]
-        self.assertEqual(f["platform"], "linux")
-        self.assertEqual(f["fileName"], "SeatFlow-1.2.0-linux.tar.gz")
         self.assertTrue(Path(f["localPath"]).exists())
+        self.assertEqual(Path(f["localPath"]).name, "SeatFlow-1.2.0-windows.exe")
+
+    @patch("release.run_command")
+    def test_vpk_pack_all_linux_collects_artifacts(self, mock_cmd):
+        """vpk [linux] pack 成功后应收集 AppImage 产物。"""
+        mock_cmd.return_value.returncode = 0
+        mock_cmd.return_value.stdout = ""
+        self._make_vpk_output("linux-x64", [
+            "SeatFlow-1.2.0-x64.AppImage",
+            "releases.linux-x64.json",
+        ])
+
+        mgr = self._make_vpk_manager()
+        files = mgr.vpk_pack_all({"linux-x64": self.root / "dummy-publish"})
+
+        self.assertEqual(len(files), 2)
+        self.assertTrue(all(f["platform"] == "linux" for f in files))
+        self.assertTrue(any("AppImage" in f["fileName"] for f in files))
+        self.assertTrue(all(len(f["sha256"]) == 64 for f in files))
+
+    @patch("release.run_command")
+    def test_vpk_pack_all_skips_missing_rid(self, mock_cmd):
+        """无构建产物的 RID 应跳过，不执行 vpk pack。"""
+        mgr = self._make_vpk_manager()
+        files = mgr.vpk_pack_all({})  # 无任何 RID 产物
+        self.assertEqual(files, [])
+        mock_cmd.assert_not_called()
+
+    def test_vpk_pack_all_dry_run_short_circuits(self):
+        """dry-run 模式应跳过 Velopack 打包并返回空列表。"""
+        files = self.mgr.vpk_pack_all({"win-x64": self.root / "dummy-publish"})
+        self.assertEqual(files, [])
 
     # ── Release Body ──
 
     def test_build_release_body(self):
         files = [
-            {"fileName": "test.zip", "sha256": "abc123", "size": 100,
-             "platform": "windows", "localPath": "/tmp/test.zip"},
+            {"fileName": "SeatFlow-1.2.0-windows.exe", "sha256": "abc123", "size": 100,
+             "platform": "windows", "localPath": "/tmp/SeatFlow-1.2.0-windows.exe"},
         ]
         body = self.mgr._build_release_body("# Notes", files)
         self.assertIn("# Notes", body)
         self.assertIn("### SHA256 Checksums", body)
-        self.assertIn("| test.zip | abc123 |", body)
+        self.assertIn("| SeatFlow-1.2.0-windows.exe | abc123 |", body)
+
+    def test_build_release_body_no_installers(self):
+        """无安装程序产物时（如仅更新包），不附加 SHA256 表格。"""
+        files = [
+            {"fileName": "updates/SeatFlow-1.2.0-full.nupkg", "sha256": "def456", "size": 100,
+             "platform": "windows", "localPath": "/tmp/x.nupkg"},
+        ]
+        body = self.mgr._build_release_body("# Notes", files)
+        self.assertIn("# Notes", body)
+        self.assertNotIn("### SHA256 Checksums", body)
 
     # ── Dry Run ──
 
@@ -239,8 +280,7 @@ class TestReleaseManager(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.mgr._update_releases_index(mock_bucket, files, "# Notes")
 
-    @patch("release.ReleaseManager._oss_put")
-    def test_releases_index_new_version(self, mock_put):
+    def test_releases_index_new_version(self):
         """OSS 无同版本 → 应成功插入。"""
         existing = {
             "latest": "1.0.0",
@@ -250,11 +290,16 @@ class TestReleaseManager(unittest.TestCase):
         mock_bucket = MagicMock()
         mock_bucket.get_object.return_value.read.return_value = json.dumps(existing).encode()
 
-        files = [{"platform": "windows", "fileName": "test.zip",
-                   "size": 100, "sha256": "abc", "localPath": "/tmp/test.zip"}]
+        files = [{"platform": "windows", "fileName": "SeatFlow-1.2.0-windows.exe",
+                   "size": 100, "sha256": "abc", "localPath": "/tmp/test.exe"}]
 
         self.mgr._update_releases_index(mock_bucket, files, "# Notes")
-        self.assertTrue(mock_put.called)
+        mock_bucket.put_object.assert_called_once()
+        # 上传内容应为更新后的索引（含新版本 1.2.0）
+        uploaded = mock_bucket.put_object.call_args.args[1]
+        parsed = json.loads(uploaded)
+        self.assertEqual(parsed["latest"], "1.2.0")
+        self.assertEqual(parsed["versions"][0]["version"], "1.2.0")
 
 
 if __name__ == "__main__":

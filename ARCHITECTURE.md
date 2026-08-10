@@ -51,15 +51,19 @@
 
 ```
 SeatFlow.slnx
-├── SeatFlow.Core              # 领域核心
-├── SeatFlow.Contracts         # 共享契约（插件接口）
-├── SeatFlow.Application       # 应用层（编排、策略调度）
-├── SeatFlow.Infrastructure    # 基础设施（数据访问、布局实现）
-├── SeatFlow.Plugins.Sdk       # 插件 SDK
-├── SeatFlow.Presentation.Avalonia  # Avalonia UI 主程序
-├── SeatFlow.Core.Tests          # 核心领域测试
-├── SeatFlow.Application.Tests   # 应用层测试
-└── SeatFlow.Infrastructure.Tests # 基础设施测试
+├── src/
+│   ├── SeatFlow.Core              # 领域核心
+│   ├── SeatFlow.Contracts         # 共享契约（插件接口）
+│   ├── SeatFlow.Application       # 应用层（编排、策略调度）
+│   ├── SeatFlow.Infrastructure    # 基础设施（数据访问、布局实现）
+│   ├── SeatFlow.Plugins.Sdk       # 插件 SDK
+│   ├── SeatFlow.Presentation.Avalonia  # Avalonia UI 主程序
+│   └── plugin-examples/           # 示例插件
+└── tests/
+    ├── SeatFlow.Core.Tests          # 核心领域测试
+    ├── SeatFlow.Application.Tests   # 应用层测试
+    ├── SeatFlow.Infrastructure.Tests # 基础设施测试
+    └── SeatFlow.Plugin.TestFixture  # 插件测试辅助
 ```
 
 ---
@@ -364,7 +368,7 @@ UI 层通过 `LocalizeHelper.Resolve(dict)` 按 `CurrentUICulture` 解析。
 5.4 版本管理与升级
 
 · 配置文件包含 `version` 字段（`VenueFile` v1.1、`RosterFile` v1.0、`SeatingSnapshot` v1.0、`AppSettings` v1.0、`StrategyConfig` v1.0、`VenueSnapshotInfo` v1.0）
-· 各文件类型当前版本号记录于 `SeatFlow.Infrastructure/Migration/file_versions.json`（嵌入资源，随程序编译）
+· 各文件类型当前版本号记录于 `src/SeatFlow.Infrastructure/Migration/file_versions.json`（嵌入资源，随程序编译）
 · 加载时 `FileMigrationService` 读取文件版本号，链式执行注册的 `IFileMigrator` 实现完成向前迁移（不支持回退）
 · 迁移器按文件类型组织：`Migration/Migrators/{FileType}Migrators.cs`，每个版本步进为一个嵌套类（如 `VenueMigrators.Step_1_0_to_1_1`），DI 中以 `IFileMigrator` 注册
 · 反序列化前通过 `JsonNode` 操作完成迁移，避免目标类型 Schema 不一致

@@ -54,7 +54,7 @@ IPluginHost                      ← 插件初始化时获取的宿主服务入�
 ```bash
 dotnet new classlib -n MyPlugin
 cd MyPlugin
-dotnet add reference /path/to/SeatFlow/SeatFlow.Plugins.Sdk/SeatFlow.Plugins.Sdk.csproj
+dotnet add reference /path/to/SeatFlow/src/SeatFlow.Plugins.Sdk/SeatFlow.Plugins.Sdk.csproj
 ```
 
 > 真实插件作者可改用 NuGet 包 `SeatFlow.Plugins.Sdk`。
@@ -156,7 +156,7 @@ public class MyStrategy : PluginStrategyBase
 
 > **字段说明**：`displayName` 是**字符串**（非字典）；优先级字段为 `defaultPriority`。
 > 程序集插件用 `assembly` + `entryType`；脚本插件改用 `scriptFile` + `scriptType`
-> （见下文"脚本插件"）。可参考仓库内 `examples/plugins/` 的真实示例。
+> （见下文"脚本插件"）。可参考仓库内 `src/plugin-examples/` 的真实示例。
 
 ### 4. 构建、打包与安装
 
@@ -168,7 +168,7 @@ dotnet build -c Release
   （开发环境 `{exeDir}/Plugins/`，安装版 `{RootAppDir}/Plugins/`）。
 - **打包分发**：把包目录打成 ZIP（根含 `plugins-manifest.json`），扩展名 `.ap-plugin`，
   在插件管理页点击"安装插件"或直接拖放安装。
-- 参考 `examples/plugins/build.sh` 的打包流程。
+- 参考 `src/plugin-examples/build.sh` 的打包流程。
 
 ---
 
@@ -228,7 +228,7 @@ public interface IPluginDependentSeatingStrategy : IPlugin
 
 `IPluginRandomFillContext` 暴露 `RerollCount`/`MaxRerolls` 与 `LogWarning/LogError/LogInfo(messageKey, ...)`。
 
-> 依赖策略实现示例见 `examples/plugins/src/DeskPairPlugin`。
+> 依赖策略实现示例见 `src/plugin-examples/src/DeskPairPlugin`。
 
 ### IPluginWorkspace（插件视角的工作区）
 
@@ -393,4 +393,4 @@ for (int i = 0; i < Math.Min(students.Count, seats.Count); i++)
 - **manifest 版本警告**：`manifestVersion` 高于宿主支持版本时会警告（兼容模式加载）。
 - **脚本超时但仍在运行**：见上文安全边界——死循环脚本无法被强制中断。
 
-完整可运行示例见仓库 `examples/plugins/`（身高排序 / 依赖策略 / Lua / C# / 多策略包）。
+完整可运行示例见仓库 `src/plugin-examples/`（身高排序 / 依赖策略 / Lua / C# / 多策略包）。

@@ -11,7 +11,7 @@
 
   <ItemGroup>
     <!-- 示例插件通过项目引用使用 SDK；真实插件作者应改用 NuGet 包 SeatFlow.Plugins.Sdk -->
-    <ProjectReference Include="..\..\..\..\SeatFlow.Plugins.Sdk\SeatFlow.Plugins.Sdk.csproj" />
+    <ProjectReference Include="..\..\..\SeatFlow.Plugins.Sdk\SeatFlow.Plugins.Sdk.csproj" />
   </ItemGroup>
 
   <!-- 契约程序集不随插件输出：运行时经 AssemblyLoadContext 回退默认上下文，由宿主提供 -->

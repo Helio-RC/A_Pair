@@ -26,14 +26,14 @@ jobs:
         with:
           filters: |
             {
-              "core": ["SeatFlow.Core/**", "SeatFlow.Contracts/**"],
-              "infra": ["SeatFlow.Infrastructure/**"],
-              "app": ["SeatFlow.Application/**"],
-              "pres": ["SeatFlow.Presentation.Avalonia/**"],
-              "plugins": ["SeatFlow.Plugins.Sdk/**"],
-              "tests-core": ["SeatFlow.Core.Tests/**"],
-              "tests-infra": ["SeatFlow.Infrastructure.Tests/**"],
-              "tests-app": ["SeatFlow.Application.Tests/**"]
+              "core": ["src/SeatFlow.Core/**", "src/SeatFlow.Contracts/**"],
+              "infra": ["src/SeatFlow.Infrastructure/**"],
+              "app": ["src/SeatFlow.Application/**"],
+              "pres": ["src/SeatFlow.Presentation.Avalonia/**"],
+              "plugins": ["src/SeatFlow.Plugins.Sdk/**"],
+              "tests-core": ["tests/SeatFlow.Core.Tests/**"],
+              "tests-infra": ["tests/SeatFlow.Infrastructure.Tests/**"],
+              "tests-app": ["tests/SeatFlow.Application.Tests/**"]
             }
 
       - uses: actions/setup-dotnet@v6
@@ -45,15 +45,15 @@ jobs:
       - if: steps.filter.outputs.core == 'true'
            || steps.filter.outputs.infra == 'true'
            || steps.filter.outputs.tests-core == 'true'
-        run: dotnet test SeatFlow.Core.Tests --no-build
+        run: dotnet test tests/SeatFlow.Core.Tests --no-build
 
       - if: steps.filter.outputs.core == 'true'
            || steps.filter.outputs.infra == 'true'
            || steps.filter.outputs.tests-infra == 'true'
-        run: dotnet test SeatFlow.Infrastructure.Tests --no-build
+        run: dotnet test tests/SeatFlow.Infrastructure.Tests --no-build
 
       - if: steps.filter.outputs.core == 'true'
            || steps.filter.outputs.infra == 'true'
            || steps.filter.outputs.app == 'true'
            || steps.filter.outputs.tests-app == 'true'
-        run: dotnet test SeatFlow.Application.Tests --no-build
+        run: dotnet test tests/SeatFlow.Application.Tests --no-build

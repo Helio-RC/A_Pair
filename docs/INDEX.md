@@ -36,11 +36,11 @@ README.md                     ← 项目入口，功能概览 + 开发状态
 │       ├── ADR-010-velopack-oss-distribution.md ← Velopack 自动更新与 OSS 分发架构
 │       ├── ADR-011-keyboard-shortcuts.md ← 全局键盘快捷键系统（Behavior + Tunnel + 设置开关）
 │       └── ADR-012-plugin-first-class-architecture.md ← 插件一级类型架构（去包装链、plugins-manifest v2、ALC 卸载模式、脚本安全边界）
-├── SeatFlow.Presentation.Avalonia/docs/
+├── docs/presentation/
 │   ├── Design_Spec.md        ← UI 设计规范（色板、字体、间距）
 │   ├── DragDrop.md           ← Avalonia 12 拖放实现模式与踩坑记录
 │   └── Fluent_Icons.md       ← 已使用的 FluentUI 图标清单
-└── SeatFlow.Plugins.Sdk/docs/
+└── docs/sdk/
     └── README.md             ← 插件开发 SDK 指南
 ```
 
@@ -102,22 +102,22 @@ README.md                     ← 项目入口，功能概览 + 开发状态
 - **何时更新**: 脚本新增子命令、修改校验规则、修改工作流
 - **关联文档**: CLAUDE.md（i18n 节）
 
-### SeatFlow.Presentation.Avalonia/docs/Design_Spec.md
+### docs/presentation/Design_Spec.md
 - **覆盖**: 色板、排版层级、间距系统、圆角、布局模式
 - **何时更新**: 视觉规范变更、新增 Token
 - **关联文档**: Fluent_Icons.md
 
-### SeatFlow.Presentation.Avalonia/docs/Fluent_Icons.md
+### docs/presentation/Fluent_Icons.md
 - **覆盖**: 项目中已使用的所有 FluentUI 图标名称
 - **何时更新**: 新增或替换图标时
 - **关联文档**: Design_Spec.md
 
-### SeatFlow.Presentation.Avalonia/docs/DragDrop.md
+### docs/presentation/DragDrop.md
 - **覆盖**: Avalonia 12 拖放 API 正确用法、`PointerPressed` + `DoDragDropAsync` 模式、数据格式创建/读写、CanvasZoomPan 冲突处理、常见坑及修复
 - **何时更新**: 新增拖放交互、Avalonia 版本升级后 API 变更、发现新的拖放坑
 - **关联文档**: CLAUDE.md（Behaviors 节）、SeatingArrangementView.axaml.cs
 
-### SeatFlow.Plugins.Sdk/docs/README.md
+### docs/sdk/README.md
 - **覆盖**: 插件开发指南、接口参考、打包格式
 - **何时更新**: 插件 API 变更、打包格式变更
 - **关联文档**: ARCHITECTURE.md（插件化架构）

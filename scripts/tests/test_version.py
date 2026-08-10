@@ -138,12 +138,12 @@ class TestVersionManager(unittest.TestCase):
         self.root = self.tmpdir
 
         # 创建完整目录结构
-        about_dir = self.root / "SeatFlow.Presentation.Avalonia/Data"
-        fv_dir = self.root / "SeatFlow.Infrastructure/Migration"
-        model_dir = self.root / "SeatFlow.Core/Models"
-        manifest_dir = self.root / "SeatFlow.Core/Strategies/Manifests"
-        provider_dir = self.root / "SeatFlow.Infrastructure/Providers"
-        service_dir = self.root / "SeatFlow.Core/Services"
+        about_dir = self.root / "src/SeatFlow.Presentation.Avalonia/Data"
+        fv_dir = self.root / "src/SeatFlow.Infrastructure/Migration"
+        model_dir = self.root / "src/SeatFlow.Core/Models"
+        manifest_dir = self.root / "src/SeatFlow.Core/Strategies/Manifests"
+        provider_dir = self.root / "src/SeatFlow.Infrastructure/Providers"
+        service_dir = self.root / "src/SeatFlow.Core/Services"
 
         for d in [about_dir, fv_dir, model_dir, manifest_dir, provider_dir, service_dir]:
             d.mkdir(parents=True, exist_ok=True)
@@ -215,7 +215,7 @@ public class StrategyManifestProvider
         self.assertEqual(issues, [])
 
     def test_check_detects_model_mismatch(self):
-        path = self.root / "SeatFlow.Core/Models/StrategyConfig.cs"
+        path = self.root / "src/SeatFlow.Core/Models/StrategyConfig.cs"
         path.write_text('public string Version { get; set; } = "9.9";', encoding="utf-8")
 
         issues = self.mgr.check()
@@ -300,7 +300,7 @@ public class StrategyManifestProvider
 
     def test_sync_models(self):
         # 故意让 Model 类版本落后
-        path = self.root / "SeatFlow.Core/Models/VenueFile.cs"
+        path = self.root / "src/SeatFlow.Core/Models/VenueFile.cs"
         path.write_text('public string Version { get; set; } = "1.0";', encoding="utf-8")
 
         changes = self.mgr.sync_models()

@@ -16,7 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 dotnet build                    # Build all 9 projects (uses .slnx, requires .NET 10 SDK)
 dotnet test                     # Run all tests (xUnit v3, Microsoft.Testing.Platform)
 dotnet test --filter "FullyQualifiedName~TestName"  # Run a single test
-dotnet run --project SeatFlow.Presentation.Avalonia   # Launch the desktop app
+dotnet run --project src/SeatFlow.Presentation.Avalonia   # Launch the desktop app
 ```
 
 **Test stack**: xUnit v3 + FluentAssertions + NSubstitute. Tests are in 3 projects: `*.Core.Tests`, `*.Application.Tests`, `*.Infrastructure.Tests`. Each has `<ImplicitUsings>enable</ImplicitUsings>` (provides `System`, `System.Collections.Generic`, `System.Linq`, `System.Threading.Tasks`). Project-specific global usings are in `Usings.cs` (or `Using.cs` in Application.Tests).
@@ -63,7 +63,7 @@ Conflict resolution = Priority number (first-come-first-served). Dependent strat
 
 **Strategy messaging**: Strategies can report warnings/errors during execution via `workspace.LogWarning(strategyId, displayName, messageKey, args)` and `workspace.LogError(strategyId, displayName, messageKey, args)`. `messageKey` corresponds to a key in the manifest's `messages` dictionary (inline i18n: `{ "zh-CN": "...", "en-US": "..." }`). Messages are collected in `SeatingWorkspace.Messages` (with `StrategyId`, `StrategyDisplayName`, `MessageKey`, and `Args`) and surfaced to the UI sidebar after pipeline execution. Plugin strategies access the same methods through `IPluginWorkspace`.
 
-**Declarative strategy configuration**: All strategy-specific configuration (beyond Priority/IsEnabled) is driven by the manifest JSON files (`SeatFlow.Core/Strategies/Manifests/*.json`). Three top-level fields:
+**Declarative strategy configuration**: All strategy-specific configuration (beyond Priority/IsEnabled) is driven by the manifest JSON files (`src/SeatFlow.Core/Strategies/Manifests/*.json`). Three top-level fields:
 
 - **`visible`** — (optional, default `true`) Controls whether the strategy participates in the pipeline. Set to `false` to exclude it from both the UI (configuration page, seating sidebar) and execution — the pipeline skips invisible strategies.
 - **`isIndependent`** — (optional, default `true`) `true` = independent strategy (executed by external pipeline); `false` = dependent strategy (executed inside RandomFill's assignment loop). DeskMate, GenderRestrictedSeat, and NoRepeatDeskMate are `false`.
@@ -79,7 +79,7 @@ Conflict resolution = Priority number (first-come-first-served). Dependent strat
   - **RandomFill**: No parameters, no codeBlocks.
   - **Defrag** (independent, Priority=0): "扫地僧" role — executes after all other strategies. Scans empty seats front-to-back, moves unconstrained students (those not in fixed seats or DeskMate groups) from behind each gap forward to fill it. Cross-column allowed. Logs `Defrag_EffectivenessNote` warning that prior strategy results may be invalidated. Zero parameters — behavior is purely position-driven. Default disabled.
 
-**Plugin seat protection**: Plugins protect their assigned seats by declaring `"MarkFixedSeat"` in their manifest `capabilities` and calling `IPluginWorkspace.TryMarkFixed()`. The workspace validates the capability declaration, sets `IsFixed=true`, and logs the operation. `GetEmptySeats()` and Defrag's seat scanning both exclude `IsFixed` seats automatically. Built-in strategies use the same mechanism via `IFixedSeatCapability`. Capability constants and interfaces are centralized in `SeatFlow.Core/Strategies/Capability.cs` — add new const + interface there for future capabilities.
+**Plugin seat protection**: Plugins protect their assigned seats by declaring `"MarkFixedSeat"` in their manifest `capabilities` and calling `IPluginWorkspace.TryMarkFixed()`. The workspace validates the capability declaration, sets `IsFixed=true`, and logs the operation. `GetEmptySeats()` and Defrag's seat scanning both exclude `IsFixed` seats automatically. Built-in strategies use the same mechanism via `IFixedSeatCapability`. Capability constants and interfaces are centralized in `src/SeatFlow.Core/Strategies/Capability.cs` — add new const + interface there for future capabilities.
 
 All user-visible text uses inline i18n: `{ "zh-CN": "...", "en-US": "..." }` dictionaries (not .resx keys). `LocalizeHelper.Resolve(dict)` in Presentation resolves per `CultureInfo.CurrentUICulture`, falling back to zh-CN. This works for both built-in strategies and plugins.
 
@@ -164,7 +164,7 @@ Called by `NavigationService` before navigating away. Override to prompt user ab
 - **Font**: Global `Window` style sets `FontFamily` to `Inter,Microsoft YaHei UI,PingFang SC,Noto Sans CJK SC,WenQuanYi Micro Hei,sans-serif` for CJK support.
 - **BoxShadows**: `CardShadowNone`, `CardShadowLarge`, `CardShadowSmall` are defined as `BoxShadows` resources.
 
-### UI Services (`SeatFlow.Presentation.Avalonia/Services/`)
+### UI Services (`src/SeatFlow.Presentation.Avalonia/Services/`)
 - **INavigationService** — Page switching with `PageKey` enum. `NavigateTo()` is synchronous, `NavigateToAsync()` runs `CanLeaveAsync()` first.
 - **IDialogService** — Shows error/info dialogs. Requires `SetTopLevel(TopLevel)` before use.
 - **IFileService** — File open/save pickers. Also requires `SetTopLevel()`.
@@ -174,7 +174,7 @@ Called by `NavigationService` before navigating away. Override to prompt user ab
 - `InputWindow` — modal dialog for single-line text input (returns the entered string)
 - `DialogWindow` — general-purpose modal content host with title bar and close button
 
-### Behaviors (`SeatFlow.Presentation.Avalonia/Behaviors/`)
+### Behaviors (`src/SeatFlow.Presentation.Avalonia/Behaviors/`)
 - `CanvasZoomPan` — Pan and zoom for Canvas-based previews. **拖放座位时通过 NaN 哨兵机制跳过平移**（详见 `docs/DragDrop.md`）
 - `ZoomOnScroll` — Ctrl+Scroll to zoom
 - `ChineseInputNormalizer` — Converts full-width numbers/symbols to half-width on text input
@@ -220,7 +220,7 @@ public interface IFileDropHandler
 
 ### Axaml Bindings
 - Always use `x:DataType` on the root element for compiled bindings
-- Icons: `<fic:FluentIcon Icon="{x:Static ficEnum:Icon.{Name}}" FontSize="18"/>` (see `SeatFlow.Presentation.Avalonia/docs/Fluent_Icons.md`)
+- Icons: `<fic:FluentIcon Icon="{x:Static ficEnum:Icon.{Name}}" FontSize="18"/>` (see `docs/presentation/Fluent_Icons.md`)
 - Converters: `BoolConverters.cs` (Negate, TrueWhenNull, etc.) and `ValueConverters.cs`
 
 ### Sidebar
@@ -230,7 +230,7 @@ public interface IFileDropHandler
 
 ### i18n / Localization (`Lang/`)
 
-Uses standard .NET `.resx` resource files in `SeatFlow.Presentation.Avalonia/Lang/`:
+Uses standard .NET `.resx` resource files in `src/SeatFlow.Presentation.Avalonia/Lang/`:
 - `Resources.resx` — neutral language (zh-CN), ~700 keys
 - `Resources.en-US.resx` — English satellite
 - `Resources.Designer.cs` — hand-maintained typed accessor class (Visual Studio's `PublicResXFileCodeGenerator` doesn't work with `dotnet build`)
@@ -296,7 +296,7 @@ Multi-language JSON with top-level culture keys:
 
 ## File Versions & Migration
 
-All persisted JSON files carry a `version` field. Current versions are defined in `SeatFlow.Infrastructure/Migration/file_versions.json` (embedded resource, compiled into the assembly). `FileVersionInfo.GetCurrentVersion(fileType)` reads the latest version at runtime.
+All persisted JSON files carry a `version` field. Current versions are defined in `src/SeatFlow.Infrastructure/Migration/file_versions.json` (embedded resource, compiled into the assembly). `FileVersionInfo.GetCurrentVersion(fileType)` reads the latest version at runtime.
 
 | File type | Version | Location | Wrapper class |
 |---|---|---|---|
@@ -613,9 +613,9 @@ python3 -m pytest tests/ -v                  # 全部脚本测试
 - `docs/ONBOARDING_GUIDE.md` — Onboarding guide system design (JSON-driven, startup + page guides)
 - `docs/StrategyDataResilience.md` — Strategy data persistence & fault tolerance analysis
 - `docs/adr/` — Architecture Decision Records (ADR-001 ~ ADR-012). Key ones: ADR-002 (MVVM + IMessenger planned for cross-ViewModel communication), ADR-006 (strategy pipeline fill-in-order), ADR-012 (plugin first-class architecture — 插件一级类型、plugins-manifest v2、ALC 卸载模式、脚本安全边界)
-- `SeatFlow.Presentation.Avalonia/docs/Design_Spec.md` — FluentUI design spec (colors, typography, spacing, icons)
-- `SeatFlow.Presentation.Avalonia/docs/DragDrop.md` — Avalonia 12 drag-drop patterns, pitfalls, CanvasZoomPan interaction
-- `SeatFlow.Presentation.Avalonia/docs/Fluent_Icons.md` — All FluentUI icon names in use
-- `SeatFlow.Plugins.Sdk/docs/README.md` — Plugin SDK development guide (interfaces, 2-tier manifest format v2, packaging, dependent strategies, scripting sandbox)
-- `examples/plugins/` — Example plugins (height-sort / desk-pair / Lua / C# script / multi-strategy package) + `build.sh`
+- `docs/presentation/Design_Spec.md` — FluentUI design spec (colors, typography, spacing, icons)
+- `docs/presentation/DragDrop.md` — Avalonia 12 drag-drop patterns, pitfalls, CanvasZoomPan interaction
+- `docs/presentation/Fluent_Icons.md` — All FluentUI icon names in use
+- `docs/sdk/README.md` — Plugin SDK development guide (interfaces, 2-tier manifest format v2, packaging, dependent strategies, scripting sandbox)
+- `src/plugin-examples/` — Example plugins (height-sort / desk-pair / Lua / C# script / multi-strategy package) + `build.sh`
 - `scripts/ToolsCollection.md` — Full reference for `i18n.py` and `version.py` scripts

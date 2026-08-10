@@ -48,7 +48,7 @@
 git clone https://github.com/Helio-RC/Seatflow.git
 cd SeatFlow
 dotnet build
-dotnet run --project SeatFlow.Presentation.Avalonia
+dotnet run --project src/SeatFlow.Presentation.Avalonia
 ```
 
 **运行测试**
@@ -62,7 +62,7 @@ dotnet test
 - **Bug 反馈**：请在 [GitHub Issues](https://github.com/Helio-RC/Seatflow/issues) 提交，附上操作系统版本和复现步骤，最好能附上日志
 - **功能建议**：欢迎提交 Feature Request
 - **界面美化**：初代开发者审美不好，欢迎各位大能贡献 UI 设计和图标资源
-- **插件开发**：参见 [SeatFlow.Plugins.Sdk/docs/README.md](SeatFlow.Plugins.Sdk/docs/README.md) 插件开发指南 `尚未完善 🚧 部分支持`
+- **插件开发**：参见 [docs/sdk/README.md](docs/sdk/README.md) 插件开发指南 `尚未完善 🚧 部分支持`
 - **参与开发**：参见 [CONTRIBUTING.md](CONTRIBUTING.md) 了解构建环境、项目结构和编码规范
 - **AI 辅助开发**：本项目使用 Claude Code & Deepseek V4 preview 辅助开发。项目级 AI 配置位于 [CLAUDE.md](CLAUDE.md)，包含架构约定、代码模式和开发命令。建议 AI 开发者先阅读此文件和 [docs/adr/](docs/adr/) 中的架构决策记录
 
@@ -102,9 +102,9 @@ MIT License © 2026 SeatFlow Contributors
 | [CLAUDE.md](CLAUDE.md) | AI 编码助手配置 |
 | [CHANGELOG.md](CHANGELOG.md) | 变更日志 |
 | [docs/adr/](docs/adr/) | 架构决策记录 |
-| [Design_Spec.md](SeatFlow.Presentation.Avalonia/docs/Design_Spec.md) | UI 设计规范 |
-| [Fluent_Icons.md](SeatFlow.Presentation.Avalonia/docs/Fluent_Icons.md) | 图标参考 |
-| [Plugins.Sdk/README.md](SeatFlow.Plugins.Sdk/docs/README.md) | 插件开发 SDK 文档 |
+| [Design_Spec.md](docs/presentation/Design_Spec.md) | UI 设计规范 |
+| [Fluent_Icons.md](docs/presentation/Fluent_Icons.md) | 图标参考 |
+| [Plugins.Sdk/README.md](docs/sdk/README.md) | 插件开发 SDK 文档 |
 
 ---
 

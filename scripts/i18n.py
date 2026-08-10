@@ -91,7 +91,7 @@ def resolve_lang_dir(lang_dir: Optional[str] = None) -> Path:
     if lang_dir:
         p = Path(lang_dir)
     else:
-        p = Path(__file__).resolve().parent.parent / "SeatFlow.Presentation.Avalonia" / "Lang"
+        p = Path(__file__).resolve().parent.parent / "src" / "SeatFlow.Presentation.Avalonia" / "Lang"
     return p
 
 
@@ -933,7 +933,7 @@ def main():
     parser.add_argument(
         "--lang-dir",
         default=None,
-        help="Lang 目录路径 (默认: SeatFlow.Presentation.Avalonia/Lang/)",
+        help="Lang 目录路径 (默认: src/SeatFlow.Presentation.Avalonia/Lang/)",
     )
 
     sub = parser.add_subparsers(dest="command", help="子命令")

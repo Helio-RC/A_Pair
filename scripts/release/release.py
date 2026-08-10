@@ -61,7 +61,7 @@ def _versioned_name(filename: str, version: str) -> str:
 
 
 APP_NAME = "SeatFlow"
-PROJECT = "SeatFlow.Presentation.Avalonia"
+PROJECT = "src/SeatFlow.Presentation.Avalonia"
 CONFIGURATION = "Release"
 
 # RID → 平台标识 + 打包格式

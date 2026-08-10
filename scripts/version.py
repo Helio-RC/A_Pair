@@ -130,13 +130,13 @@ class VersionManager:
 
         # 路径定义
         self.version_json_path = root / "version.json"
-        self.about_path = root / "SeatFlow.Presentation.Avalonia/Data/about.json"
-        self.file_versions_path = root / "SeatFlow.Infrastructure/Migration/file_versions.json"
-        self.onboarding_path = root / "SeatFlow.Presentation.Avalonia/Data/onboarding_config.json"
-        self.manifests_dir = root / "SeatFlow.Core/Strategies/Manifests"
-        self.models_dir = root / "SeatFlow.Core/Models"
-        self.json_student_writer_path = root / "SeatFlow.Infrastructure/Providers/JsonStudentWriter.cs"
-        self.manifest_provider_path = root / "SeatFlow.Core/Services/StrategyManifestProvider.cs"
+        self.about_path = root / "src/SeatFlow.Presentation.Avalonia/Data/about.json"
+        self.file_versions_path = root / "src/SeatFlow.Infrastructure/Migration/file_versions.json"
+        self.onboarding_path = root / "src/SeatFlow.Presentation.Avalonia/Data/onboarding_config.json"
+        self.manifests_dir = root / "src/SeatFlow.Core/Strategies/Manifests"
+        self.models_dir = root / "src/SeatFlow.Core/Models"
+        self.json_student_writer_path = root / "src/SeatFlow.Infrastructure/Providers/JsonStudentWriter.cs"
+        self.manifest_provider_path = root / "src/SeatFlow.Core/Services/StrategyManifestProvider.cs"
 
     # ── 备份 ──────────────────────────────────
 

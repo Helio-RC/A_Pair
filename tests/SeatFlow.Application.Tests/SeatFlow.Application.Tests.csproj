@@ -21,14 +21,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\SeatFlow.Application\SeatFlow.Application.csproj" />
-    <ProjectReference Include="..\SeatFlow.Plugins.Sdk\SeatFlow.Plugins.Sdk.csproj" />
+    <ProjectReference Include="..\..\src\SeatFlow.Application\SeatFlow.Application.csproj" />
+    <ProjectReference Include="..\..\src\SeatFlow.Plugins.Sdk\SeatFlow.Plugins.Sdk.csproj" />
     <ProjectReference Include="..\SeatFlow.Plugin.TestFixture\SeatFlow.Plugin.TestFixture.csproj">
       <Private>false</Private>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
-    <ProjectReference Include="..\SeatFlow.Core\SeatFlow.Core.csproj" />
-    <ProjectReference Include="..\SeatFlow.Infrastructure\SeatFlow.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\SeatFlow.Core\SeatFlow.Core.csproj" />
+    <ProjectReference Include="..\..\src\SeatFlow.Infrastructure\SeatFlow.Infrastructure.csproj" />
   </ItemGroup>
 
   <Target Name="CopyTestFixture" AfterTargets="Build">

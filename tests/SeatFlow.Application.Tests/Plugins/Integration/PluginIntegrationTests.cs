@@ -5,9 +5,9 @@ using SeatFlow.Application.Plugins;
 namespace SeatFlow.Application.Tests.Plugins.Integration;
 
 /// <summary>
-/// 插件端到端集成测试：从 <c>examples/plugins/dist</c> 安装示例插件包，
+/// 插件端到端集成测试：从 <c>src/plugin-examples/dist</c> 安装示例插件包，
 /// 验证 v2 格式装配、独立策略执行、依赖策略接入与配置路由。
-/// 依赖 <c>examples/plugins/build.sh</c> 的构建产物；产物缺失时测试跳过。
+/// 依赖 <c>src/plugin-examples/build.sh</c> 的构建产物；产物缺失时测试跳过。
 /// </summary>
 public class PluginIntegrationTests : IDisposable
 {
@@ -31,7 +31,7 @@ public class PluginIntegrationTests : IDisposable
         get
         {
             var dir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory ,
-                "../../../../examples/plugins/dist"));
+                "../../../../../src/plugin-examples/dist"));
             return Directory.Exists(dir) ? dir : string.Empty;
         }
     }
@@ -39,7 +39,7 @@ public class PluginIntegrationTests : IDisposable
     private void SkipIfNoPackages ()
     {
         if (string.IsNullOrEmpty(DistDir) || !Directory.EnumerateFiles(DistDir , "*.ap-plugin").Any())
-            Assert.Skip("缺少示例插件包（请先运行 examples/plugins/build.sh）");
+            Assert.Skip("缺少示例插件包（请先运行 src/plugin-examples/build.sh）");
     }
 
     private async Task<PluginManager> CreateManagerWithInstalledPackagesAsync ()

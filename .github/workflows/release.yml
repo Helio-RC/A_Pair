@@ -8,7 +8,7 @@ on:
 env:
   DOTNET_NOLOGO: 'true'
   DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
-  PROJECT_PATH: 'SeatFlow.Presentation.Avalonia'
+  PROJECT_PATH: 'src/SeatFlow.Presentation.Avalonia'
   CONFIGURATION: 'Release'
 
 permissions:

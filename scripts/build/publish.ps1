@@ -9,7 +9,7 @@ param(
 )
 $ErrorActionPreference="Stop"
 Push-Location ..
-$AppName,$Project="SeatFlow","SeatFlow.Presentation.Avalonia"
+$AppName,$Project="SeatFlow","src/SeatFlow.Presentation.Avalonia"
 $P=@(@{N="win-x64";S=".exe";Sel=$false},@{N="linux-x64";S="";Sel=$false},@{N="osx-x64";S="";Sel=$false},@{N="osx-arm64";S="";Sel=$false})
 
 function Step($t,$c="White"){Write-Host "  [$([datetime]::Now.ToString('HH:mm:ss'))] $t" -ForegroundColor $c}

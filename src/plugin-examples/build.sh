@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SDK_PROJ="$ROOT/../../../SeatFlow.Plugins.Sdk/SeatFlow.Plugins.Sdk.csproj"
+SDK_PROJ="$ROOT/../SeatFlow.Plugins.Sdk/SeatFlow.Plugins.Sdk.csproj"
 DIST="$ROOT/dist"
 CONFIG="${CONFIG:-Debug}"
 
