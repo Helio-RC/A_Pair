@@ -26,9 +26,17 @@
       <DockPanel>
         <TextBlock DockPanel.Dock="Left" Text="{x:Static lang:Resources.Plugin_Title}" Classes="pageTitle"
                    VerticalAlignment="Center" />
+        <Button DockPanel.Dock="Right" Command="{Binding InstallPluginCommand}"
+                AutomationProperties.Name="{x:Static lang:Resources.Plugin_Install}"
+                Classes="accent" HorizontalContentAlignment="Center" Padding="12,6">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <fic:FluentIcon Icon="{x:Static ficEnum:Icon.PlugConnected}" FontSize="16" />
+            <TextBlock Text="{x:Static lang:Resources.Plugin_Install}" Classes="body" />
+          </StackPanel>
+        </Button>
         <Button DockPanel.Dock="Right" Command="{Binding RefreshPluginsCommand}"
                 AutomationProperties.Name="{x:Static lang:Resources.Strategy_Plugin}"
-                HorizontalContentAlignment="Center" Padding="12,6">
+                Margin="0,0,8,0" HorizontalContentAlignment="Center" Padding="12,6">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <fic:FluentIcon Icon="{x:Static ficEnum:Icon.ArrowSync}" FontSize="16" />
             <TextBlock Text="{x:Static lang:Resources.Common_Refresh}" Classes="body" />

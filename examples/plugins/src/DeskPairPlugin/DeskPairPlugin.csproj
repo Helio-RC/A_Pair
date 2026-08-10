@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <AssemblyName>DeskPairPlugin</AssemblyName>
+    <RootNamespace>DeskPairPlugin</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\SeatFlow.Plugins.Sdk\SeatFlow.Plugins.Sdk.csproj" />
+  </ItemGroup>
+
+  <Target Name="StripSharedContractAssemblies" AfterTargets="Build">
+    <Delete Files="$(OutDir)SeatFlow.Contracts.dll" />
+  </Target>
+
+</Project>

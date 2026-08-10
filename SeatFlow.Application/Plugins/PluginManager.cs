@@ -1,7 +1,10 @@
 using System.IO.Compression;
 using System.Text.Json;
+using SeatFlow.Application.Scripting.CSharp;
+using SeatFlow.Application.Scripting.Lua;
 using SeatFlow.Contracts.Interfaces;
 using SeatFlow.Core.Models;
+using SeatFlow.Core.Services;
 using SeatFlow.Infrastructure.Serialization;
 using Microsoft.Extensions.Logging;
 
@@ -24,13 +27,13 @@ namespace SeatFlow.Application.Plugins
     {
         private readonly string _pluginsPath;
         private readonly ILogger<PluginManager> _logger;
-        private readonly List<PluginLoadContext> _contexts = [];
-        private readonly Dictionary<string , Func<string , string , int , IPluginSeatingStrategy>> _scriptAdapters = new(StringComparer.OrdinalIgnoreCase);
+        private readonly List<LoadedContext> _contexts = [];
+        private readonly Dictionary<string , Func<string , string , string , string , int , IPluginSeatingStrategy>> _scriptAdapters = new(StringComparer.OrdinalIgnoreCase);
 
         // 包级存储
         private readonly Dictionary<string , LoadedPackageInfo> _loadedPackages = [];
         private readonly Dictionary<string , string> _strategyToPackage = []; // strategyId → packageId
-        private readonly Dictionary<string , PluginStrategyEntry> _strategyEntryMap = []; // strategyId → entry
+        private readonly Dictionary<string , PluginEntry> _strategyEntryMap = []; // strategyId → entry
         private readonly Dictionary<string , LoadedPluginInfo> _strategyPlugins = []; // strategyId → LoadedPluginInfo
         private readonly HashSet<string> _loadedPackageDirs = new(StringComparer.OrdinalIgnoreCase);
 
@@ -43,8 +46,18 @@ namespace SeatFlow.Application.Plugins
             _logger = logger;
             Directory.CreateDirectory(_pluginsPath);
 
-            _scriptAdapters["lua"] = (code , name , priority) => new LuaScriptPluginAdapter(code , name , priority);
-            _scriptAdapters["csharp"] = (code , name , priority) => new CSharpScriptPluginAdapter(code , name , priority);
+            _scriptAdapters["lua"] = (code , strategyId , name , version , priority) => new LuaScriptStrategy(code , strategyId , version , new LuaScriptConfiguration
+            {
+                StrategyName = name ,
+                Priority = priority ,
+                Enabled = true
+            });
+            _scriptAdapters["csharp"] = (code , strategyId , name , version , priority) => new CSharpScriptStrategy(code , strategyId , version , new CSharpScriptConfiguration
+            {
+                StrategyName = name ,
+                Priority = priority ,
+                Enabled = true
+            });
         }
 
         // ─── IPluginManager 实现 ───
@@ -53,7 +66,7 @@ namespace SeatFlow.Application.Plugins
         public IReadOnlyDictionary<string , LoadedPackageInfo> LoadedPackages => _loadedPackages;
 
         /// <inheritdoc />
-        public void RegisterScriptAdapter (string scriptType , Func<string , string , int , IPluginSeatingStrategy> factory)
+        public void RegisterScriptAdapter (string scriptType , Func<string , string , string , string , int , IPluginSeatingStrategy> factory)
         {
             _scriptAdapters[scriptType] = factory;
         }
@@ -154,11 +167,8 @@ namespace SeatFlow.Application.Plugins
         /// <inheritdoc />
         public async Task RefreshPackageAsync (string packageId , CancellationToken ct = default)
         {
-            if (!_loadedPackages.TryGetValue(packageId , out var pkgInfo))
-                return;
-
-            await UnloadSinglePackageInternal(pkgInfo);
-            RemovePackageFromDictionaries(packageId);
+            var pkgInfo = await UnloadPackageInternalAsync(packageId);
+            if (pkgInfo == null) return;
 
             var packageDir = pkgInfo.PackagePath;
             var manifestPath = Path.Combine(packageDir , "plugins-manifest.json");
@@ -171,17 +181,30 @@ namespace SeatFlow.Application.Plugins
         /// <inheritdoc />
         public async Task UnloadPackageAsync (string packageId)
         {
-            if (!_loadedPackages.TryGetValue(packageId , out var pkgInfo))
-                return;
-
-            await UnloadSinglePackageInternal(pkgInfo);
-            RemovePackageFromDictionaries(packageId);
+            var pkgInfo = await UnloadPackageInternalAsync(packageId);
+            if (pkgInfo == null) return;
 
             if (Directory.Exists(pkgInfo.PackagePath))
             {
                 try { Directory.Delete(pkgInfo.PackagePath , recursive: true); }
                 catch (Exception ex) { _logger.LogWarning(ex , "删除插件包目录失败：{Path}" , pkgInfo.PackagePath); }
             }
+        }
+
+        /// <summary>
+        /// 卸载指定包：dispose 生命周期 → 移除内部字典强引用 → 卸载 AssemblyLoadContext。
+        /// 返回包信息（供调用方继续使用包目录等）；包未加载时返回 null。
+        /// </summary>
+        private async Task<LoadedPackageInfo?> UnloadPackageInternalAsync (string packageId)
+        {
+            if (!_loadedPackages.TryGetValue(packageId , out var pkgInfo))
+                return null;
+
+            await UnloadSinglePackageInternal(pkgInfo);
+            // 先移除内部字典的强引用（指向 ALC 内类型/实例），再卸载 ALC，否则运行时持强句柄阻止回收
+            RemovePackageFromDictionaries(packageId);
+            UnloadContexts(packageId);
+            return pkgInfo;
         }
 
         /// <inheritdoc />
@@ -289,6 +312,11 @@ namespace SeatFlow.Application.Plugins
                     throw new InvalidDataException("plugins-manifest.json 格式无效：缺少 id 字段");
                 var packageId = manifest.Id;
 
+                // 安全校验：packageId 来自不可信清单，必须是合法单目录名（防路径遍历写入插件目录之外）
+                var idError = SeatFlow.Contracts.Utilities.PluginArchiveSafety.ValidateSafePathSegment(packageId);
+                if (idError != null)
+                    throw new InvalidDataException($"plugins-manifest.json 的 id 字段无效：{idError}");
+
                 ct.ThrowIfCancellationRequested();
 
                 var targetDir = Path.Combine(_pluginsPath , packageId);
@@ -336,14 +364,7 @@ namespace SeatFlow.Application.Plugins
             _strategyPlugins.Clear();
             _loadedPackageDirs.Clear();
 
-            foreach (var c in _contexts)
-            {
-                c.Unload();
-            }
-            _contexts.Clear();
-
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
+            UnloadContexts(packageId: null);
         }
 
         // ─── 私有方法 ───
@@ -378,9 +399,30 @@ namespace SeatFlow.Application.Plugins
                 Enables = enables
             };
 
-            foreach (var entry in packageManifest.Strategies)
+            foreach (var entry in packageManifest.Plugins)
             {
                 ct.ThrowIfCancellationRequested();
+
+                // 按插件类型分派加载：当前仅 strategy 受支持，其余类型给出警告并跳过（预留扩展点）
+                if (!string.Equals(entry.Kind , PluginKind.Strategy , StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogWarning("插件类型 {Kind}（包：{PkgId}）暂不支持，已跳过" , entry.Kind , packageId);
+                    continue;
+                }
+
+                // 纵深防御：entry 路径字段来自不可信清单，拒绝路径遍历（../、绝对路径、分隔符）
+                var pathError = SeatFlow.Contracts.Utilities.PluginArchiveSafety.ValidateSafePathSegment(entry.Path);
+                if (pathError != null)
+                {
+                    _logger.LogWarning("插件条目 path 字段无效（包：{PkgId}）：{Error}" , packageId , pathError);
+                    continue;
+                }
+                var manifestFieldError = SeatFlow.Contracts.Utilities.PluginArchiveSafety.ValidateSafeRelativePath(entry.Manifest);
+                if (manifestFieldError != null)
+                {
+                    _logger.LogWarning("插件条目 manifest 字段无效（包：{PkgId}）：{Error}" , packageId , manifestFieldError);
+                    continue;
+                }
 
                 var strategyManifestPath = Path.Combine(packageDir , entry.Manifest);
                 if (!File.Exists(strategyManifestPath))
@@ -398,7 +440,9 @@ namespace SeatFlow.Application.Plugins
                     continue;
                 }
 
-                var strategy = await LoadStrategyFromEntry(entry , strategyManifest , packageDir , ct);
+                ValidatePluginManifestVersion(strategyManifest);
+
+                var strategy = await LoadStrategyFromEntry(entry , strategyManifest , packageDir , packageId , ct);
                 if (strategy == null)
                     continue;
 
@@ -433,18 +477,28 @@ namespace SeatFlow.Application.Plugins
                     !string.IsNullOrEmpty(entry.ScriptFile) ? entry.ScriptType ?? "script" : "unknown");
             }
 
+            // 包即使没有任何成功加载的策略也注册（如全部为未支持的插件类型），
+            // 否则 UI 无法定位并卸载该包
             _loadedPackages[packageId] = pkgInfo;
             return results;
         }
 
         /// <summary>
-        /// 从 PluginStrategyEntry 和 StrategyManifest 加载策略实例。
+        /// 从 PluginEntry 和 StrategyManifest 加载策略实例。
         /// </summary>
         private async Task<IPluginSeatingStrategy?> LoadStrategyFromEntry (
-            PluginStrategyEntry entry , StrategyManifest strategyManifest , string packageDir , CancellationToken ct)
+            PluginEntry entry , StrategyManifest strategyManifest , string packageDir , string packageId , CancellationToken ct)
         {
             if (!string.IsNullOrEmpty(entry.ScriptFile) && !string.IsNullOrEmpty(entry.ScriptType))
             {
+                // 纵深防御：脚本文件路径来自不可信清单
+                var scriptFieldError = SeatFlow.Contracts.Utilities.PluginArchiveSafety.ValidateSafeRelativePath(entry.ScriptFile);
+                if (scriptFieldError != null)
+                {
+                    _logger.LogWarning("插件条目 scriptFile 字段无效：{Error}" , scriptFieldError);
+                    return null;
+                }
+
                 var scriptPath = Path.Combine(packageDir , entry.Path , entry.ScriptFile);
                 if (!File.Exists(scriptPath))
                 {
@@ -459,13 +513,22 @@ namespace SeatFlow.Application.Plugins
                 var scriptCode = await File.ReadAllTextAsync(scriptPath , ct);
 
                 if (_scriptAdapters.TryGetValue(entry.ScriptType , out var factory))
-                    return factory(scriptCode , strategyManifest.DisplayName , strategyManifest.DefaultPriority);
+                    return factory(scriptCode , strategyManifest.Id , strategyManifest.DisplayName ,
+                        strategyManifest.Version , strategyManifest.DefaultPriority);
 
                 _logger.LogWarning("未找到脚本适配器：{ScriptType}，策略：{StrategyId}" , entry.ScriptType , strategyManifest.Id);
                 return null;
             }
             else if (!string.IsNullOrEmpty(entry.Assembly) && !string.IsNullOrEmpty(entry.EntryType))
             {
+                // 纵深防御：程序集路径来自不可信清单
+                var assemblyFieldError = SeatFlow.Contracts.Utilities.PluginArchiveSafety.ValidateSafeRelativePath(entry.Assembly);
+                if (assemblyFieldError != null)
+                {
+                    _logger.LogWarning("插件条目 assembly 字段无效：{Error}" , assemblyFieldError);
+                    return null;
+                }
+
                 var assemblyPath = Path.Combine(packageDir , entry.Path , entry.Assembly);
                 if (!File.Exists(assemblyPath))
                 {
@@ -478,17 +541,39 @@ namespace SeatFlow.Application.Plugins
                 }
 
                 var loadContext = new PluginLoadContext(assemblyPath);
-                _contexts.Add(loadContext);
+                var loadedContext = new LoadedContext(loadContext , packageId);
+                _contexts.Add(loadedContext);
 
-                var assembly = loadContext.LoadFromAssemblyPath(assemblyPath);
-                var type = assembly.GetType(entry.EntryType);
-                if (type == null || !typeof(IPluginSeatingStrategy).IsAssignableFrom(type))
+                bool succeeded = false;
+                try
                 {
-                    _logger.LogWarning("入口类型 {Type} 不存在或未实现 IPluginSeatingStrategy" , entry.EntryType);
+                    var assembly = loadContext.LoadFromAssemblyPath(assemblyPath);
+                    var type = assembly.GetType(entry.EntryType);
+                    if (type == null || !typeof(IPluginSeatingStrategy).IsAssignableFrom(type))
+                    {
+                        _logger.LogWarning("入口类型 {Type} 不存在或未实现 IPluginSeatingStrategy" , entry.EntryType);
+                        return null;
+                    }
+
+                    var instance = Activator.CreateInstance(type) as IPluginSeatingStrategy;
+                    succeeded = instance != null;
+                    return instance;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex , "插件策略实例化失败：{Type}（包：{PkgId}）" , entry.EntryType , packageId);
                     return null;
                 }
-
-                return Activator.CreateInstance(type) as IPluginSeatingStrategy;
+                finally
+                {
+                    // 失败路径（类型不符/实例化异常）：卸载并移除刚创建的上下文，避免 AssemblyLoadContext 泄漏
+                    if (!succeeded)
+                    {
+                        _contexts.Remove(loadedContext);
+                        try { loadContext.Unload(); }
+                        catch (Exception ex) { _logger.LogWarning(ex , "卸载失败路径的插件上下文异常：{Type}" , entry.EntryType); }
+                    }
+                }
             }
 
             _logger.LogWarning("策略 {StrategyId} 缺少加载指令（assembly/entryType 或 scriptFile/scriptType）" , strategyManifest.Id);
@@ -517,45 +602,81 @@ namespace SeatFlow.Application.Plugins
         }
 
         /// <summary>
-        /// 验证 ZIP 文件安全性：检查压缩炸弹、总大小、条目数、路径遍历。
-        /// 注意：此方法与 <see cref="SeatFlow.Plugins.Sdk.Models.PluginPackage.ValidateZipSafety"/> 逻辑对应，
-        /// 因 Application 层不引用 Plugins.Sdk 而在此独立维护。SDK 侧的打包流程复用 SDK 版本。
+        /// 校验插件策略 manifest 版本：高于当前程序支持的最大版本时警告（仍加载，兼容模式）。
+        /// 与内置 manifest 的版本校验（<see cref="SeatFlow.Core.Services.StrategyManifestProvider"/>）行为一致。
         /// </summary>
-        private static void ValidateZipSafety (string archivePath)
+        /// <param name="strategyManifest">插件策略 manifest。</param>
+        private void ValidatePluginManifestVersion (StrategyManifest strategyManifest)
         {
-            const int maxEntryCount = 10000;
-            const long maxUncompressedSize = 500L * 1024 * 1024;
-            const int maxCompressionRatio = 100;
+            var version = strategyManifest.ManifestVersion;
+            if (string.IsNullOrEmpty(version)) return;
 
-            using var archive = ZipFile.OpenRead(archivePath);
-            var entries = archive.Entries;
-            if (entries.Count > maxEntryCount)
-                throw new InvalidDataException($"ZIP 条目数 ({entries.Count}) 超过上限 ({maxEntryCount})");
-
-            long totalUncompressed = 0;
-            foreach (var entry in entries)
+            if (StrategyManifestProvider.CompareVersions(version ,
+                    StrategyManifestProvider.MaxManifestVersion) > 0)
             {
-                if (string.IsNullOrEmpty(entry.Name) && entry.FullName.EndsWith('/'))
-                    continue;
-
-                // ZIP Slip 防护：禁止路径遍历和绝对路径
-                if (entry.FullName.Contains("..") || Path.IsPathRooted(entry.FullName))
-                    throw new InvalidDataException($"条目 \"{entry.FullName}\" 包含非法路径（禁止 ../ 或绝对路径）");
-
-                totalUncompressed += entry.Length;
-                if (totalUncompressed > maxUncompressedSize)
-                    throw new InvalidDataException(
-                        $"ZIP 解压后总大小 ({totalUncompressed / 1024 / 1024:N0} MB) 超过上限 ({maxUncompressedSize / 1024 / 1024:N0} MB)");
-
-                if (entry.CompressedLength > 0 && entry.Length > 0)
-                {
-                    var ratio = entry.Length / (double)entry.CompressedLength;
-                    if (ratio > maxCompressionRatio)
-                        throw new InvalidDataException(
-                            $"条目 \"{entry.FullName}\" 压缩比 ({ratio:N0}:1) 超过上限 ({maxCompressionRatio}:1)，疑似 ZIP 炸弹");
-                }
+                _logger.LogWarning(
+                    "插件策略 Manifest 版本 {ManifestVersion} 高于当前程序支持的最大版本 {MaxVersion}，" +
+                    "策略 {StrategyId} 可能包含不受支持的字段，将以兼容模式加载" ,
+                    version , StrategyManifestProvider.MaxManifestVersion ,
+                    strategyManifest.Id);
             }
         }
+
+        /// <summary>
+        /// 卸载指定包（或全部，packageId 为 null）的 AssemblyLoadContext，
+        /// 并按官方模式以弱引用循环探测回收完成度。
+        /// </summary>
+        /// <remarks>
+        /// <b>调用前置条件：</b>调用前必须已从 <c>_strategyPlugins</c> 等字典移除指向
+        /// ALC 内类型/实例的强引用（<see cref="RemovePackageFromDictionaries"/>），
+        /// 否则运行时对 ALC 持有的强 GC 句柄会阻止回收。
+        /// </remarks>
+        /// <param name="packageId">包 ID；为 null 时卸载所有上下文。</param>
+        private void UnloadContexts (string? packageId)
+        {
+            List<LoadedContext> toUnload;
+            if (packageId == null)
+            {
+                toUnload = [.. _contexts];
+                _contexts.Clear();
+            }
+            else
+            {
+                toUnload = [.. _contexts.Where(c => c.PackageId == packageId)];
+                foreach (var lc in toUnload)
+                    _contexts.Remove(lc);
+            }
+
+            foreach (var lc in toUnload)
+            {
+                try { lc.Context.Unload(); }
+                catch (Exception ex) { _logger.LogWarning(ex , "插件上下文卸载失败：{PackageId}" , lc.PackageId); }
+            }
+
+            // 官方卸载模式：Unload() 仅发起，需多轮 GC 循环等待真正回收。
+            // 注意：必须使用压缩式强制收集（compacting）——collectible ALC 的 LoaderAllocator
+            // 仅在压缩 GC 中释放，普通 GC.Collect() 无法完成回收。
+            for (int round = 0; round < 10 && toUnload.Any(lc => lc.WeakRef.IsAlive); round++)
+            {
+                GC.Collect(2 , GCCollectionMode.Forced , blocking: true , compacting: true);
+                GC.WaitForPendingFinalizers();
+            }
+
+            var stillAlive = toUnload.Where(lc => lc.WeakRef.IsAlive).ToList();
+            if (stillAlive.Count > 0)
+            {
+                _logger.LogWarning("插件上下文未能完全卸载，可能存在引用泄漏：{PackageId}（{Count} 个上下文）" ,
+                    packageId ?? "<all>" , stillAlive.Count);
+            }
+        }
+
+        /// <summary>
+        /// 验证 ZIP 文件安全性：检查压缩炸弹、总大小、条目数、路径遍历。
+        /// 实现收敛于 <see cref="SeatFlow.Contracts.Utilities.PluginArchiveSafety"/>（宿主与 SDK 共享，
+        /// 避免双份逻辑漂移）。
+        /// </summary>
+        private static void ValidateZipSafety (string archivePath)
+            => SeatFlow.Contracts.Utilities.PluginArchiveSafety.EnsureSafe(archivePath);
 
         /// <summary>
         /// 递归复制目录（Copy+Delete 模式，兼容跨文件系统场景）。
@@ -617,7 +738,7 @@ namespace SeatFlow.Application.Plugins
         /// <summary>
         /// 策略对应的加载条目（来自 <c>plugins-manifest.json</c> 的 <c>strategies[]</c>）。
         /// </summary>
-        public PluginStrategyEntry? Entry { get; set; }
+        public PluginEntry? Entry { get; set; }
 
         /// <summary>
         /// 策略的声明式元数据清单（来自策略 <c>manifest.json</c>）。
@@ -632,5 +753,25 @@ namespace SeatFlow.Application.Plugins
     {
         public IPluginConfigurationService Configuration { get; } = new PluginConfigurationService(pluginsBasePath);
         public string PluginDirectory { get; } = pluginDir;
+    }
+
+    /// <summary>
+    /// 已加载的插件 AssemblyLoadContext 登记项：记录所属包与弱引用，
+    /// 用于按包精准卸载与卸载完成度探测（<see cref="PluginManager.UnloadContexts"/>）。
+    /// </summary>
+    /// <param name="context">插件程序集加载上下文。</param>
+    /// <param name="packageId">所属插件包 ID。</param>
+    internal sealed class LoadedContext (PluginLoadContext context , string packageId)
+    {
+        /// <summary>插件程序集加载上下文。</summary>
+        public PluginLoadContext Context { get; } = context;
+
+        /// <summary>所属插件包 ID。</summary>
+        public string PackageId { get; } = packageId;
+
+        /// <summary>
+        /// 上下文的弱引用（trackResurrection），卸载后用于循环探测回收完成度。
+        /// </summary>
+        public WeakReference WeakRef { get; } = new(context , trackResurrection: true);
     }
 }

@@ -50,7 +50,7 @@ SeatFlow.slnx
 - **外观模式** — `IApplicationFacade` 是 UI 层唯一入口
 - **策略模式** — `ISeatingStrategy` 按优先级管道执行
 - **命令模式** — `IUndoableCommand` + `CommandHistory` 撤销/重做
-- **插件隔离** — `AssemblyLoadContext` 独立加载外部 DLL
+- **插件隔离** — `AssemblyLoadContext`（`isCollectible: true`）独立加载外部 DLL，卸载遵循官方可回收模式（弱引用探测 + 压缩式强制 GC）
 
 ## 编码约定
 

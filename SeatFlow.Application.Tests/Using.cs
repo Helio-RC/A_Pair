@@ -3,6 +3,7 @@ global using SeatFlow.Application.Interfaces;
 global using SeatFlow.Application.Plugins;
 global using SeatFlow.Application.Services;
 global using SeatFlow.Contracts.Interfaces;
+global using SeatFlow.Contracts.Models;
 global using SeatFlow.Core.Models;
 global using SeatFlow.Core.Strategies;
 global using SeatFlow.Core.Workspace;

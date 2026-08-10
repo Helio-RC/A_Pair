@@ -1,0 +1,26 @@
+{
+  "id": "height-sort",
+  "name": "HeightSort",
+  "displayName": "按身高排序",
+  "version": "1.0.0",
+  "manifestVersion": "1.0",
+  "description": "按身高降序填充空座：有身高数据的学生优先（高个在前），无身高数据的学生最后分配。",
+  "author": "SeatFlow Examples",
+  "category": "assignment",
+  "defaultPriority": 80,
+  "defaultEnabled": true,
+  "visible": true,
+  "isIndependent": true,
+  "parameters": [],
+  "codeBlocks": [],
+  "messages": {
+    "HeightSort_Assigned": {
+      "zh-CN": "按身高排序完成，共分配 {0} 名学生",
+      "en-US": "Height sort completed, assigned {0} students"
+    },
+    "HeightSort_AssignFailed": {
+      "zh-CN": "学生 {0} 分配到座位 {1} 失败：{2}",
+      "en-US": "Failed to assign student {0} to seat {1}: {2}"
+    }
+  }
+}

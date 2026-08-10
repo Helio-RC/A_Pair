@@ -236,16 +236,14 @@ namespace SeatFlow.Application.Services
             await RestorePersistedStrategyConfigsAsync(
                 builtInStrategies , builtInDependents , cancellationToken);
 
-            // 5. 加载插件策略并适配（加入独立列表，不污染缓存）
+            // 5. 加载插件策略（插件为一级策略类型，直接加入独立列表，不污染内置缓存）
             var strategies = new List<ISeatingStrategy>(builtInStrategies);
+            var pluginStrategies = new List<IPluginSeatingStrategy>();
             var loadedPlugins = await _pluginManager.LoadStrategyPluginsAsync(cancellationToken);
             foreach (var pluginInfo in loadedPlugins)
             {
                 if (pluginInfo.Strategy.IsEnabled)
-                {
-                    var adapter = new PluginStrategyAdapter(pluginInfo.Strategy);
-                    strategies.Add(adapter);
-                }
+                    pluginStrategies.Add(pluginInfo.Strategy);
             }
 
             // 5b. 排除标记为不可见（visible=false）的策略
@@ -259,10 +257,14 @@ namespace SeatFlow.Application.Services
                     invisibleIds.Add(pi.StrategyManifest.Id);
             }
             strategies = [.. strategies.Where(s => !invisibleIds.Contains(s.Id))];
+            pluginStrategies = [.. pluginStrategies.Where(s => !invisibleIds.Contains(s.Id))];
 
             // 6. 按请求过滤策略
             if (!request.UseDefaultStrategies && request.StrategyIds.Count != 0)
+            {
                 strategies = [.. strategies.Where(s => request.StrategyIds.Contains(s.Id))];
+                pluginStrategies = [.. pluginStrategies.Where(s => request.StrategyIds.Contains(s.Id))];
+            }
 
             // 6b. 同步 FrontRowCount / SeatsPerDesk 到策略配置
             if (venueLayout?.Metadata is GridLayoutMetadata gridMeta)
@@ -324,8 +326,15 @@ namespace SeatFlow.Application.Services
             {
                 if (pi.StrategyManifest is { IsIndependent: false } && pi.Strategy.IsEnabled)
                 {
-                    // TODO: 插件依赖策略适配器 — 当前插件无法实现 EvaluateAsync，默认 Approve
-                    logger.LogWarning("插件依赖策略 {PluginId} 尚不支持 EvaluateAsync，将默认批准所有分配" , pi.Strategy.Id);
+                    if (pi.Strategy is IPluginDependentSeatingStrategy dep)
+                    {
+                        dependentStrategies.Add(new PluginDependentAdapter(dep));
+                        logger.LogInformation("插件依赖策略 {PluginId} 已接入 RandomFill" , pi.Strategy.Id);
+                    }
+                    else
+                    {
+                        logger.LogWarning("插件 {PluginId} 声明为依赖策略但未实现 IPluginDependentSeatingStrategy" , pi.Strategy.Id);
+                    }
                 }
             }
 
@@ -350,8 +359,8 @@ namespace SeatFlow.Application.Services
                     workspace.RegisterCapabilities(pi.Strategy.Id , pi.StrategyManifest.Capabilities);
             }
 
-            // 7. 执行策略管道
-            var pipeline = new StrategyExecutionPipeline(strategies);
+            // 7. 执行策略管道（内置 + 插件混排执行）
+            var pipeline = new StrategyExecutionPipeline(strategies , pluginStrategies);
             var plan = await pipeline.ExecuteAsync(workspace , progress , cancellationToken);
 
             // 8. 解决冲突
@@ -388,7 +397,7 @@ namespace SeatFlow.Application.Services
                     success: true,
                     studentCount: students.Count,
                     venueCount: seats.Count,
-                    strategyCount: strategies.Count);
+                    strategyCount: strategies.Count + pluginStrategies.Count);
             }
             catch { /* 遥测未注册时静默处理 */ }
 
@@ -1785,7 +1794,7 @@ namespace SeatFlow.Application.Services
             await _pluginManager.SetStrategyEnabledAsync(pluginId , enabled , ct);
         }
 
-        private static string GetLoadKindFromEntry (PluginStrategyEntry? entry)
+        private static string GetLoadKindFromEntry (PluginEntry? entry)
         {
             if (entry == null) return "unknown";
             if (!string.IsNullOrEmpty(entry.ScriptFile) && !string.IsNullOrEmpty(entry.ScriptType))

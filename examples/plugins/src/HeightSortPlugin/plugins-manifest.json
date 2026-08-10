@@ -1,0 +1,17 @@
+{
+  "id": "height-sort",
+  "name": "Height Sort Plugin",
+  "version": "1.0.0",
+  "author": "SeatFlow Examples",
+  "description": "按身高降序填充空座",
+  "type": "strategy",
+  "plugins": [
+    {
+      "kind": "strategy",
+      "path": "strategy",
+      "manifest": "strategy/manifest.json",
+      "assembly": "HeightSortPlugin.dll",
+      "entryType": "HeightSortPlugin.HeightSortStrategy"
+    }
+  ]
+}

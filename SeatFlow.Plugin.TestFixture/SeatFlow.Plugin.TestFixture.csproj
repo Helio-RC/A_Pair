@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <!-- 模拟真实插件打包：Sdk.dll 随插件输出（经 PluginLoadContext 私有加载），
+         Contracts.dll 不输出（回退默认 ALC，由宿主提供，保证类型同一性） -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SeatFlow.Plugins.Sdk\SeatFlow.Plugins.Sdk.csproj" />
+  </ItemGroup>
+
+  <!-- 契约程序集不随插件输出：避免 ALC 私有加载副本导致类型不匹配 -->
+  <Target Name="StripSharedContractAssemblies" AfterTargets="Build">
+    <Delete Files="$(OutDir)SeatFlow.Contracts.dll" />
+  </Target>
+
+</Project>

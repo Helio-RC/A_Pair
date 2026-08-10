@@ -58,8 +58,8 @@ public interface IPluginManager
     /// 注册脚本语言适配器。内置已注册 <c>"lua"</c> 和 <c>"csharp"</c>。
     /// </summary>
     /// <param name="scriptType">脚本类型标识符（如 "lua"、"csharp"）。</param>
-    /// <param name="factory">创建策略实例的工厂委托。参数：脚本代码、策略名称、优先级。</param>
-    void RegisterScriptAdapter (string scriptType , Func<string , string , int , IPluginSeatingStrategy> factory);
+    /// <param name="factory">创建策略实例的工厂委托。参数：脚本代码、策略 ID（manifest id）、策略名称、策略版本、优先级。</param>
+    void RegisterScriptAdapter (string scriptType , Func<string , string , string , string , int , IPluginSeatingStrategy> factory);
 
     /// <summary>
     /// 根据策略 ID 查找其所属的包和策略加载信息。

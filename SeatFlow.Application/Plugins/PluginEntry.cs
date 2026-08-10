@@ -3,13 +3,35 @@ using System.Text.Json.Serialization;
 namespace SeatFlow.Application.Plugins
 {
     /// <summary>
-    /// 插件包中单个策略的加载条目，位于 <c>plugins-manifest.json</c> 的 <c>strategies[]</c> 数组中。
-    /// 包含策略子目录路径、manifest 文件路径、以及加载指令（程序集或脚本二选一）。
+    /// 插件类型标识（v2 包格式）。当前仅 <see cref="Strategy"/> 已实现，
+    /// <see cref="DataProvider"/> / <see cref="Exporter"/> 为预留扩展类型。
     /// </summary>
-    public class PluginStrategyEntry
+    public static class PluginKind
+    {
+        /// <summary>排座策略插件（当前唯一受支持的加载类型）。</summary>
+        public const string Strategy = "strategy";
+
+        /// <summary>学生数据提供器插件（预留，未实现）。</summary>
+        public const string DataProvider = "data-provider";
+
+        /// <summary>座位表导出器插件（预留，未实现）。</summary>
+        public const string Exporter = "exporter";
+    }
+
+    /// <summary>
+    /// 插件包中单个插件的加载条目，位于 <c>plugins-manifest.json</c> 的 <c>plugins[]</c> 数组中（v2 格式）。
+    /// 包含插件类型、子目录路径、manifest 文件路径、以及加载指令（程序集或脚本二选一）。
+    /// </summary>
+    public class PluginEntry
     {
         /// <summary>
-        /// 策略子目录的相对路径（相对于包根目录）。
+        /// 插件类型，见 <see cref="PluginKind"/>。未知类型加载时给出警告并跳过。
+        /// </summary>
+        [JsonPropertyName("kind")]
+        public string Kind { get; set; } = PluginKind.Strategy;
+
+        /// <summary>
+        /// 插件子目录的相对路径（相对于包根目录）。
         /// </summary>
         [JsonPropertyName("path")]
         public string Path { get; set; } = string.Empty;

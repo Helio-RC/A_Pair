@@ -1,0 +1,17 @@
+{
+  "id": "multi-strat-b",
+  "name": "MultiStratB",
+  "displayName": "策略 B（包内第二个）",
+  "version": "1.0.0",
+  "manifestVersion": "1.0",
+  "description": "多策略包中的第二个 Lua 策略：倒序分配。",
+  "author": "SeatFlow Examples",
+  "category": "assignment",
+  "defaultPriority": 30,
+  "defaultEnabled": true,
+  "visible": true,
+  "isIndependent": true,
+  "parameters": [],
+  "codeBlocks": [],
+  "messages": {}
+}

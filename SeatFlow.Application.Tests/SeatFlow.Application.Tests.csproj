@@ -22,8 +22,19 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SeatFlow.Application\SeatFlow.Application.csproj" />
+    <ProjectReference Include="..\SeatFlow.Plugins.Sdk\SeatFlow.Plugins.Sdk.csproj" />
+    <ProjectReference Include="..\SeatFlow.Plugin.TestFixture\SeatFlow.Plugin.TestFixture.csproj">
+      <Private>false</Private>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
     <ProjectReference Include="..\SeatFlow.Core\SeatFlow.Core.csproj" />
     <ProjectReference Include="..\SeatFlow.Infrastructure\SeatFlow.Infrastructure.csproj" />
   </ItemGroup>
+
+  <Target Name="CopyTestFixture" AfterTargets="Build">
+    <Copy SourceFiles="$(MSBuildThisFileDirectory)..\SeatFlow.Plugin.TestFixture\bin\$(Configuration)\net10.0\SeatFlow.Plugin.TestFixture.dll"
+          DestinationFolder="$(OutDir)fixtures" SkipUnchangedFiles="true" />
+  </Target>
+
 
 </Project>

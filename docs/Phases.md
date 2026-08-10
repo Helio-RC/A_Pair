@@ -19,7 +19,7 @@
 | Excel 处理 | EPPlus / ClosedXML | - | 导入导出 .xlsx |
 | CSV 处理 | CsvHelper | - | CSV 导入导出 |
 | 脚本引擎 | NLua / Microsoft.CodeAnalysis.CSharp.Scripting | - | Lua / C# 脚本插件 |
-| 插件加载 | System.Runtime.Loader | - | Assembly 动态加载 |
+| 插件加载 | System.Runtime.Loader | - | Assembly 动态加载（可回收 ALC，卸载 + 压缩式 GC） |
 | PDF 生成 | QuestPDF | - | 座位表导出 PDF |
 | 序列化 | System.Text.Json | 10.0.x | JSON 处理 |
 | 测试框架 | xUnit + NSubstitute + FluentAssertions | - | 单元/集成测试 |

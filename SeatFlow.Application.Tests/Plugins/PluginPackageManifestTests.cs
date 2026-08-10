@@ -16,7 +16,7 @@ public class PluginPackageManifestTests
         manifest.Author.Should().BeEmpty();
         manifest.Description.Should().BeEmpty();
         manifest.Type.Should().Be("strategy");
-        manifest.Strategies.Should().BeEmpty();
+        manifest.Plugins.Should().BeEmpty();
         manifest.Repository.Should().BeNull();
         manifest.Website.Should().BeNull();
     }
@@ -29,10 +29,11 @@ public class PluginPackageManifestTests
             Id = "test-pkg" ,
             Name = "Test Package" ,
             Version = "1.0.0" ,
-            Strategies =
+            Plugins =
             [
-                new PluginStrategyEntry
+                new PluginEntry
                 {
+                    Kind = PluginKind.Strategy ,
                     Path = "my_strategy" ,
                     Manifest = "my_strategy/manifest.json" ,
                     Assembly = "MyStrategy.dll" ,
@@ -45,7 +46,8 @@ public class PluginPackageManifestTests
 
         json.Should().Contain("\"id\":");
         json.Should().Contain("\"name\":");
-        json.Should().Contain("\"strategies\":");
+        json.Should().Contain("\"plugins\":");
+        json.Should().Contain("\"kind\":");
         json.Should().Contain("\"path\":");
         json.Should().Contain("\"manifest\":");
         json.Should().Contain("\"assembly\":");
@@ -63,14 +65,16 @@ public class PluginPackageManifestTests
             "author": "Author",
             "description": "A test package",
             "type": "strategy",
-            "strategies": [
+            "plugins": [
                 {
+                    "kind": "strategy",
                     "path": "strat1",
                     "manifest": "strat1/manifest.json",
                     "assembly": "Strat1.dll",
                     "entryType": "MyPlugin.Strategy1"
                 },
                 {
+                    "kind": "strategy",
                     "path": "strat2",
                     "manifest": "strat2/manifest.json",
                     "scriptFile": "script.lua",
@@ -88,27 +92,38 @@ public class PluginPackageManifestTests
         manifest.Author.Should().Be("Author");
         manifest.Description.Should().Be("A test package");
         manifest.Type.Should().Be("strategy");
-        manifest.Strategies.Should().HaveCount(2);
+        manifest.Plugins.Should().HaveCount(2);
 
-        manifest.Strategies[0].Path.Should().Be("strat1");
-        manifest.Strategies[0].Assembly.Should().Be("Strat1.dll");
-        manifest.Strategies[0].EntryType.Should().Be("MyPlugin.Strategy1");
+        manifest.Plugins[0].Kind.Should().Be(PluginKind.Strategy);
+        manifest.Plugins[0].Path.Should().Be("strat1");
+        manifest.Plugins[0].Assembly.Should().Be("Strat1.dll");
+        manifest.Plugins[0].EntryType.Should().Be("MyPlugin.Strategy1");
 
-        manifest.Strategies[1].Path.Should().Be("strat2");
-        manifest.Strategies[1].ScriptFile.Should().Be("script.lua");
-        manifest.Strategies[1].ScriptType.Should().Be("lua");
+        manifest.Plugins[1].Kind.Should().Be(PluginKind.Strategy);
+        manifest.Plugins[1].Path.Should().Be("strat2");
+        manifest.Plugins[1].ScriptFile.Should().Be("script.lua");
+        manifest.Plugins[1].ScriptType.Should().Be("lua");
     }
 
     [Fact]
-    public void PluginStrategyEntry_Defaults_ShouldBeEmpty ()
+    public void PluginEntry_Defaults_ShouldBeExpected ()
     {
-        var entry = new PluginStrategyEntry();
+        var entry = new PluginEntry();
+        entry.Kind.Should().Be(PluginKind.Strategy);
         entry.Path.Should().BeEmpty();
         entry.Manifest.Should().BeEmpty();
         entry.Assembly.Should().BeNull();
         entry.EntryType.Should().BeNull();
         entry.ScriptFile.Should().BeNull();
         entry.ScriptType.Should().BeNull();
+    }
+
+    [Fact]
+    public void PluginEntry_UnknownKind_ShouldBePreserved ()
+    {
+        const string json = """{"id":"p","plugins":[{"kind":"data-provider","path":"x"}]}""";
+        var manifest = JsonSerializer.Deserialize<PluginPackageManifest>(json , JsonOptions.CaseInsensitiveRead);
+        manifest!.Plugins[0].Kind.Should().Be("data-provider");
     }
 
     [Fact]

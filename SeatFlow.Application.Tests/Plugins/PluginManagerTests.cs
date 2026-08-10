@@ -96,7 +96,7 @@ public class PluginManagerTests : IDisposable
     public async Task InstallFromPackageAsync_InvalidManifest_ShouldThrow ()
     {
         var zipPath = CreateZipWithContent("no-id.ap-plugin" , "plugins-manifest.json" ,
-            "{\"name\":\"NoId\",\"strategies\":[]}");
+            "{\"name\":\"NoId\",\"plugins\":[]}");
 
         var manager = CreateManager();
         await manager.Invoking(m => m.InstallFromPackageAsync(zipPath , CancellationToken.None))
@@ -115,7 +115,7 @@ public class PluginManagerTests : IDisposable
             var stratDir = Path.Combine(tmpDir , "strat1");
             Directory.CreateDirectory(stratDir);
             File.WriteAllText(Path.Combine(tmpDir , "plugins-manifest.json") ,
-                "{\"id\":\"test-pkg\",\"name\":\"Test Package\",\"version\":\"1.0.0\",\"type\":\"strategy\",\"strategies\":[{\"path\":\"strat1\",\"manifest\":\"strat1/manifest.json\",\"assembly\":\"Strat1.dll\",\"entryType\":\"MyPlugin.Strategy1\"}]}");
+                "{\"id\":\"test-pkg\",\"name\":\"Test Package\",\"version\":\"1.0.0\",\"type\":\"strategy\",\"plugins\":[{\"kind\":\"strategy\",\"path\":\"strat1\",\"manifest\":\"strat1/manifest.json\",\"assembly\":\"Strat1.dll\",\"entryType\":\"MyPlugin.Strategy1\"}]}");
             File.WriteAllText(Path.Combine(stratDir , "manifest.json") ,
                 "{\"id\":\"strat1\",\"displayName\":\"Strategy 1\",\"defaultPriority\":50,\"defaultEnabled\":true,\"isIndependent\":true}");
 
@@ -215,8 +215,14 @@ public class PluginManagerTests : IDisposable
         Directory.CreateDirectory(tmpDir);
         try
         {
+            // 包内包含一个可加载的 Lua 脚本策略（空包不再注册）
+            var luaDir = Path.Combine(tmpDir , "lua");
+            Directory.CreateDirectory(luaDir);
+            File.WriteAllText(Path.Combine(luaDir , "script.lua") , "-- 空脚本");
+            File.WriteAllText(Path.Combine(luaDir , "manifest.json") ,
+                "{\"id\":\"strat1\",\"displayName\":\"Strat 1\",\"defaultPriority\":50,\"defaultEnabled\":true,\"isIndependent\":true}");
             File.WriteAllText(Path.Combine(tmpDir , "plugins-manifest.json") ,
-                "{\"id\":\"" + Path.GetFileNameWithoutExtension(fileName) + "\",\"name\":\"Test\",\"version\":\"1.0.0\",\"type\":\"strategy\",\"strategies\":[]}");
+                "{\"id\":\"" + Path.GetFileNameWithoutExtension(fileName) + "\",\"name\":\"Test\",\"version\":\"1.0.0\",\"type\":\"strategy\",\"plugins\":[{\"kind\":\"strategy\",\"path\":\"lua\",\"manifest\":\"lua/manifest.json\",\"scriptFile\":\"script.lua\",\"scriptType\":\"lua\"}]}");
 
             var zipPath = Path.Combine(_pluginsDir , fileName);
             var zipDir = Path.GetDirectoryName(zipPath);

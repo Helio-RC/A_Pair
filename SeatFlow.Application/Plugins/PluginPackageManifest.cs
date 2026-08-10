@@ -68,9 +68,10 @@ namespace SeatFlow.Application.Plugins
         public string Type { get; set; } = "strategy";
 
         /// <summary>
-        /// 插件包内包含的策略子组件列表。每个条目对应一个独立加载的策略。
+        /// 插件包内包含的插件条目列表（v2 格式，<c>plugins[]</c>）。
+        /// 每个条目对应一个独立加载的插件（当前支持 <c>kind: "strategy"</c>）。
         /// </summary>
-        [JsonPropertyName("strategies")]
-        public List<PluginStrategyEntry> Strategies { get; set; } = [];
+        [JsonPropertyName("plugins")]
+        public List<PluginEntry> Plugins { get; set; } = [];
     }
 }

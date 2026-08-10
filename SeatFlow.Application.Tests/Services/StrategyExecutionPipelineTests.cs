@@ -108,4 +108,54 @@ public class StrategyExecutionPipelineTests
         await pipeline.Awaiting(p => p.ExecuteAsync(workspace , cancellationToken: cts.Token))
             .Should().ThrowAsync<OperationCanceledException>();
     }
+
+    [Fact]
+    public async Task ExecuteAsync_PluginStrategiesMixedWithBuiltIn_ExecutedByPriority ()
+    {
+        // 插件策略 Priority=20（最高），内置策略 Priority=5
+        var plugin = Substitute.For<IPluginSeatingStrategy>();
+        plugin.Id.Returns("p1");
+        plugin.Name.Returns("Plugin1");
+        plugin.Priority.Returns(20);
+        plugin.IsEnabled.Returns(true);
+        plugin.ExecuteAsync(Arg.Any<IPluginWorkspace>() , Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new PluginStrategyResult { Success = true }));
+
+        var builtIn = Substitute.For<ISeatingStrategy>();
+        builtIn.Id.Returns("s1");
+        builtIn.Name.Returns("Strat1");
+        builtIn.Priority.Returns(5);
+        builtIn.IsEnabled.Returns(true);
+        builtIn.ExecuteAsync(Arg.Any<SeatingWorkspace>() , Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new StrategyExecutionResult { Success = true }));
+
+        var pipeline = new StrategyExecutionPipeline([builtIn] , [plugin]);
+        var workspace = new SeatingWorkspace(new List<Student>() , new List<Seat>());
+
+        // Act
+        await pipeline.ExecuteAsync(workspace , cancellationToken: CancellationToken.None);
+
+        // Assert: 插件（priority 20）先于内置（priority 5）执行
+        Received.InOrder(() =>
+        {
+            plugin.ExecuteAsync(Arg.Any<IPluginWorkspace>() , Arg.Any<CancellationToken>());
+            builtIn.ExecuteAsync(workspace , Arg.Any<CancellationToken>());
+        });
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_DisabledPluginStrategyNotCalled ()
+    {
+        var plugin = Substitute.For<IPluginSeatingStrategy>();
+        plugin.Id.Returns("p1");
+        plugin.Priority.Returns(20);
+        plugin.IsEnabled.Returns(false);
+
+        var pipeline = new StrategyExecutionPipeline([plugin]);
+        var workspace = new SeatingWorkspace(new List<Student>() , new List<Seat>());
+
+        await pipeline.ExecuteAsync(workspace , cancellationToken: CancellationToken.None);
+
+        await plugin.DidNotReceive().ExecuteAsync(Arg.Any<IPluginWorkspace>() , Arg.Any<CancellationToken>());
+    }
 }
