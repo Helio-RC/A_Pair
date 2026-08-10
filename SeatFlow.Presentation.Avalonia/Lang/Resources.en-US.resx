@@ -885,6 +885,15 @@ This cannot be undone.</value>
   <data name="Plugin_FoundFmt" xml:space="preserve">
     <value>Plugins found ({0})</value>
   </data>
+  <data name="Plugin_Install" xml:space="preserve">
+    <value>Install Plugin</value>
+  </data>
+  <data name="Plugin_InstallFailed" xml:space="preserve">
+    <value>Plugin install failed</value>
+  </data>
+  <data name="Plugin_InstalledFmt" xml:space="preserve">
+    <value>Plugin package {0} installed</value>
+  </data>
   <data name="Plugin_JSONErrorFmt" xml:space="preserve">
     <value>JSON format error: {0}</value>
   </data>

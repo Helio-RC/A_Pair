@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text.Json;
@@ -6,6 +8,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using SeatFlow.Application.Interfaces;
 using SeatFlow.Presentation.Avalonia.Lang;
+using SeatFlow.Presentation.Avalonia.Services;
+using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
@@ -13,10 +17,17 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace SeatFlow.Presentation.Avalonia.ViewModels;
 
-public partial class PluginManagementViewModel (IApplicationFacade facade , ILogger<PluginManagementViewModel>? logger = null) : ViewModelBase
+public partial class PluginManagementViewModel (
+    IApplicationFacade facade ,
+    IFileService fileService ,
+    ILogger<PluginManagementViewModel>? logger = null) : ViewModelBase , IFileDropHandler
 {
     private readonly IApplicationFacade _facade = facade;
+    private readonly IFileService _fileService = fileService;
     private readonly ILogger<PluginManagementViewModel> _logger = logger ?? NullLogger<PluginManagementViewModel>.Instance;
+
+    /// <inheritdoc />
+    public IReadOnlyList<string> AcceptedFileExtensions { get; } = [".ap-plugin"];
 
 
     public string PluginCountDisplay => string.Format(Resources.Plugin_FoundFmt , Plugins.Count);
@@ -107,6 +118,52 @@ public partial class PluginManagementViewModel (IApplicationFacade facade , ILog
     private CancellationTokenSource? _loadCts;
 
     // ── 命令 ──
+
+    /// <summary>
+    /// 安装插件包命令：通过文件选择器选取 <c>.ap-plugin</c> 并安装。
+    /// </summary>
+    [RelayCommand]
+    private async Task InstallPlugin ()
+    {
+        var file = await _fileService.OpenFileAsync(
+            Resources.Plugin_Install ,
+            [new FilePickerFileType("SeatFlow Plugin") { Patterns = ["*.ap-plugin"] }]);
+        if (file == null) return;
+
+        await SafeExecuteAsync(async () =>
+        {
+            await InstallPackageAsync(file.Path.LocalPath);
+        } , Resources.Plugin_InstallFailed);
+    }
+
+    /// <summary>
+    /// 安装插件包（供按钮与拖放共用）。
+    /// </summary>
+    /// <param name="packagePath">.ap-plugin 文件路径。</param>
+    /// <param name="ct">取消令牌（拖放场景传入页面级取消令牌）。</param>
+    private async Task InstallPackageAsync (string packagePath , CancellationToken ct = default)
+    {
+        var targetDir = await _facade.InstallPluginPackageAsync(packagePath , ct);
+        _logger?.LogInformation("插件包已安装: {TargetDir}" , targetDir);
+        StatusMessage = string.Format(Resources.Plugin_InstalledFmt , Path.GetFileNameWithoutExtension(packagePath));
+        await RefreshPlugins();
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> HandleFileDropAsync (IReadOnlyList<string> filePaths , CancellationToken ct)
+    {
+        var packagePath = filePaths.FirstOrDefault();
+        if (string.IsNullOrEmpty(packagePath))
+            return false;
+
+        var installed = false;
+        await SafeExecuteAsync(async () =>
+        {
+            await InstallPackageAsync(packagePath , ct);
+            installed = true;
+        } , Resources.Plugin_InstallFailed);
+        return installed;
+    }
 
     [RelayCommand]
     private async Task RefreshPlugins ()

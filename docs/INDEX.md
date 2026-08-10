@@ -34,7 +34,8 @@ README.md                     ← 项目入口，功能概览 + 开发状态
 │       ├── ADR-008-onboarding-demo-data-injection.md ← 引导系统纯内存示例数据注入
 │       ├── ADR-009-arrangement-counter.md ← 排座次数计数器客户端实现
 │       ├── ADR-010-velopack-oss-distribution.md ← Velopack 自动更新与 OSS 分发架构
-│       └── ADR-011-keyboard-shortcuts.md ← 全局键盘快捷键系统（Behavior + Tunnel + 设置开关）
+│       ├── ADR-011-keyboard-shortcuts.md ← 全局键盘快捷键系统（Behavior + Tunnel + 设置开关）
+│       └── ADR-012-plugin-first-class-architecture.md ← 插件一级类型架构（去包装链、plugins-manifest v2、ALC 卸载模式、脚本安全边界）
 ├── SeatFlow.Presentation.Avalonia/docs/
 │   ├── Design_Spec.md        ← UI 设计规范（色板、字体、间距）
 │   ├── DragDrop.md           ← Avalonia 12 拖放实现模式与踩坑记录

@@ -319,8 +319,10 @@ UI 层通过 `LocalizeHelper.Resolve(dict)` 按 `CurrentUICulture` 解析。
 4.6 插件化策略
 
 · Assembly 插件：编译为 DLL，实现 IPluginSeatingStrategy。
-· Script 插件：支持 Lua / C# Script，逻辑完全由脚本文件描述。
-· 插件清单：双层架构 — `plugins-manifest.json`（包级，定义加载指令）+ 策略 `manifest.json`（定义 ID、parameters、codeBlocks 等，格式与内置策略一致）。
+· Script 插件：支持 Lua / C# Script，逻辑完全由脚本文件描述（脚本宿主直接实现插件接口，无适配器包装）。
+· 依赖策略插件：`isIndependent: false`，实现 IPluginDependentSeatingStrategy，由 Core 层 PluginDependentAdapter 接入 RandomFill 评估循环（批准/拒绝/已处理三态）。
+· 插件清单：双层架构（v2，ADR-012）— `plugins-manifest.json`（包级，`plugins[]` 加载指令 + `kind` 类型字段）+ 策略 `manifest.json`（定义 ID、parameters、codeBlocks 等，格式与内置策略一致）。
+· 插件为策略管线一级类型：StrategyExecutionPipeline 直接执行 IPluginSeatingStrategy（与内置策略按 Priority 混排）。
 
 ---
 

@@ -1,23 +1,36 @@
-using SeatFlow.Core.Strategies;
-using SeatFlow.Core.Workspace;
+using SeatFlow.Contracts.Interfaces;
+using SeatFlow.Contracts.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NLua.Exceptions;
 
 namespace SeatFlow.Application.Scripting.Lua
 {
-    public class LuaScriptStrategy : ISeatingStrategy
+    /// <summary>
+    /// Lua 脚本策略，将 Lua 脚本作为插件策略执行。
+    /// 直接实现 <see cref="IPluginSeatingStrategy"/>，是插件系统中的一级策略类型。
+    /// </summary>
+    public class LuaScriptStrategy : IPluginSeatingStrategy
     {
         private readonly string _scriptCode;
         private readonly LuaScriptConfiguration _config;
         private readonly ILogger<LuaScriptStrategy> _logger;
 
-        public LuaScriptStrategy (string scriptCode , LuaScriptConfiguration? config = null , ILogger<LuaScriptStrategy>? logger = null)
+        /// <summary>
+        /// 初始化 Lua 脚本策略。
+        /// </summary>
+        /// <param name="scriptCode">Lua 脚本源代码。</param>
+        /// <param name="strategyId">策略唯一标识（来自策略 manifest id，保证配置路由一致）。</param>
+        /// <param name="version">策略版本号（来自策略 manifest）。</param>
+        /// <param name="config">脚本策略配置。</param>
+        /// <param name="logger">日志记录器。</param>
+        public LuaScriptStrategy (string scriptCode , string strategyId , string? version = null , LuaScriptConfiguration? config = null , ILogger<LuaScriptStrategy>? logger = null)
         {
             _scriptCode = scriptCode ?? throw new ArgumentNullException(nameof(scriptCode));
             _config = config ?? new LuaScriptConfiguration();
             _logger = logger ?? NullLogger<LuaScriptStrategy>.Instance;
-            Id = Guid.NewGuid().ToString();
+            Id = strategyId;
+            Version = version ?? "1.0.0";
             Name = _config.StrategyName ?? "LuaScript";
             Priority = _config.Priority;
             IsEnabled = _config.Enabled;
@@ -25,6 +38,9 @@ namespace SeatFlow.Application.Scripting.Lua
 
         /// <inheritdoc />
         public string Id { get; }
+
+        /// <inheritdoc />
+        public string Version { get; }
 
         /// <inheritdoc />
         public string Name { get; }
@@ -36,50 +52,73 @@ namespace SeatFlow.Application.Scripting.Lua
         public bool IsEnabled { get; set; }
 
         /// <inheritdoc />
-        public async Task<StrategyExecutionResult> ExecuteAsync (SeatingWorkspace workspace , CancellationToken cancellationToken)
+        public async Task<PluginStrategyResult> ExecuteAsync (IPluginWorkspace workspace , CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(workspace);
-
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(_config.TimeoutMilliseconds);
 
             try
             {
                 _logger.LogInformation("Lua 脚本策略开始执行：{Name}" , Name);
-                using var lua = CreateRestrictedLuaState();
 
+                // 注意：此处不能 using——Lua state 的释放由执行线程的 finally 负责，
+                // 超时路径绝不与正在运行的 VM 并发 Dispose（避免原生层崩溃）。
+                var lua = CreateRestrictedLuaState();
                 var api = new LuaWorkspaceAPI(workspace);
                 lua["workspace"] = api;
                 lua["cancellationToken"] = cancellationToken;
 
-                await Task.Run(() => lua.DoString(_scriptCode) , cts.Token);
+                // 脚本与 Dispose 在同一线程内依次执行；脚本结束后（或进程退出时）资源自然回收
+                var execTask = Task.Run(() =>
+                {
+                    try
+                    {
+                        lua.DoString(_scriptCode);
+                        _logger.LogInformation("Lua 脚本策略执行完成：{Name}" , Name);
+                        return new PluginStrategyResult { Success = true };
+                    }
+                    catch (LuaScriptException ex)
+                    {
+                        _logger.LogWarning(ex , "Lua 脚本错误：{Name}" , Name);
+                        return new PluginStrategyResult { Success = false , Message = $"Lua 错误: {ex.Message}" };
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex , "Lua 脚本执行失败：{Name}" , Name);
+                        return new PluginStrategyResult { Success = false , Message = $"执行失败: {ex.Message}" };
+                    }
+                    finally
+                    {
+                        lua.Dispose();
+                    }
+                } , cancellationToken);
 
-                _logger.LogInformation("Lua 脚本策略执行完成：{Name}" , Name);
-                return new StrategyExecutionResult { Success = true };
+                var timeoutTask = Task.Delay(_config.TimeoutMilliseconds , cancellationToken);
+
+                if (await Task.WhenAny(execTask , timeoutTask) == timeoutTask)
+                {
+                    if (!timeoutTask.IsCompletedSuccessfully)
+                        throw new OperationCanceledException(cancellationToken);
+
+                    // 超时：返回失败。受 .NET 进程内脚本宿主限制，无法强制中断 Lua VM 死循环——
+                    // 脚本在后台继续运行直至自行结束（或进程退出），期间不并发释放其 Lua state。
+                    // 安全边界详见 SDK 文档：脚本插件仅应从可信来源安装。
+                    _logger.LogWarning(
+                        "Lua 脚本执行超时：{Name}（{Timeout}ms），脚本将在后台继续运行直至自行结束" ,
+                        Name , _config.TimeoutMilliseconds);
+                    return new PluginStrategyResult { Success = false , Message = "脚本执行超时" };
+                }
+
+                return await execTask;
             }
             catch (OperationCanceledException)
             {
-                _logger.LogWarning("Lua 脚本执行超时：{Name}（{Timeout}ms）" , Name , _config.TimeoutMilliseconds);
-                return new StrategyExecutionResult { Success = false , Message = "脚本执行超时" };
-            }
-            catch (LuaScriptException ex)
-            {
-                _logger.LogWarning(ex , "Lua 脚本错误：{Name}" , Name);
-                return new StrategyExecutionResult { Success = false , Message = $"Lua 错误: {ex.Message}" };
+                throw;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex , "Lua 脚本执行失败：{Name}" , Name);
-                return new StrategyExecutionResult { Success = false , Message = $"执行失败: {ex.Message}" };
+                return new PluginStrategyResult { Success = false , Message = $"执行失败: {ex.Message}" };
             }
-        }
-
-        /// <inheritdoc />
-        public ValidationResult ValidateConfiguration ()
-        {
-            if (string.IsNullOrWhiteSpace(_scriptCode))
-                return new ValidationResult { IsValid = false , Error = "脚本代码不能为空" };
-            return new ValidationResult { IsValid = true };
         }
 
         /// <summary>
@@ -87,8 +126,10 @@ namespace SeatFlow.Application.Scripting.Lua
         /// </summary>
         /// <remarks>
         /// 当前移除的全局库：<c>io</c>（文件操作）、<c>os</c>（系统操作）、
-        /// <c>package</c>（模块加载）、<c>debug</c>（调试功能）。
-        /// 内存限制尚未实现（TODO）。
+        /// <c>package</c>（模块加载）、<c>debug</c>（调试功能）、<c>require</c>（模块加载函数）。
+        /// <c>import</c>（.NET 程序集加载）被覆盖为空函数，阻止脚本访问任意 .NET 类型。
+        /// 内存限制尚未实现（TODO）。超时无法强制中断 Lua VM（与 Roslyn C# 脚本同理），
+        /// 脚本插件应仅从可信来源安装。
         /// </remarks>
         /// <returns>受限的 Lua 状态实例。</returns>
         private static global::NLua.Lua CreateRestrictedLuaState ()
@@ -99,6 +140,8 @@ namespace SeatFlow.Application.Scripting.Lua
         os = nil
         package = nil
         debug = nil
+        require = nil
+        import = function () end
     ");
             //TODO:GC还没有找到好的办法，暂时不限制内存，后续可以考虑通过监控 Lua 内存使用情况来实现
             return lua;
@@ -112,10 +155,10 @@ namespace SeatFlow.Application.Scripting.Lua
     /// Lua 脚本通过全局变量 <c>workspace</c> 访问此 API 的方法。
     /// 所有方法均设计为简单类型输入/输出，以兼容 Lua 的类型系统。
     /// </remarks>
-    /// <param name="workspace">当前座位工作区。</param>
-    public class LuaWorkspaceAPI (SeatingWorkspace workspace)
+    /// <param name="workspace">当前座位工作区（插件受限视图）。</param>
+    public class LuaWorkspaceAPI (IPluginWorkspace workspace)
     {
-        private readonly SeatingWorkspace _workspace = workspace;
+        private readonly IPluginWorkspace _workspace = workspace;
 
         /// <summary>
         /// 获取所有未分配的学生 ID 列表。
@@ -123,7 +166,7 @@ namespace SeatFlow.Application.Scripting.Lua
         /// <returns>未分配学生的 ID 数组。</returns>
         public string[] GetUnassignedStudentIds ()
         {
-            var assignedIds = _workspace.BuildSeatingPlan().Assignments.Values;
+            var assignedIds = _workspace.GetAssignments().Values;
             return [.. _workspace.Students
                 .Select(s => s.Id)
                 .Where(id => !assignedIds.Contains(id))];

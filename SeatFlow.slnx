@@ -7,6 +7,7 @@
   <Project Path="SeatFlow.Core/SeatFlow.Core.csproj" />
   <Project Path="SeatFlow.Infrastructure.Tests/SeatFlow.Infrastructure.Tests.csproj" />
   <Project Path="SeatFlow.Infrastructure/SeatFlow.Infrastructure.csproj" />
+  <Project Path="SeatFlow.Plugin.TestFixture/SeatFlow.Plugin.TestFixture.csproj" />
   <Project Path="SeatFlow.Plugins.Sdk/SeatFlow.Plugins.Sdk.csproj" />
   <Project Path="SeatFlow.Presentation.Avalonia/SeatFlow.Presentation.Avalonia.csproj" Id="3ca31cc4-b276-4fff-bbc2-5c3d43f8c251" />
 </Solution>

@@ -44,6 +44,7 @@ public static class PluginPackage
 
     /// <summary>
     /// 验证 ZIP 文件是否安全（检查压缩炸弹、总大小、条目数）。
+    /// 实现收敛于 <see cref="SeatFlow.Contracts.Utilities.PluginArchiveSafety"/>（宿主与 SDK 共享）。
     /// </summary>
     /// <param name="archivePath">ZIP 文件路径。</param>
     /// <returns>验证失败时返回错误描述；通过时返回 <c>null</c>。</returns>
@@ -51,36 +52,7 @@ public static class PluginPackage
     {
         try
         {
-            using var archive = ZipFile.OpenRead(archivePath);
-            var entries = archive.Entries;
-            if (entries.Count > MaxEntryCount)
-                return $"ZIP 条目数 ({entries.Count}) 超过上限 ({MaxEntryCount})";
-
-            long totalUncompressed = 0;
-            foreach (var entry in entries)
-            {
-                if (string.IsNullOrEmpty(entry.Name) && entry.FullName.EndsWith('/'))
-                    continue;
-
-                // ZIP Slip 防护：禁止路径遍历和绝对路径
-                if (entry.FullName.Contains("..") || Path.IsPathRooted(entry.FullName))
-                    return $"条目 \"{entry.FullName}\" 包含非法路径（禁止 ../ 或绝对路径）";
-
-                var compressed = entry.CompressedLength;
-                var uncompressed = entry.Length;
-
-                totalUncompressed += uncompressed;
-                if (totalUncompressed > MaxUncompressedSize)
-                    return $"ZIP 解压后总大小 ({totalUncompressed / 1024 / 1024:N0} MB) 超过上限 ({MaxUncompressedSize / 1024 / 1024:N0} MB)";
-
-                if (compressed > 0 && uncompressed > 0)
-                {
-                    var ratio = uncompressed / (double)compressed;
-                    if (ratio > MaxCompressionRatio)
-                        return $"条目 \"{entry.FullName}\" 压缩比 ({ratio:N0}:1) 超过上限 ({MaxCompressionRatio}:1)，疑似 ZIP 炸弹";
-                }
-            }
-            return null;
+            return SeatFlow.Contracts.Utilities.PluginArchiveSafety.Validate(archivePath);
         }
         catch (InvalidDataException)
         {
@@ -212,10 +184,10 @@ public static class PluginPackage
                 if (!root.TryGetProperty("id" , out var idElem) || idElem.GetString() is not string id || string.IsNullOrEmpty(id))
                     return "plugins-manifest.json 格式无效：缺少 id 字段";
 
-                if (!root.TryGetProperty("strategies" , out var strategiesElem) ||
-                    strategiesElem.ValueKind != JsonValueKind.Array ||
-                    strategiesElem.GetArrayLength() == 0)
-                    return "plugins-manifest.json 格式无效：strategies 数组为空或缺失";
+                if (!root.TryGetProperty("plugins" , out var pluginsElem) ||
+                    pluginsElem.ValueKind != JsonValueKind.Array ||
+                    pluginsElem.GetArrayLength() == 0)
+                    return "plugins-manifest.json 格式无效：plugins 数组为空或缺失（v2 格式）";
             }
             catch (JsonException ex)
             {

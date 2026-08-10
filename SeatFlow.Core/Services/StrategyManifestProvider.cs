@@ -118,7 +118,7 @@ public class StrategyManifestProvider
     /// 比较两个语义化版本号字符串（如 "1.0" vs "2.0"）。
     /// 返回值：&lt;0 = a 小于 b，0 = 相等，&gt;0 = a 大于 b。
     /// </summary>
-    internal static int CompareVersions (string? a , string? b)
+    public static int CompareVersions (string? a , string? b)
     {
         if (a is null && b is null) return 0;
         if (a is null) return -1;

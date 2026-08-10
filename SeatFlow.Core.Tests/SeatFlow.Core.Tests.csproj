@@ -19,6 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\SeatFlow.Contracts\SeatFlow.Contracts.csproj" />
     <ProjectReference Include="..\SeatFlow.Core\SeatFlow.Core.csproj" />
     <ProjectReference Include="..\SeatFlow.Infrastructure\SeatFlow.Infrastructure.csproj" />
   </ItemGroup>

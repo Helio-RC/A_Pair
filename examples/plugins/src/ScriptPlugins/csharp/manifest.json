@@ -1,0 +1,17 @@
+{
+  "id": "order-assign",
+  "name": "OrderAssign",
+  "displayName": "空座顺序分配（C# 脚本）",
+  "version": "1.0.0",
+  "manifestVersion": "1.0",
+  "description": "C# 脚本策略：按座位 ID 顺序分配剩余学生。",
+  "author": "SeatFlow Examples",
+  "category": "assignment",
+  "defaultPriority": 55,
+  "defaultEnabled": true,
+  "visible": true,
+  "isIndependent": true,
+  "parameters": [],
+  "codeBlocks": [],
+  "messages": {}
+}

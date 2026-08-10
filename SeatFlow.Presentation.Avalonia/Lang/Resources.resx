@@ -885,6 +885,15 @@
   <data name="Plugin_FoundFmt" xml:space="preserve">
     <value>已发现插件（{0}）</value>
   </data>
+  <data name="Plugin_Install" xml:space="preserve">
+    <value>安装插件</value>
+  </data>
+  <data name="Plugin_InstallFailed" xml:space="preserve">
+    <value>安装插件失败</value>
+  </data>
+  <data name="Plugin_InstalledFmt" xml:space="preserve">
+    <value>插件包 {0} 已安装</value>
+  </data>
   <data name="Plugin_JSONErrorFmt" xml:space="preserve">
     <value>JSON 格式错误: {0}</value>
   </data>

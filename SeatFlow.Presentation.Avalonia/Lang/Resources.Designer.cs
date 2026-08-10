@@ -300,6 +300,9 @@ public class Resources
     public static string Plugin_Disabled => ResourceManager.GetString("Plugin_Disabled", Culture)!;
     public static string Plugin_Enable => ResourceManager.GetString("Plugin_Enable", Culture)!;
     public static string Plugin_FoundFmt => ResourceManager.GetString("Plugin_FoundFmt", Culture)!;
+    public static string Plugin_Install => ResourceManager.GetString("Plugin_Install", Culture)!;
+    public static string Plugin_InstallFailed => ResourceManager.GetString("Plugin_InstallFailed", Culture)!;
+    public static string Plugin_InstalledFmt => ResourceManager.GetString("Plugin_InstalledFmt", Culture)!;
     public static string Plugin_JSONErrorFmt => ResourceManager.GetString("Plugin_JSONErrorFmt", Culture)!;
     public static string Plugin_LoadConfigFailed => ResourceManager.GetString("Plugin_LoadConfigFailed", Culture)!;
     public static string Plugin_LoadScriptFailed => ResourceManager.GetString("Plugin_LoadScriptFailed", Culture)!;
