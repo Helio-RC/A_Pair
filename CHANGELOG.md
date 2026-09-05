@@ -2,7 +2,7 @@
 
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
-## [Unreleased]
+## [2.0.0] — 2026-09-05
 
 ### Removed
 - **移除插件系统（ADR-013）**：删除 `SeatFlow.Contracts`、`SeatFlow.Plugins.Sdk`、`SeatFlow.Plugin.TestFixture` 项目与 `src/plugin-examples/`，并移除 `NLua`、`Microsoft.CodeAnalysis.CSharp.Scripting` 两个 NuGet 依赖
