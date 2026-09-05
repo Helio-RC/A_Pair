@@ -212,22 +212,6 @@
           "target": "SaveLayoutButton"
         }
       ]
-    },
-    "PluginManagement": {
-      "page": "PluginManagement",
-      "steps": [
-        {
-          "titleKey": "Guide_Plugin_List_Title",
-          "descKey": "Guide_Plugin_List_Desc",
-          "target": "PluginListBox"
-        },
-        {
-          "titleKey": "Guide_Plugin_Enable_Title",
-          "descKey": "Guide_Plugin_Enable_Desc",
-          "target": "PluginEnabledSwitch",
-          "placement": "Left"
-        }
-      ]
     }
   }
 }

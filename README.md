@@ -25,7 +25,7 @@
 
 - [x] **多格式数据导入** — CSV、Excel（XLSX）、JSON 学生名单导入
 - [x] **智能排座引擎** — 7 条内置策略管道执行（4 独立 + 3 依赖）：固定座位、前排轮换、性别限制、同桌分组、同桌上一次、随机填充、碎片整理；策略按优先级 Fill-in-Order 模型执行
-- [x] **插件扩展** — 第三方可通过 DLL、Lua 脚本、C# 脚本编写自定义排座策略，拖入即用
+- [x] **策略扩展建议** — 新策略以内置方式加入（2.0.0 起插件系统移除，见 [ADR-013](docs/adr/ADR-013-remove-plugin-system.md)），通过 [New Strategy issue 模板](.github/ISSUE_TEMPLATE/new-strategy.md) 提议
 - [x] **手动微调** — 拖拽交换座位，全功能撤销/重做
 - [x] **多种布局** — 网格、环形/扇形、自由点教室布局；支持障碍物（柱子、讲台）
 - [x] **多格式导出** — Excel、CSV、PDF、图片导出座位表
@@ -61,8 +61,8 @@ dotnet test
 
 - **Bug 反馈**：请在 [GitHub Issues](https://github.com/Helio-RC/Seatflow/issues) 提交，附上操作系统版本和复现步骤，最好能附上日志
 - **功能建议**：欢迎提交 Feature Request
+- **新策略请求**：使用 [New Strategy issue 模板](.github/ISSUE_TEMPLATE/new-strategy.md) 描述排座策略（内置实现，无插件机制）
 - **界面美化**：初代开发者审美不好，欢迎各位大能贡献 UI 设计和图标资源
-- **插件开发**：参见 [docs/sdk/README.md](docs/sdk/README.md) 插件开发指南 `尚未完善 🚧 部分支持`
 - **参与开发**：参见 [CONTRIBUTING.md](CONTRIBUTING.md) 了解构建环境、项目结构和编码规范
 - **AI 辅助开发**：本项目使用 Claude Code & Deepseek V4 preview 辅助开发。项目级 AI 配置位于 [CLAUDE.md](CLAUDE.md)，包含架构约定、代码模式和开发命令。建议 AI 开发者先阅读此文件和 [docs/adr/](docs/adr/) 中的架构决策记录
 
@@ -83,7 +83,7 @@ Core           Infrastructure
 | 层 | 职责 |
 |----|------|
 | **Core** | 领域实体（`Student`, `Seat`）、策略接口、领域服务 |
-| **Application** | 外观模式入口、策略管道、插件管理、撤销/重做 |
+| **Application** | 外观模式入口、策略管道、撤销/重做 |
 | **Infrastructure** | CSV/Excel/JSON 导入导出、网格/环形/自由布局构建、PDF/图片导出、文件版本迁移 |
 | **Presentation** | Avalonia 12 桌面 UI、MVVM（CommunityToolkit.Mvvm）、编译绑定 |
 
@@ -104,7 +104,6 @@ MIT License © 2026 SeatFlow Contributors
 | [docs/adr/](docs/adr/) | 架构决策记录 |
 | [Design_Spec.md](docs/presentation/Design_Spec.md) | UI 设计规范 |
 | [Fluent_Icons.md](docs/presentation/Fluent_Icons.md) | 图标参考 |
-| [Plugins.Sdk/README.md](docs/sdk/README.md) | 插件开发 SDK 文档 |
 
 ---
 

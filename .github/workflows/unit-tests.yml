@@ -30,7 +30,6 @@ jobs:
               "infra": ["src/SeatFlow.Infrastructure/**"],
               "app": ["src/SeatFlow.Application/**"],
               "pres": ["src/SeatFlow.Presentation.Avalonia/**"],
-              "plugins": ["src/SeatFlow.Plugins.Sdk/**"],
               "tests-core": ["tests/SeatFlow.Core.Tests/**"],
               "tests-infra": ["tests/SeatFlow.Infrastructure.Tests/**"],
               "tests-app": ["tests/SeatFlow.Application.Tests/**"]

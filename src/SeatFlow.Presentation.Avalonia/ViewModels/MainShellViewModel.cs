@@ -73,10 +73,6 @@ public partial class MainShellViewModel : ViewModelBase
     private bool IsPageEnabled (string key) =>
         !_pageNav.TryGetValue(key , out var enabled) || enabled;
 
-    public double PluginManagementOpacity => IsPageEnabled("PluginManagement") ? 1.0 : 0.4;
-    public string? PluginManagementDisabledTip =>
-        IsPageEnabled("PluginManagement") ? null : Resources.Nav_PluginDisabled;
-
     /// <summary>页面淡出时长。</summary>
     private static readonly TimeSpan FadeOutDuration = TimeSpan.FromMilliseconds(200);
     /// <summary>新旧页切换间隙。</summary>

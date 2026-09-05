@@ -3,8 +3,6 @@ global using System.Collections.Generic;
 global using System.Linq;
 global using System.Threading;
 global using System.Threading.Tasks;
-global using SeatFlow.Contracts.Interfaces;
-global using SeatFlow.Contracts.Models;
 global using SeatFlow.Core.DomainServices;
 global using SeatFlow.Core.Models;
 global using SeatFlow.Core.Strategies;

@@ -13,7 +13,6 @@ public enum PageKey
     StrategyConfiguration,
     SeatingArrangement,
     SnapshotHistory,
-    PluginManagement,
     Settings,
     About
 }

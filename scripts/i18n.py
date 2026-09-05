@@ -37,7 +37,7 @@ from typing import Optional
 KNOWN_CATEGORIES = [
     "About", "App", "Common", "ConfigBlock", "Data",
     "Freeform", "Gender", "Guide", "Home", "Lang",
-    "Member", "Nav", "Plugin", "Seating", "Settings",
+    "Member", "Nav", "Seating", "Settings",
     "Snapshot", "Startup", "Strategy", "Theme", "Venue",
     "Watchdog", "Zoom",
 ]

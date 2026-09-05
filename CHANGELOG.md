@@ -2,28 +2,14 @@
 
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
-## [Unreleased]
+## [2.0.0] — 2026-09-05
 
-### Added
-- **插件一级类型架构（ADR-012）**：删除 `PluginStrategyAdapter`/`LuaScriptPluginAdapter`/`CSharpScriptPluginAdapter` 三个适配器包装类，`StrategyExecutionPipeline` 直接执行 `IPluginSeatingStrategy`，插件与内置策略按优先级混排
-- **插件依赖策略**：新增 `IPluginDependentSeatingStrategy`（Contracts）+ `PluginDependentAdapter`（Core）接入 RandomFill 评估循环（Approve/Reject/Handled 三态），替换原"默认批准所有分配"的 TODO 警告
-- **plugins-manifest.json v2 格式**：`strategies[]` → `plugins[]`（新增 `kind` 字段：`"strategy"` 已实现，`"data-provider"`/`"exporter"` 预留），不再兼容 v1
-- **插件管理页安装通道**："安装插件"按钮 + `.ap-plugin` 拖放安装
-- **示例插件仓库**：`src/plugin-examples/`（身高排序 / 同桌配对依赖策略 / Lua / C# 脚本 / 多策略包）+ `build.sh` 打包脚本
-- **插件集成测试**：`Application.Tests/Plugins/Integration/` 端到端验证（装配、执行、配置路由、未知 kind 跳过）；`SeatFlow.Plugin.TestFixture` 测试夹具项目
-
-### Changed
-- Lua/C# 脚本策略直接实现 `IPluginSeatingStrategy`，构造注入 manifest id（修复配置路由失效）
-- AssemblyLoadContext 卸载遵循官方可回收模式：先清字典强引用 → `Unload()` → 弱引用循环探测（**压缩式强制 GC**，普通 `GC.Collect()` 无法回收 collectible ALC）；加载失败路径不再泄漏上下文
-- `IPluginSeat.IsFixed` 改为只读，固定座唯一修改通道 `TryMarkFixed`（能力校验）
-- 插件策略 manifest 版本校验（`manifestVersion` 超限警告，复用 `StrategyManifestProvider`）
-- `ValidateZipSafety` 收敛到 `Contracts.Utilities.PluginArchiveSafety`（宿主与 SDK 共享）
-- Lua 沙箱增强：追加禁用 `require`、覆盖 `import`；超时后不再与运行中的 Lua VM 并发 Dispose（修复 SIGABRT 崩溃）
-- `StrategyManifestProvider.CompareVersions` 提升为 public
-
-### Fixed
-- 脚本插件 ID 断裂导致配置保存/加载路由错误（manifest id 注入）
-- 单包卸载/刷新/加载失败路径的 AssemblyLoadContext 泄漏
+### Removed
+- **移除插件系统（ADR-013）**：删除 `SeatFlow.Contracts`、`SeatFlow.Plugins.Sdk`、`SeatFlow.Plugin.TestFixture` 项目与 `src/plugin-examples/`，并移除 `NLua`、`Microsoft.CodeAnalysis.CSharp.Scripting` 两个 NuGet 依赖
+- 删除插件运行时（`PluginManager`、`PluginLoadContext`、包清单与配置服务）与 Lua/C# 脚本策略（`Application/Scripting/`）
+- 删除能力系统（`Capability.cs`、`IFixedSeatCapability`、`TryMarkFixed` 能力校验），`FixedSeatStrategy` 直接设置 `Seat.IsFixed`
+- 删除插件管理页（`PageKey.PluginManagement`）、相关 i18n 键与 `onboarding_config.json` 页面引导
+- 删除插件系统文档：`docs/sdk/`、ADR-007、ADR-012；ADR-003 修订为纯分层架构；ADR-013 记录本决策
 
 ## [1.4.1] — 2026-07-24
 

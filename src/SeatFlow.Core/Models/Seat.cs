@@ -1,5 +1,4 @@
 using System.Text.Json.Serialization;
-using SeatFlow.Contracts.Models;
 using SeatFlow.Core.Utilities;
 
 namespace SeatFlow.Core.Models
@@ -20,7 +19,7 @@ namespace SeatFlow.Core.Models
     /// <summary>
     /// 座位抽象基类，定义所有座位类型的公共属性。
     /// </summary>
-    public abstract class Seat : IPluginSeat
+    public abstract class Seat
     {
         /// <summary>座位唯一标识符，默认自动生成 GUID。</summary>
         public string Id { get; set; } = Guid.NewGuid().ToString();
@@ -44,7 +43,7 @@ namespace SeatFlow.Core.Models
         /// <summary>当前占用该座位的学生 ID，null 表示无人占用。</summary>
         public string? OccupantId { get; set; }
 
-        /// <summary>扩展属性挂载点，供插件或自定义逻辑附加额外数据。</summary>
+        /// <summary>扩展属性挂载点，供自定义逻辑附加额外数据。</summary>
         public AttributeBag Extensions { get; set; } = new();
     }
 

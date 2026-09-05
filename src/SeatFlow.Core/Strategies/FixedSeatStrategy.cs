@@ -74,7 +74,7 @@ namespace SeatFlow.Core.Strategies
                     bool success = workspace.TryAssignSeat(seat.Id , kv.Value , out _);
                     if (success)
                     {
-                        ((IFixedSeatCapability)workspace).TryMarkFixed(seat.Id , null , Id , DisplayNameConst , out _);
+                        seat.IsFixed = true;
                         assignedCount++;
                     }
                     else
@@ -85,7 +85,7 @@ namespace SeatFlow.Core.Strategies
                 }
                 else
                 {
-                    ((IFixedSeatCapability)workspace).TryMarkFixed(seat.Id , null , Id , DisplayNameConst , out _);
+                    seat.IsFixed = true;
                 }
             }
 

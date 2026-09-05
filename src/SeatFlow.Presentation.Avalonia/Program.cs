@@ -70,10 +70,8 @@ namespace SeatFlow.Presentation.Avalonia
 
             var services = new ServiceCollection();
             // 使用 OS 标准数据目录（而非 exe 同目录）
-            var pluginsDir = GetPluginsDirectory();
             services.AddSeatFlowApplication(
-                AppEnvironment.DefaultDataDirectory ,
-                pluginsDir);
+                AppEnvironment.DefaultDataDirectory);
 
             // 注册 OpenTelemetry 遥测（必须在 AddSeatFlowApplication 之后，依赖 IAppSettingsRepository）
             services.AddSeatFlowTelemetry();
@@ -102,7 +100,6 @@ namespace SeatFlow.Presentation.Avalonia
             services.AddSingleton<StrategyConfigurationViewModel>();
             services.AddSingleton<SeatingArrangementViewModel>();
             services.AddTransient<SnapshotHistoryViewModel>();
-            services.AddSingleton<PluginManagementViewModel>();
             services.AddSingleton<SettingsViewModel>();
             services.AddSingleton<AboutViewModel>();
 
@@ -132,16 +129,6 @@ namespace SeatFlow.Presentation.Avalonia
 #endif
                 .WithInterFont()
                 .LogToTrace();
-
-        /// <summary>
-        /// 获取插件目录。Velopack 安装时使用 RootAppDir/Plugins（更新时保留），
-        /// 开发/便携模式 fallback 到 exe 同目录。
-        /// </summary>
-        private static string GetPluginsDirectory ()
-        {
-            var root = GetInstallRootDirectory();
-            return root is not null ? Path.Combine(root , "Plugins") : Path.Combine(AppEnvironment.ExeDirectory , "Plugins");
-        }
 
         /// <summary>
         /// 获取 Velopack 安装根目录，非安装模式返回 null。

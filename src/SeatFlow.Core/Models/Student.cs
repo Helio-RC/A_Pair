@@ -1,5 +1,4 @@
 using System.Text.Json.Serialization;
-using SeatFlow.Contracts.Models;
 using SeatFlow.Core.Enums;
 using SeatFlow.Core.Utilities;
 
@@ -8,7 +7,7 @@ namespace SeatFlow.Core.Models;
 /// <summary>
 /// 表示一名学生，包含排座所需的基本信息与轮换辅助数据。
 /// </summary>
-public class Student : IPluginStudent
+public class Student
 {
     /// <summary>
     /// 学生唯一标识符，默认自动生成 GUID。
@@ -48,7 +47,7 @@ public class Student : IPluginStudent
     public int FrontRowPreferenceScore { get; set; }
 
     /// <summary>
-    /// 扩展属性挂载点，供插件或自定义逻辑附加额外数据。
+    /// 扩展属性挂载点，供自定义逻辑附加额外数据。
     /// </summary>
     [JsonIgnore]
     public AttributeBag Extensions { get; set; } = new();

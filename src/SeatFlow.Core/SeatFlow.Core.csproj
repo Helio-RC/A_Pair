@@ -15,10 +15,6 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.10" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\SeatFlow.Contracts\SeatFlow.Contracts.csproj" />
-  </ItemGroup>
-
   <Target Name="_GetPackageRefs" Returns="@(PackageReference)" />
 
 </Project>

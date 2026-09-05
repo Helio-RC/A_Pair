@@ -22,7 +22,7 @@
     ]
   },
   "en-US": {
-    "description": "Cross-platform desktop seating arrangement and rotation system supporting multiple layouts, strategy engines, plugin extensions (in development), and data import/export.",
+    "description": "Cross-platform desktop seating arrangement and rotation system supporting multiple layouts, strategy engines, and data import/export.",
     "projectUrl": "https://github.com/Helio-RC/Seatflow",
     "officialSiteUrl": "https://seatflow.work",
     "docsUrl": "https://seatflow.work/Docs",

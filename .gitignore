@@ -384,7 +384,7 @@ dev-debug.log
 /.claude
 
 # i18n backup files
-Seatflow.Presentation.Avalonia/Lang/.backup/
+SeatFlow.Presentation.Avalonia/Lang/.backup/
 .version-backups
 
 # Release config (contains OSS credentials + GitHub token)

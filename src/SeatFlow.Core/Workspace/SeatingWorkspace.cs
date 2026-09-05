@@ -1,4 +1,3 @@
-using SeatFlow.Contracts.Models;
 using SeatFlow.Core.Models;
 using SeatFlow.Core.Strategies;
 using Microsoft.Extensions.Logging;
@@ -10,12 +9,11 @@ namespace SeatFlow.Core.Workspace;
 /// 包含学生列表和座位列表，提供座位分配、查询和快照恢复功能。
 /// 策略通过 <see cref="TryAssignSeat"/> 方法修改工作区状态。
 /// </summary>
-public class SeatingWorkspace : IPluginWorkspace, IFixedSeatCapability
+public class SeatingWorkspace
 {
     private readonly List<Student> _students = [];
     private readonly List<Seat> _seats = [];
     private readonly List<StrategyMessage> _messages = [];
-    private readonly Dictionary<string , HashSet<string>> _strategyCapabilities = [];
     private readonly ILogger<SeatingWorkspace>? _logger;
 
     /// <summary>学生列表（只读）。</summary>
@@ -219,85 +217,6 @@ public class SeatingWorkspace : IPluginWorkspace, IFixedSeatCapability
     public IReadOnlyDictionary<string , string> GetAssignments ()
     {
         return BuildSeatingPlan().Assignments;
-    }
-
-    IReadOnlyList<IPluginStudent> IPluginWorkspace.Students => Students;
-
-    bool IPluginWorkspace.TryAssignSeat (string seatId , string studentId , out string error)
-        => TryAssignSeat(seatId , studentId , out error , updateHistory: true);
-
-    IEnumerable<IPluginSeat> IPluginWorkspace.GetEmptySeats () => GetEmptySeats();
-
-    IEnumerable<IPluginSeat> IPluginWorkspace.FindSeats (Func<IPluginSeat , bool> predicate)
-    {
-        return FindSeats(seat => predicate(seat));
-    }
-
-    // ═══════════════ 能力系统 ═══════════════
-
-    /// <summary>
-    /// 注册策略的能力声明。由 ApplicationFacade 在管道执行前从 manifest 读取并调用。
-    /// </summary>
-    public void RegisterCapabilities (string strategyId , IEnumerable<string> capabilities)
-    {
-        if (string.IsNullOrEmpty(strategyId)) return;
-        _strategyCapabilities[strategyId] = new HashSet<string>(capabilities ?? []);
-    }
-
-    /// <summary>检查策略是否声明了指定能力。</summary>
-    private bool HasCapability (string strategyId , string capability)
-    {
-        return _strategyCapabilities.TryGetValue(strategyId , out var caps)
-            && caps.Contains(capability);
-    }
-
-    bool IPluginWorkspace.TryMarkFixed (string seatId , string? studentId , string strategyId , string displayName , out string error)
-        => TryMarkFixedImpl(seatId , studentId , strategyId , displayName , out error);
-
-    bool IFixedSeatCapability.TryMarkFixed (string seatId , string? studentId , string strategyId , string displayName , out string error)
-        => TryMarkFixedImpl(seatId , studentId , strategyId , displayName , out error);
-
-    private bool TryMarkFixedImpl (string seatId , string? studentId , string strategyId , string displayName , out string error)
-    {
-        error = string.Empty;
-
-        // 校验能力声明
-        if (!HasCapability(strategyId , Capability.MarkFixedSeat))
-        {
-            error = $"策略 {displayName} 未声明 MarkFixedSeat 能力，请在 manifest capabilities 中添加";
-            _logger?.LogWarning("[{DisplayName}] 尝试调用未声明的能力 {Capability}（策略 {StrategyId}）" ,
-                displayName , Capability.MarkFixedSeat , strategyId);
-            return false;
-        }
-
-        var seat = _seats.FirstOrDefault(s => s.Id == seatId);
-        if (seat == null)
-        {
-            error = $"座位 {seatId} 不存在";
-            _logger?.LogWarning("TryMarkFixed：座位 {SeatId} 不存在" , seatId);
-            return false;
-        }
-
-        // 若指定学生则先分配
-        if (!string.IsNullOrEmpty(studentId))
-        {
-            // 如果座位已被其他人占用则清除
-            if (seat.OccupantId != null && seat.OccupantId != studentId)
-            {
-                seat.OccupantId = null;
-                seat.IsAvailable = true;
-            }
-            if (!TryAssignSeat(seatId , studentId , out var assignErr))
-            {
-                error = assignErr;
-                return false;
-            }
-        }
-
-        seat.IsFixed = true;
-        _logger?.LogInformation("[{DisplayName}] 通过 MarkFixedSeat 能力将座位 {SeatId} 标记为固定（学生 {StudentId}）" ,
-            displayName , seatId , studentId ?? "无");
-        return true;
     }
 }
 

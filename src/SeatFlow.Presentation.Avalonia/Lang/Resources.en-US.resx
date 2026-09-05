@@ -837,12 +837,6 @@ This cannot be undone.</value>
   <data name="Nav_Home" xml:space="preserve">
     <value>Home</value>
   </data>
-  <data name="Nav_PluginManagement" xml:space="preserve">
-    <value>Plugins</value>
-  </data>
-  <data name="Nav_PluginDisabled" xml:space="preserve">
-    <value>Plugin system not ready</value>
-  </data>
   <data name="Nav_Seating" xml:space="preserve">
     <value>Seating</value>
   </data>
@@ -860,94 +854,6 @@ This cannot be undone.</value>
   </data>
   <data name="Nav_VenueConfig" xml:space="preserve">
     <value>Venue</value>
-  </data>
-  <data name="Plugin_AuthorFmt" xml:space="preserve">
-    <value>Author: {0}</value>
-  </data>
-  <data name="Plugin_ConfigJSON" xml:space="preserve">
-    <value>Config JSON</value>
-  </data>
-  <data name="Plugin_ConfigSaveFailed" xml:space="preserve">
-    <value>Failed to save config</value>
-  </data>
-  <data name="Plugin_ConfigSaved" xml:space="preserve">
-    <value>Config &quot;{0}&quot; saved</value>
-  </data>
-  <data name="Plugin_ConfigSavedFmt" xml:space="preserve">
-    <value>Config &quot;{0}&quot; saved</value>
-  </data>
-  <data name="Plugin_Disabled" xml:space="preserve">
-    <value>Disabled</value>
-  </data>
-  <data name="Plugin_Enable" xml:space="preserve">
-    <value>Enable plugin</value>
-  </data>
-  <data name="Plugin_FoundFmt" xml:space="preserve">
-    <value>Plugins found ({0})</value>
-  </data>
-  <data name="Plugin_Install" xml:space="preserve">
-    <value>Install Plugin</value>
-  </data>
-  <data name="Plugin_InstallFailed" xml:space="preserve">
-    <value>Plugin install failed</value>
-  </data>
-  <data name="Plugin_InstalledFmt" xml:space="preserve">
-    <value>Plugin package {0} installed</value>
-  </data>
-  <data name="Plugin_JSONErrorFmt" xml:space="preserve">
-    <value>JSON format error: {0}</value>
-  </data>
-  <data name="Plugin_LoadConfigFailed" xml:space="preserve">
-    <value>Failed to load config</value>
-  </data>
-  <data name="Plugin_LoadScriptFailed" xml:space="preserve">
-    <value>Failed to load script</value>
-  </data>
-  <data name="Plugin_NoPlugins" xml:space="preserve">
-    <value>No plugins found
-Place plugins in the Plugins directory</value>
-  </data>
-  <data name="Plugin_Priority" xml:space="preserve">
-    <value>Priority: </value>
-  </data>
-  <data name="Plugin_SaveConfig" xml:space="preserve">
-    <value>Save config</value>
-  </data>
-  <data name="Plugin_SaveScript" xml:space="preserve">
-    <value>Save script</value>
-  </data>
-  <data name="Plugin_ScriptEdit" xml:space="preserve">
-    <value>Script editor</value>
-  </data>
-  <data name="Plugin_ScriptSaveFailed" xml:space="preserve">
-    <value>Failed to save script</value>
-  </data>
-  <data name="Plugin_ScriptSaved" xml:space="preserve">
-    <value>Script &quot;{0}&quot; saved</value>
-  </data>
-  <data name="Plugin_ScriptSavedFmt" xml:space="preserve">
-    <value>Script &quot;{0}&quot; saved</value>
-  </data>
-  <data name="Plugin_SelectHint" xml:space="preserve">
-    <value>Select a plugin from the list</value>
-  </data>
-  <data name="Plugin_Title" xml:space="preserve">
-    <value>Plugins</value>
-  </data>
-  <data name="Plugin_ToggleFailed" xml:space="preserve">
-    <value>Failed to toggle plugin</value>
-  </data>
-  <data name="Plugin_ToggledFmt" xml:space="preserve">
-    <value>Plugin &quot;{0}&quot; {1}</value>
-  </data>
-  <data name="Plugin_UnsavedChanges" xml:space="preserve">
-    <value>Unsaved Changes</value>
-  </data>
-  <data name="Plugin_UnsavedChangesMsg" xml:space="preserve">
-    <value>The current plugin has unsaved changes. Save before leaving?</value>
-  </data>
-  <data name="Plugin_VersionFmt" xml:space="preserve">
-    <value>Version v{0}</value>
   </data>
   <data name="SeatSets_AppSettings_Label" xml:space="preserve">
     <value>Application Settings</value>
@@ -1719,9 +1625,6 @@ Current seating will be overwritten.</value>
   </data>
   <data name="Strategy_NoChanges" xml:space="preserve">
     <value>No changes to save</value>
-  </data>
-  <data name="Strategy_Plugin" xml:space="preserve">
-    <value>Plugin</value>
   </data>
   <data name="Strategy_PriorityConflict" xml:space="preserve">
     <value>Priority conflict</value>
@@ -2508,18 +2411,6 @@ Diagnostics saved to: {1}</value>
   </data>
   <data name="Guide_Freeform_Save_Desc" xml:space="preserve">
     <value>After editing the freeform layout, click this button to save. Saved layouts can be used in the seating page.</value>
-  </data>
-  <data name="Guide_Plugin_List_Title" xml:space="preserve">
-    <value>Browse plugins in this list</value>
-  </data>
-  <data name="Guide_Plugin_List_Desc" xml:space="preserve">
-    <value>Installed plugins appear here. Click a plugin to view details, configuration, and script editor.</value>
-  </data>
-  <data name="Guide_Plugin_Enable_Title" xml:space="preserve">
-    <value>Toggle to enable the plugin</value>
-  </data>
-  <data name="Guide_Plugin_Enable_Desc" xml:space="preserve">
-    <value>After selecting a plugin, toggle this switch to enable or disable it in the seating strategy pipeline.</value>
   </data>
   <data name="Guide_Previous" xml:space="preserve">
     <value>Previous</value>

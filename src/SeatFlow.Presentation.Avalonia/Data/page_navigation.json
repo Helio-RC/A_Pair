@@ -8,7 +8,6 @@
     "StrategyConfiguration": true,
     "SeatingArrangement": true,
     "SnapshotHistory": true,
-    "PluginManagement": false,
     "Settings": true,
     "About": true
   }
