@@ -26,7 +26,7 @@ jobs:
         with:
           filters: |
             {
-              "core": ["src/SeatFlow.Core/**", "src/SeatFlow.Contracts/**"],
+              "core": ["src/SeatFlow.Core/**"],
               "infra": ["src/SeatFlow.Infrastructure/**"],
               "app": ["src/SeatFlow.Application/**"],
               "pres": ["src/SeatFlow.Presentation.Avalonia/**"],
@@ -38,6 +38,14 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
 
       - run: dotnet build
 
