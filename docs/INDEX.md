@@ -26,16 +26,15 @@ README.md                     ← 项目入口，功能概览 + 开发状态
 │   └── adr/
 │       ├── ADR-001-avalonia-ui-framework.md        ← 选择 Avalonia UI 的决策
 │       ├── ADR-002-mvvm-framework.md               ← 选择 CommunityToolkit.Mvvm 的决策
-│       ├── ADR-003-layered-architecture-with-plugins.md ← 分层架构 + 插件化决策
+│       ├── ADR-003-layered-architecture.md ← 分层架构决策
 │       ├── ADR-004-strategy-pattern-for-seating.md ← 策略模式座位安排决策
 │       ├── ADR-005-command-pattern-for-undo-redo.md ← 命令模式撤销/重做决策
-│       ├── ADR-006-strategy-pipeline-fill-in-order.md ← 策略管道 Fill-in-Order + 依赖策略三态 + 能力声明系统
-│       ├── ADR-007-multi-strategy-plugin-packages.md ← 多策略插件包架构
+│       ├── ADR-006-strategy-pipeline-fill-in-order.md ← 策略管道 Fill-in-Order + 依赖策略三态
 │       ├── ADR-008-onboarding-demo-data-injection.md ← 引导系统纯内存示例数据注入
 │       ├── ADR-009-arrangement-counter.md ← 排座次数计数器客户端实现
 │       ├── ADR-010-velopack-oss-distribution.md ← Velopack 自动更新与 OSS 分发架构
 │       ├── ADR-011-keyboard-shortcuts.md ← 全局键盘快捷键系统（Behavior + Tunnel + 设置开关）
-│       └── ADR-012-plugin-first-class-architecture.md ← 插件一级类型架构（去包装链、plugins-manifest v2、ALC 卸载模式、脚本安全边界）
+│       └── ADR-013-remove-plugin-system.md ← 移除插件系统（2026-09）
 ├── docs/presentation/
 │   ├── Design_Spec.md        ← UI 设计规范（色板、字体、间距）
 │   ├── DragDrop.md           ← Avalonia 12 拖放实现模式与踩坑记录
@@ -129,12 +128,11 @@ README.md                     ← 项目入口，功能概览 + 开发状态
 | 新增/修改/删除 .resx 资源 key | scripts/ToolsCollection.md（如新增工作流）、CLAUDE.md（i18n 节工具链） |
 | 新增文件类型版本迁移 | CLAUDE.md、docs/CLAUDE.md、ARCHITECTURE.md（5.3 节）、CONTRIBUTING.md（示例代码）、Phases.md（Phase 7 状态） |
 | 新增策略实现 | ARCHITECTURE.md（4.4/4.5 节）、Phases.md、CLAUDE.md（架构摘要） |
-| 新增/修改策略配置 | 更新 manifest JSON（`Manifests/{Id}.json`）中的 `parameters`/`codeBlocks`；CONTRIBUTING.md（声明式配置）；Plugins.Sdk README（i18n + codeBlocks） |
+| 新增/修改策略配置 | 更新 manifest JSON（`Manifests/{Id}.json`）中的 `parameters`/`codeBlocks`；CONTRIBUTING.md（声明式配置） |
 | 修改策略配置 UI | 更新 manifest JSON，不修改 C#（声明式驱动） |
 | 新增页面 | CLAUDE.md（导航枚举值 + Patterns）、Design_Spec.md（如有新图标） |
 | 修改数据模型 | ARCHITECTURE.md（3.x 节）、Phases.md |
 | 修改 JSON 序列化格式 | CLAUDE.md（JSON 约定）、docs/CLAUDE.md、CONTRIBUTING.md（字段约定） |
 | 修改快照/完整性检测逻辑 | CLAUDE.md（快照完整性检测/轮转/嵌入）、docs/CLAUDE.md、ARCHITECTURE.md（5.3 节） |
 | 修改构建/测试流程 | CLAUDE.md、CONTRIBUTING.md、README.md |
-| 新增/修改插件 API | Plugins.Sdk README、ARCHITECTURE.md（4.5 节） |
 | 推进开发阶段 | README.md（状态表）、Phases.md |

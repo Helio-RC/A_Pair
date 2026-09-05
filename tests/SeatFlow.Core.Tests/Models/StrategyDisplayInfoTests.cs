@@ -46,9 +46,9 @@ public class StrategyDisplayInfoTests
     }
 
     [Fact]
-    public void NonBuiltIn_SourceIsPlugin ()
+    public void DefaultSource_IsBuiltIn ()
     {
-        var d = new StrategyDisplayInfo { Source = "plugin:MyPlugin" };
-        d.IsBuiltIn.Should().BeFalse();
+        var d = new StrategyDisplayInfo();
+        d.IsBuiltIn.Should().BeTrue();
     }
 }

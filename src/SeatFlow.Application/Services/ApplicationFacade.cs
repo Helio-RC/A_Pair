@@ -1,8 +1,6 @@
 using System.Text.Json;
 using SeatFlow.Application.Commands;
 using SeatFlow.Application.Interfaces;
-using SeatFlow.Application.Plugins;
-using SeatFlow.Contracts.Interfaces;
 using SeatFlow.Core.DomainServices;
 using SeatFlow.Core.Enums;
 using SeatFlow.Core.Telemetry;
@@ -41,23 +39,18 @@ namespace SeatFlow.Application.Services
         IServiceProvider serviceProvider ,
         ISeatingSnapshotRepository snapshotRepository ,
         IEnumerable<ISeatingPlanExporter> exporters ,
-        IPluginManager pluginManager ,
-        IPluginConfigurationService pluginConfigService ,
         IAppSettingsRepository appSettingsRepo ,
         IVenueRepository venueRepo ,
         IStudentDatasetRepository datasetRepo ,
         StrategyManifestProvider manifestProvider ,
         StrategyConfigFileRepository strategyConfigRepo ,
         StrategyDatasetConfigRepository datasetConfigRepo ,
-        PluginPackageConfigService pluginPackageConfigService ,
         ISeatSetsService seatSetsService ,
         ILogger<ApplicationFacade> logger) : IApplicationFacade
     {
         private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         private readonly ISeatingSnapshotRepository _snapshotRepository = snapshotRepository ?? throw new ArgumentNullException(nameof(snapshotRepository));
         private readonly IEnumerable<ISeatingPlanExporter> _exporters = exporters ?? throw new ArgumentNullException(nameof(exporters));
-        private readonly IPluginManager _pluginManager = pluginManager ?? throw new ArgumentNullException(nameof(pluginManager));
-        private readonly IPluginConfigurationService _pluginConfigService = pluginConfigService ?? throw new ArgumentNullException(nameof(pluginConfigService));
         private readonly CommandHistory _history = new();
         private readonly IAppSettingsRepository _appSettingsRepo = appSettingsRepo ?? throw new ArgumentNullException(nameof(appSettingsRepo));
         private readonly IVenueRepository _venueRepo = venueRepo ?? throw new ArgumentNullException(nameof(venueRepo));
@@ -65,7 +58,6 @@ namespace SeatFlow.Application.Services
         private readonly StrategyManifestProvider _manifestProvider = manifestProvider ?? throw new ArgumentNullException(nameof(manifestProvider));
         private readonly StrategyConfigFileRepository _strategyConfigRepo = strategyConfigRepo ?? throw new ArgumentNullException(nameof(strategyConfigRepo));
         private readonly StrategyDatasetConfigRepository _datasetConfigRepo = datasetConfigRepo ?? throw new ArgumentNullException(nameof(datasetConfigRepo));
-        private readonly PluginPackageConfigService _pluginPackageConfigService = pluginPackageConfigService ?? throw new ArgumentNullException(nameof(pluginPackageConfigService));
         private readonly ISeatSetsService _seatSetsService = seatSetsService ?? throw new ArgumentNullException(nameof(seatSetsService));
         private SeatingWorkspace? _currentWorkspace;
         // 注意：以下字段假定单线程访问（桌面 UI 线程）。
@@ -236,34 +228,18 @@ namespace SeatFlow.Application.Services
             await RestorePersistedStrategyConfigsAsync(
                 builtInStrategies , builtInDependents , cancellationToken);
 
-            // 5. 加载插件策略（插件为一级策略类型，直接加入独立列表，不污染内置缓存）
+            // 5. 排除标记为不可见（visible=false）的策略
             var strategies = new List<ISeatingStrategy>(builtInStrategies);
-            var pluginStrategies = new List<IPluginSeatingStrategy>();
-            var loadedPlugins = await _pluginManager.LoadStrategyPluginsAsync(cancellationToken);
-            foreach (var pluginInfo in loadedPlugins)
-            {
-                if (pluginInfo.Strategy.IsEnabled)
-                    pluginStrategies.Add(pluginInfo.Strategy);
-            }
-
-            // 5b. 排除标记为不可见（visible=false）的策略
             var invisibleIds = _manifestProvider.GetBuiltInManifests()
                 .Where(m => !m.Visible)
                 .Select(m => m.Id)
                 .ToHashSet();
-            foreach (var pi in loadedPlugins)
-            {
-                if (pi.StrategyManifest is { Visible: false })
-                    invisibleIds.Add(pi.StrategyManifest.Id);
-            }
             strategies = [.. strategies.Where(s => !invisibleIds.Contains(s.Id))];
-            pluginStrategies = [.. pluginStrategies.Where(s => !invisibleIds.Contains(s.Id))];
 
             // 6. 按请求过滤策略
             if (!request.UseDefaultStrategies && request.StrategyIds.Count != 0)
             {
                 strategies = [.. strategies.Where(s => request.StrategyIds.Contains(s.Id))];
-                pluginStrategies = [.. pluginStrategies.Where(s => request.StrategyIds.Contains(s.Id))];
             }
 
             // 6b. 同步 FrontRowCount / SeatsPerDesk 到策略配置
@@ -321,23 +297,6 @@ namespace SeatFlow.Application.Services
                 .ToList();
             dependentStrategies.AddRange(visibleDependents);
 
-            // 收集插件依赖策略（IsIndependent == false 的插件）
-            foreach (var pi in loadedPlugins)
-            {
-                if (pi.StrategyManifest is { IsIndependent: false } && pi.Strategy.IsEnabled)
-                {
-                    if (pi.Strategy is IPluginDependentSeatingStrategy dep)
-                    {
-                        dependentStrategies.Add(new PluginDependentAdapter(dep));
-                        logger.LogInformation("插件依赖策略 {PluginId} 已接入 RandomFill" , pi.Strategy.Id);
-                    }
-                    else
-                    {
-                        logger.LogWarning("插件 {PluginId} 声明为依赖策略但未实现 IPluginDependentSeatingStrategy" , pi.Strategy.Id);
-                    }
-                }
-            }
-
             // 注入依赖策略到 RandomFill
             var randomFill = strategies.OfType<RandomFillStrategy>().FirstOrDefault();
             if (randomFill != null && dependentStrategies.Count > 0)
@@ -346,21 +305,8 @@ namespace SeatFlow.Application.Services
                 logger.LogInformation("已将 {Count} 个依赖策略注入 RandomFill" , dependentStrategies.Count);
             }
 
-            // 6e. 注册策略能力到 workspace（从 manifest 读取）
-            foreach (var s in strategies)
-            {
-                var m = _manifestProvider.GetBuiltInManifest(s.Id);
-                if (m?.Capabilities is { Count: > 0 })
-                    workspace.RegisterCapabilities(s.Id , m.Capabilities);
-            }
-            foreach (var pi in loadedPlugins)
-            {
-                if (pi.StrategyManifest?.Capabilities is { Count: > 0 })
-                    workspace.RegisterCapabilities(pi.Strategy.Id , pi.StrategyManifest.Capabilities);
-            }
-
-            // 7. 执行策略管道（内置 + 插件混排执行）
-            var pipeline = new StrategyExecutionPipeline(strategies , pluginStrategies);
+            // 7. 执行策略管道
+            var pipeline = new StrategyExecutionPipeline(strategies);
             var plan = await pipeline.ExecuteAsync(workspace , progress , cancellationToken);
 
             // 8. 解决冲突
@@ -397,7 +343,7 @@ namespace SeatFlow.Application.Services
                     success: true,
                     studentCount: students.Count,
                     venueCount: seats.Count,
-                    strategyCount: strategies.Count + pluginStrategies.Count);
+                    strategyCount: strategies.Count);
             }
             catch { /* 遥测未注册时静默处理 */ }
 
@@ -760,38 +706,6 @@ namespace SeatFlow.Application.Services
                 result.Add(info);
             }
 
-            // 收集插件策略
-            var loadedPlugins = await _pluginManager.LoadStrategyPluginsAsync(ct);
-            foreach (var pi in loadedPlugins)
-            {
-                var (pkg , _) = _pluginManager.FindStrategy(pi.Strategy.Id);
-                var category = pkg?.PackageManifest?.Type ?? "strategy";
-                var sm = pi.StrategyManifest;
-
-                var pluginManifest = new StrategyManifest
-                {
-                    Id = pi.Strategy.Id ,
-                    Name = pi.Strategy.Name ,
-                    DisplayName = pi.Strategy.Name ,
-                    Version = pkg?.PackageManifest?.Version ?? "1.0.0" ,
-                    Description = pkg?.PackageManifest?.Description ?? string.Empty ,
-                    Author = pkg?.PackageManifest?.Author ?? string.Empty ,
-                    Category = category ,
-                    DefaultPriority = sm?.DefaultPriority ?? pi.Strategy.Priority ,
-                    DefaultEnabled = pi.Strategy.IsEnabled ,
-                    Parameters = sm?.Parameters ,
-                    CodeBlocks = sm?.CodeBlocks ,
-                    Messages = sm?.Messages ,
-                    Visible = sm?.Visible ?? true ,
-                    IsIndependent = sm?.IsIndependent ?? true ,
-                    ManifestVersion = sm?.ManifestVersion ?? "1.0"
-                };
-
-                var source = $"plugin:{pi.Strategy.Id}";
-                var info = BuildDisplayInfo(pluginManifest , source , persisted , null , null);
-                result.Add(info);
-            }
-
             // 独立策略和依赖策略按各自的 Priority 分组排序，不交叉比较
             var independents = result.Where(d => d.IsIndependent).OrderByDescending(d => d.Priority).ToList();
             var dependents = result.Where(d => !d.IsIndependent).OrderByDescending(d => d.Priority).ToList();
@@ -799,8 +713,8 @@ namespace SeatFlow.Application.Services
             var depCount = dependents.Count;
             // 独立策略在前（外部管道），依赖策略在后（将被 ViewModel 嵌套到宿主下）
             independents.AddRange(dependents);
-            logger.LogInformation("加载策略列表：内置 {BuiltIn} 个，插件 {Plugin} 个，独立 {Ind} 个，依赖 {Dep} 个" ,
-                builtInManifests.Count , loadedPlugins.Count() , indCount , depCount);
+                logger.LogInformation("加载策略列表：内置 {BuiltIn} 个，独立 {Ind} 个，依赖 {Dep} 个" ,
+                    builtInManifests.Count , indCount , depCount);
             _cachedStrategyDisplayInfos = independents;
             _cachedStrategyDisplayInfosAt = DateTime.Now;
             return independents;
@@ -820,16 +734,8 @@ namespace SeatFlow.Application.Services
             logger.LogInformation("保存策略配置：{Id}，优先级 {Priority}，启用 {Enabled}" ,
                 strategyId , config.Priority , config.IsEnabled);
 
-            // 配置路由：插件策略 → PluginPackageConfigService，内置策略 → StrategyConfigFileRepository
-            var (pkg , _) = _pluginManager.FindStrategy(strategyId);
-            if (pkg != null)
-            {
-                await _pluginPackageConfigService.SaveConfigAsync(strategyId , config , ct);
-            }
-            else
-            {
-                await _strategyConfigRepo.SaveAsync(strategyId , config , ct);
-            }
+            // 配置路由：内置策略 → StrategyConfigFileRepository
+            await _strategyConfigRepo.SaveAsync(strategyId , config , ct);
 
             var builtInInstances = _cachedStrategies ??= [.. _serviceProvider.GetServices<ISeatingStrategy>()];
             var strategy = builtInInstances.FirstOrDefault(s => s.Id == strategyId);
@@ -846,25 +752,11 @@ namespace SeatFlow.Application.Services
             {
                 ApplyPersistedConfigToInstance(config , null , depStrategy);
             }
-
-            // 尝试从插件策略更新运行时状态
-            if (pkg != null)
-            {
-                var pluginInfo = _pluginManager.GetLoadedPlugin(strategyId);
-                if (pluginInfo is not null)
-                {
-                    pluginInfo.Strategy.Priority = config.Priority;
-                    pluginInfo.Strategy.IsEnabled = config.IsEnabled;
-                }
-            }
         }
 
         /// <inheritdoc />
         public async Task<List<StrategyDatasetConfig>> LoadStrategyDatasetConfigsAsync (string strategyId , CancellationToken ct = default)
         {
-            var (pkg , _) = _pluginManager.FindStrategy(strategyId);
-            if (pkg != null)
-                return await _pluginPackageConfigService.LoadDatasetConfigsAsync(strategyId , ct);
             return await _datasetConfigRepo.LoadAllAsync(strategyId , ct);
         }
 
@@ -895,21 +787,13 @@ namespace SeatFlow.Application.Services
                 venueHash = await _venueRepo.GetContentHashAsync(config.VenueId , ct);
 
             // 配置路由
-            var (pkg , _) = _pluginManager.FindStrategy(config.StrategyId);
-            if (pkg != null)
-                await _pluginPackageConfigService.SaveDatasetConfigAsync(config , studentHash , venueHash , ct);
-            else
-                await _datasetConfigRepo.SaveAsync(config , studentHash , venueHash , ct);
+            await _datasetConfigRepo.SaveAsync(config , studentHash , venueHash , ct);
         }
 
         /// <inheritdoc />
         public async Task DeleteStrategyDatasetConfigAsync (string strategyId , string datasetId , string? venueId , CancellationToken ct = default)
         {
-            var (pkg , _) = _pluginManager.FindStrategy(strategyId);
-            if (pkg != null)
-                await _pluginPackageConfigService.DeleteDatasetConfigAsync(strategyId , datasetId , venueId , ct);
-            else
-                await _datasetConfigRepo.DeleteAsync(strategyId , datasetId , venueId , ct);
+            await _datasetConfigRepo.DeleteAsync(strategyId , datasetId , venueId , ct);
         }
 
         /// <inheritdoc />
@@ -961,11 +845,7 @@ namespace SeatFlow.Application.Services
             // 处理独立策略的代码块配置（FixedSeat）
             foreach (var strategy in strategies)
             {
-                // 配置读写路径：插件策略 → PluginPackageConfigService，内置策略 → StrategyDatasetConfigRepository
-                var (pkg , _) = _pluginManager.FindStrategy(strategy.Id);
-                var config = pkg != null
-                    ? await _pluginPackageConfigService.LoadDatasetConfigAsync(strategy.Id , datasetId ?? string.Empty , venueId , ct)
-                    : await _datasetConfigRepo.LoadAsync(strategy.Id , datasetId ?? string.Empty , venueId , ct);
+                var config = await _datasetConfigRepo.LoadAsync(strategy.Id , datasetId ?? string.Empty , venueId , ct);
                 if (config?.Rows is not { Count: > 0 }) continue;
 
                 switch (strategy)
@@ -974,7 +854,7 @@ namespace SeatFlow.Application.Services
                         bool fsCleaned = CleanInvalidSeatRows(config , venueLayout);
                         fsCleaned |= CleanFixedSeatDeletedStudents(config , validStudents);
                         if (fsCleaned)
-                            await SaveDatasetConfigAsync(config , pkg , ct);
+                            await SaveDatasetConfigAsync(config , ct);
                         ApplyFixedSeatConfig(fs , config , venueLayout);
                         break;
                 }
@@ -1237,20 +1117,14 @@ namespace SeatFlow.Application.Services
         }
 
         /// <summary>
-        /// 保存清理后的数据集配置，自动路由插件策略到 PluginPackageConfigService。
-        /// 保留现有的哈希值（数据本身未变，只是移除了失效行）。
+        /// 保存清理后的数据集配置。保留现有的哈希值（数据本身未变，只是移除了失效行）。
         /// </summary>
         private async Task SaveDatasetConfigAsync (
             StrategyDatasetConfig config ,
-            LoadedPackageInfo? pkg ,
             CancellationToken ct)
         {
-            if (pkg != null)
-                await _pluginPackageConfigService.SaveDatasetConfigAsync(
-                    config , config.StudentsHash , config.ContentHash , ct);
-            else
-                await _datasetConfigRepo.SaveAsync(
-                    config , config.StudentsHash , config.ContentHash , ct);
+            await _datasetConfigRepo.SaveAsync(
+                config , config.StudentsHash , config.ContentHash , ct);
         }
 
         private static StrategyDisplayInfo BuildDisplayInfo (
@@ -1438,24 +1312,17 @@ namespace SeatFlow.Application.Services
             var validVenueIds = (await _venueRepo.ListVenueIdsAsync(ct))
                 .ToHashSet();
 
-            // 2. 收集所有策略 ID（内置 + 插件）
+            // 2. 收集所有策略 ID（内置）
             var strategyIds = new HashSet<string>();
             foreach (var s in _serviceProvider.GetServices<ISeatingStrategy>())
                 strategyIds.Add(s.Id);
             foreach (var d in _serviceProvider.GetServices<IDependentSeatingStrategy>())
                 strategyIds.Add(d.Id);
-            var plugins = await _pluginManager.LoadStrategyPluginsAsync(ct);
-            foreach (var p in plugins)
-                strategyIds.Add(p.Strategy.Id);
 
             // 3. 检查每个策略的所有数据集配置
             foreach (var sid in strategyIds)
             {
-                var (pkg , _) = _pluginManager.FindStrategy(sid);
-
-                var configs = pkg != null
-                    ? await _pluginPackageConfigService.LoadDatasetConfigsAsync(sid , ct)
-                    : await _datasetConfigRepo.LoadAllAsync(sid , ct);
+                var configs = await _datasetConfigRepo.LoadAllAsync(sid , ct);
 
                 foreach (var config in configs)
                 {
@@ -1471,12 +1338,8 @@ namespace SeatFlow.Application.Services
                         "清理孤立策略配置：{StrategyId} / Dataset={DatasetId} / Venue={VenueId}（数据集存在={DsOk}，会场存在={VOk}）" ,
                         sid , config.DatasetId , config.VenueId , !datasetGone , !venueGone);
 
-                    if (pkg != null)
-                        await _pluginPackageConfigService.DeleteDatasetConfigAsync(
-                            sid , config.DatasetId ?? string.Empty , config.VenueId , ct);
-                    else
-                        await _datasetConfigRepo.DeleteAsync(
-                            sid , config.DatasetId ?? string.Empty , config.VenueId , ct);
+                    await _datasetConfigRepo.DeleteAsync(
+                        sid , config.DatasetId ?? string.Empty , config.VenueId , ct);
                 }
             }
         }
@@ -1607,9 +1470,7 @@ namespace SeatFlow.Application.Services
 
         #endregion
 
-        #region Plugin Management
-
-        // ── 数据包 (SeatSets) ──
+        #region SeatSets 数据包
 
         /// <inheritdoc />
         public Task<int> ExportSeatSetsAsync(string outputPath, SeatSetsExportSelection selection, CancellationToken ct = default)
@@ -1631,183 +1492,6 @@ namespace SeatFlow.Application.Services
         /// <inheritdoc />
         public Task<SeatSetsExportSelection> ProbeSeatSetsCategoriesAsync(string filePath, CancellationToken ct = default)
             => _seatSetsService.ProbeCategoriesAsync(filePath, ct);
-
-        /// <inheritdoc />
-        public async Task<List<PluginDisplayInfo>> GetPluginsAsync (CancellationToken ct = default)
-        {
-            // 从包级 API 展平所有策略
-            var packages = await GetPluginPackagesAsync(ct);
-            var result = new List<PluginDisplayInfo>();
-            foreach (var pkg in packages)
-            {
-                result.AddRange(pkg.Strategies);
-            }
-            return result;
-        }
-
-        /// <inheritdoc />
-        public async Task<List<PluginPackageDisplayInfo>> GetPluginPackagesAsync (CancellationToken ct = default)
-        {
-            var result = new List<PluginPackageDisplayInfo>();
-
-            foreach (var (packageId , pkgInfo) in _pluginManager.LoadedPackages)
-            {
-                var iconPath = Path.Combine(pkgInfo.PackagePath , "icon.png");
-                var strategies = new List<PluginDisplayInfo>();
-
-                foreach (var (strategyId , pluginInfo) in pkgInfo.Strategies)
-                {
-                    var loadKind = GetLoadKindFromEntry(pluginInfo.Entry);
-                    var scriptType = pluginInfo.Entry?.ScriptType?.ToLowerInvariant();
-
-                    strategies.Add(new PluginDisplayInfo
-                    {
-                        Id = strategyId ,
-                        Name = pluginInfo.Strategy.Name ,
-                        Version = pkgInfo.PackageManifest.Version ,
-                        Category = pkgInfo.PackageManifest.Type ,
-                        LoadKind = loadKind ,
-                        IsEnabled = pluginInfo.Strategy.IsEnabled ,
-                        Description = pkgInfo.PackageManifest.Description ,
-                        Author = pkgInfo.PackageManifest.Author ,
-                        Priority = pluginInfo.Strategy.Priority ,
-                        ScriptType = scriptType ,
-                        PluginPath = pkgInfo.PackagePath ,
-                        IconPath = File.Exists(iconPath) ? iconPath : null
-                    });
-                }
-
-                result.Add(new PluginPackageDisplayInfo
-                {
-                    PackageId = packageId ,
-                    PackageName = pkgInfo.PackageManifest.Name ,
-                    Version = pkgInfo.PackageManifest.Version ,
-                    Author = pkgInfo.PackageManifest.Author ,
-                    Description = pkgInfo.PackageManifest.Description ,
-                    IsEnabled = pkgInfo.Enables?.Enabled ?? true ,
-                    IconPath = File.Exists(iconPath) ? iconPath : null ,
-                    PackagePath = pkgInfo.PackagePath ,
-                    Strategies = strategies
-                });
-            }
-            return result;
-        }
-
-        /// <inheritdoc />
-        public async Task SetPluginPackageEnabledAsync (string packageId , bool enabled , CancellationToken ct = default)
-        {
-            _cachedStrategyDisplayInfos = null;
-            await _pluginManager.SetPackageEnabledAsync(packageId , enabled , ct);
-        }
-
-        /// <inheritdoc />
-        public async Task<string> InstallPluginPackageAsync (string packagePath , CancellationToken ct = default)
-        {
-            _cachedStrategyDisplayInfos = null;
-            return await _pluginManager.InstallFromPackageAsync(packagePath , ct);
-        }
-
-        /// <inheritdoc />
-        public async Task UninstallPluginPackageAsync (string packageId , CancellationToken ct = default)
-        {
-            _cachedStrategyDisplayInfos = null;
-            await _pluginManager.UnloadPackageAsync(packageId);
-        }
-
-        /// <inheritdoc />
-        public async Task RefreshPluginPackageAsync (string packageId , CancellationToken ct = default)
-        {
-            _cachedStrategyDisplayInfos = null;
-            await _pluginManager.RefreshPackageAsync(packageId , ct);
-        }
-
-        /// <inheritdoc />
-        public async Task<string> GetPluginScriptAsync (string pluginId , CancellationToken ct = default)
-        {
-            var (pkg , plugin) = _pluginManager.FindStrategy(pluginId);
-            if (pkg == null || plugin == null)
-                throw new InvalidOperationException($"插件 {pluginId} 未加载");
-
-            var entry = plugin.Entry;
-            var scriptFile = entry?.ScriptFile;
-            if (string.IsNullOrEmpty(scriptFile))
-                throw new InvalidOperationException($"插件 {pluginId} 不是脚本插件");
-
-            // 优先从策略子目录查找（与 LoadStrategyFromEntry 的查找顺序一致）
-            var scriptPath = (string?)null;
-            if (entry != null && !string.IsNullOrEmpty(entry.Path))
-                scriptPath = Path.Combine(pkg.PackagePath , entry.Path , scriptFile);
-            // 回退到包根目录
-            if (scriptPath == null || !File.Exists(scriptPath))
-            {
-                scriptPath = Path.Combine(pkg.PackagePath , scriptFile);
-            }
-
-            return await File.ReadAllTextAsync(scriptPath , ct);
-        }
-
-        /// <inheritdoc />
-        public async Task SavePluginScriptAsync (string pluginId , string script , CancellationToken ct = default)
-        {
-            var (pkg , plugin) = _pluginManager.FindStrategy(pluginId);
-            if (pkg == null || plugin == null)
-                throw new InvalidOperationException($"插件 {pluginId} 未加载");
-
-            var scriptFile = plugin.Entry?.ScriptFile;
-            if (string.IsNullOrEmpty(scriptFile))
-                throw new InvalidOperationException($"插件 {pluginId} 不是脚本插件");
-
-            // 优先从策略子目录查找（与 LoadStrategyFromEntry 的查找顺序一致）
-            var scriptPath = (string?)null;
-            var entry = plugin.Entry;
-            if (entry != null && !string.IsNullOrEmpty(entry.Path))
-                scriptPath = Path.Combine(pkg.PackagePath , entry.Path , scriptFile);
-            // 回退到包根目录
-            if (scriptPath == null || !File.Exists(scriptPath))
-            {
-                scriptPath = Path.Combine(pkg.PackagePath , scriptFile);
-            }
-
-            await File.WriteAllTextAsync(scriptPath , script , ct);
-        }
-
-        /// <inheritdoc />
-        public async Task<string> GetPluginConfigJsonAsync (string pluginId , CancellationToken ct = default)
-        {
-            var config = await _pluginConfigService.LoadConfigurationAsync<object>(pluginId , ct);
-            return System.Text.Json.JsonSerializer.Serialize(config , JsonOptions.WriteIndented);
-        }
-
-        /// <inheritdoc />
-        public async Task SavePluginConfigJsonAsync (string pluginId , string json , CancellationToken ct = default)
-        {
-            // 验证 JSON 格式
-            var obj = System.Text.Json.JsonSerializer.Deserialize<object>(json)
-                ?? throw new ArgumentException("JSON 格式无效");
-            await _pluginConfigService.SaveConfigurationAsync(pluginId , obj , ct);
-        }
-
-        /// <inheritdoc />
-        public async Task SetPluginEnabledAsync (string pluginId , bool enabled , CancellationToken ct = default)
-        {
-            _cachedStrategyDisplayInfos = null;
-            await _pluginManager.SetStrategyEnabledAsync(pluginId , enabled , ct);
-        }
-
-        private static string GetLoadKindFromEntry (PluginEntry? entry)
-        {
-            if (entry == null) return "unknown";
-            if (!string.IsNullOrEmpty(entry.ScriptFile) && !string.IsNullOrEmpty(entry.ScriptType))
-                return entry.ScriptType.ToLowerInvariant() switch
-                {
-                    "lua" => "lua",
-                    "csharp" => "csharp",
-                    _ => "script"
-                };
-            if (!string.IsNullOrEmpty(entry.Assembly) && !string.IsNullOrEmpty(entry.EntryType))
-                return "assembly";
-            return "unknown";
-        }
 
         #endregion
     }

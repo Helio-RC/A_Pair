@@ -49,13 +49,9 @@ SeatFlow/
 │   │   └── Manifests/                   # 声明式配置 JSON
 │   └── Utilities/                       # AttributeBag, CircularHistory
 │
-├── src/SeatFlow.Contracts/                    # 共享契约（轻量接口）
-│   └── Models/                          # IPluginSeatingStrategy, IPluginStudent 等
-│
 ├── src/SeatFlow.Application/                  # 应用层
 │   ├── Interfaces/                      # IApplicationFacade
 │   ├── Services/                        # ApplicationFacade, ServiceCollectionExtensions
-│   ├── Plugins/                         # PluginManager, PluginLoadContext
 │   └── Pipelines/                       # StrategyExecutionPipeline
 │
 ├── src/SeatFlow.Infrastructure/               # 基础设施层
@@ -66,7 +62,6 @@ SeatFlow/
 │   ├── Writers/                         # JsonStudentWriter, CsvStudentWriter, XlsxStudentWriter
 │   └── Migration/                       # FileMigrationService, IFileMigrator, file_versions.json
 │
-├── src/SeatFlow.Plugins.Sdk/                  # 插件 SDK（供外部插件引用）
 ├── src/SeatFlow.Presentation.Avalonia/        # Avalonia UI 主程序
 │   ├── Views/
 │   ├── ViewModels/
@@ -83,7 +78,6 @@ SeatFlow/
 │
 ├── docs/                                # 设计文档、ADRs
 │   └── adr/
-├── plugins/                             # 外部插件目录（运行时）
 └── samples/                             # 示例配置文件、数据文件
 ```
 
@@ -203,78 +197,6 @@ SeatFlow/
        public string StatusMessage { get; set; }
    }
    ```
-
----
-
-### Phase 4：插件系统（2-3 周）
-
-**目标**：实现插件管理器，支持加载外部 DLL 策略插件。
-
-**具体任务**：
-
-| 任务 | 产出 | 技术点 | 预估工时 |
-|------|------|--------|----------|
-| 定义插件契约 IPluginSeatingStrategy | 继承 ISeatingStrategy，添加插件元数据 | 接口设计 | 0.5d |
-| 实现插件清单文件规范 | `plugin.manifest.json` 结构定义 | JSON Schema | 0.5d |
-| 实现 PluginManager | 扫描 Plugins 文件夹，加载 DLL | `AssemblyLoadContext` | 2d |
-| 实现插件隔离与卸载 | 使用 `AssemblyLoadContext` 实现热卸载 | 程序集加载上下文 | 1.5d |
-| 实现插件配置管理 | 每个插件独立 config.json 读取 | 文件监控热重载 | 1d |
-| 添加插件安全沙箱 | 限制插件代码权限（可选） | CAS 已过时，考虑 AppDomain 替代？ | 1d |
-| UI 集成：插件管理界面 | 列出插件、启用/禁用、配置 | Avalonia 列表控件 | 1.5d |
-| 编写示例插件 | 一个简单自定义策略插件 | 独立项目 | 1d |
-| 测试插件加载/卸载/执行 | 集成测试 | 1d |
-
-**关键技术细节**：
-
-1. **AssemblyLoadContext 使用**：
-   ```csharp
-   public class PluginLoadContext : AssemblyLoadContext
-   {
-       private readonly AssemblyDependencyResolver _resolver;
-       public PluginLoadContext(string pluginPath) { ... }
-       protected override Assembly Load(AssemblyName assemblyName) { ... }
-   }
-   ```
-   每个插件使用独立的 `AssemblyLoadContext` 实例，卸载时调用 `Unload()`。
-
-2. **插件发现**：
-   - 扫描 `Plugins/*/plugin.manifest.json`。
-   - 验证清单中的入口类型是否实现了 `IPluginSeatingStrategy`。
-
-3. **安全性考虑**：
-   - 在 .NET Core 中代码访问安全性 (CAS) 已过时，采用进程级隔离较为复杂。初期可信任插件来源，或通过代码审查保障。后续可考虑将脚本插件限制 API（见 Phase 5）。
-
----
-
-### Phase 5：脚本支持（2 周）
-
-**目标**：支持 Lua 脚本作为策略插件。
-
-**具体任务**：
-
-| 任务 | 产出 | 技术点 | 预估工时 |
-|------|------|--------|----------|
-| 集成 NLua 库 | Lua 解释器嵌入 | NLua | 0.5d |
-| 定义 Lua API 接口 | 暴露给脚本的工作区操作方法 | 注册 C# 函数 | 1.5d |
-| 实现 LuaScriptStrategy | 封装 Lua 脚本执行 | 执行上下文、超时控制 | 1d |
-| 实现脚本沙箱限制 | 禁用 IO/OS 库，限制内存/指令数 | Lua 环境裁剪 | 1d |
-| 支持 C# 脚本（Roslyn） | 可选，使用 `CSharpScript` | Microsoft.CodeAnalysis.CSharp.Scripting | 1d |
-| UI 集成：脚本编辑器 | 简单的文本编辑器与语法高亮 | Avalonia 文本框 | 1d |
-| 测试脚本执行与沙箱 | 死循环、内存泄漏测试 | 单元测试 | 1d |
-
-**关键技术细节**：
-
-1. **NLua 环境裁剪**：
-   - 创建 Lua 状态时不加载 `io`、`os`、`package` 等危险库。
-   - 使用 `lua.State.Environment` 限制全局变量。
-
-2. **脚本超时控制**：
-   - 使用 `CancellationTokenSource` 设置超时。
-   - 在 Lua 中定期调用 C# 检查钩子（`debug.sethook`）可能较复杂，初期可通过 `Task.WhenAny` 在 C# 侧超时取消。
-
-3. **C# 脚本限制**：
-   - 通过 `ScriptOptions` 限制引用的程序集和命名空间。
-   - 禁用 `System.IO`、`System.Net` 等。
 
 ---
 

@@ -10,7 +10,6 @@
     "defaultPriority": 100,
     "defaultEnabled": true,
     "visible": true,
-    "capabilities": ["MarkFixedSeat"],
     "parameters": [],
     "codeBlocks": [
         {

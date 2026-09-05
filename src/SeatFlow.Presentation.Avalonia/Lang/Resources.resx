@@ -837,12 +837,6 @@
   <data name="Nav_Home" xml:space="preserve">
     <value>首页</value>
   </data>
-  <data name="Nav_PluginManagement" xml:space="preserve">
-    <value>插件管理</value>
-  </data>
-  <data name="Nav_PluginDisabled" xml:space="preserve">
-    <value>插件系统尚未就绪</value>
-  </data>
   <data name="Nav_Seating" xml:space="preserve">
     <value>座位安排</value>
   </data>
@@ -860,94 +854,6 @@
   </data>
   <data name="Nav_VenueConfig" xml:space="preserve">
     <value>会场配置</value>
-  </data>
-  <data name="Plugin_AuthorFmt" xml:space="preserve">
-    <value>作者：{0}</value>
-  </data>
-  <data name="Plugin_ConfigJSON" xml:space="preserve">
-    <value>配置 JSON</value>
-  </data>
-  <data name="Plugin_ConfigSaveFailed" xml:space="preserve">
-    <value>保存配置失败</value>
-  </data>
-  <data name="Plugin_ConfigSaved" xml:space="preserve">
-    <value>配置「{0}」已保存</value>
-  </data>
-  <data name="Plugin_ConfigSavedFmt" xml:space="preserve">
-    <value>配置「{0}」已保存</value>
-  </data>
-  <data name="Plugin_Disabled" xml:space="preserve">
-    <value>已禁用</value>
-  </data>
-  <data name="Plugin_Enable" xml:space="preserve">
-    <value>启用插件</value>
-  </data>
-  <data name="Plugin_FoundFmt" xml:space="preserve">
-    <value>已发现插件（{0}）</value>
-  </data>
-  <data name="Plugin_Install" xml:space="preserve">
-    <value>安装插件</value>
-  </data>
-  <data name="Plugin_InstallFailed" xml:space="preserve">
-    <value>安装插件失败</value>
-  </data>
-  <data name="Plugin_InstalledFmt" xml:space="preserve">
-    <value>插件包 {0} 已安装</value>
-  </data>
-  <data name="Plugin_JSONErrorFmt" xml:space="preserve">
-    <value>JSON 格式错误: {0}</value>
-  </data>
-  <data name="Plugin_LoadConfigFailed" xml:space="preserve">
-    <value>加载配置失败</value>
-  </data>
-  <data name="Plugin_LoadScriptFailed" xml:space="preserve">
-    <value>加载脚本失败</value>
-  </data>
-  <data name="Plugin_NoPlugins" xml:space="preserve">
-    <value>暂无插件
-请将插件放入 Plugins 目录</value>
-  </data>
-  <data name="Plugin_Priority" xml:space="preserve">
-    <value>优先级：</value>
-  </data>
-  <data name="Plugin_SaveConfig" xml:space="preserve">
-    <value>保存配置</value>
-  </data>
-  <data name="Plugin_SaveScript" xml:space="preserve">
-    <value>保存脚本</value>
-  </data>
-  <data name="Plugin_ScriptEdit" xml:space="preserve">
-    <value>脚本编辑</value>
-  </data>
-  <data name="Plugin_ScriptSaveFailed" xml:space="preserve">
-    <value>保存脚本失败</value>
-  </data>
-  <data name="Plugin_ScriptSaved" xml:space="preserve">
-    <value>脚本「{0}」已保存</value>
-  </data>
-  <data name="Plugin_ScriptSavedFmt" xml:space="preserve">
-    <value>脚本「{0}」已保存</value>
-  </data>
-  <data name="Plugin_SelectHint" xml:space="preserve">
-    <value>从左侧列表选择一个插件</value>
-  </data>
-  <data name="Plugin_Title" xml:space="preserve">
-    <value>插件管理</value>
-  </data>
-  <data name="Plugin_ToggleFailed" xml:space="preserve">
-    <value>切换插件状态失败</value>
-  </data>
-  <data name="Plugin_ToggledFmt" xml:space="preserve">
-    <value>插件「{0}」已{1}</value>
-  </data>
-  <data name="Plugin_UnsavedChanges" xml:space="preserve">
-    <value>未保存的修改</value>
-  </data>
-  <data name="Plugin_UnsavedChangesMsg" xml:space="preserve">
-    <value>当前插件有未保存的修改，是否保存后离开？</value>
-  </data>
-  <data name="Plugin_VersionFmt" xml:space="preserve">
-    <value>版本 v{0}</value>
   </data>
   <data name="SeatSets_AppSettings_Label" xml:space="preserve">
     <value>应用设置</value>
@@ -1723,9 +1629,6 @@
   </data>
   <data name="Strategy_NoChanges" xml:space="preserve">
     <value>没有需要保存的更改</value>
-  </data>
-  <data name="Strategy_Plugin" xml:space="preserve">
-    <value>插件</value>
   </data>
   <data name="Strategy_PriorityConflict" xml:space="preserve">
     <value>优先级冲突</value>
@@ -2517,18 +2420,6 @@
   </data>
   <data name="Guide_Freeform_Save_Desc" xml:space="preserve">
     <value>完成自由布局编辑后，点击此按钮保存。保存后的布局可在排座页面选择使用。</value>
-  </data>
-  <data name="Guide_Plugin_List_Title" xml:space="preserve">
-    <value>在此列表浏览插件</value>
-  </data>
-  <data name="Guide_Plugin_List_Desc" xml:space="preserve">
-    <value>已安装的插件显示在此列表中。点击插件可查看其详情、配置和脚本编辑。</value>
-  </data>
-  <data name="Guide_Plugin_Enable_Title" xml:space="preserve">
-    <value>点击此开关启用插件</value>
-  </data>
-  <data name="Guide_Plugin_Enable_Desc" xml:space="preserve">
-    <value>选中插件后，点击此开关启用或禁用。启用后插件将在排座策略中生效。</value>
   </data>
   <data name="Guide_Previous" xml:space="preserve">
     <value>上一步</value>

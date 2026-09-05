@@ -28,10 +28,8 @@ dotnet restore
 ```
 SeatFlow.slnx
 ├── src/SeatFlow.Core/                  → 领域核心：实体、策略接口、领域服务
-├── src/SeatFlow.Contracts/             → 共享契约：跨层接口（插件契约等）
-├── src/SeatFlow.Application/           → 应用层：外观、策略管道、命令历史、插件管理、DI
+├── src/SeatFlow.Application/           → 应用层：外观、策略管道、命令历史、DI
 ├── src/SeatFlow.Infrastructure/        → 基础设施：数据提供者、导出器、布局构建器、仓储
-├── src/SeatFlow.Plugins.Sdk/           → 插件 SDK（供外部插件引用）
 ├── src/SeatFlow.Presentation.Avalonia/ → Avalonia 12 桌面应用
 ├── tests/SeatFlow.Core.Tests/
 ├── tests/SeatFlow.Application.Tests/
@@ -170,7 +168,7 @@ fieldType 在 codeBlock 中额外支持 `StudentPicker`、`SeatPosition`。
 }
 ```
 
-内建策略和插件策略共用同一格式——内建策略的 messages 在 `Manifests/{Id}.json` 中，插件策略的在各插件包策略子目录下的 `manifest.json` 中（包级清单为 `plugins-manifest.json`）。
+策略的 messages 在 `Manifests/{Id}.json` 中定义。
 
 ### i18n 约定
 

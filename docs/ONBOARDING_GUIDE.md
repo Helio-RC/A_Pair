@@ -72,7 +72,6 @@ Program.cs:
   "startupPhases": [ OnboardingPhaseDefinition, ... ],
   "pageGuides": {
     "FreeformManagement": OnboardingPhaseDefinition,
-    "PluginManagement": OnboardingPhaseDefinition
   }
 }
 ```
@@ -116,7 +115,6 @@ Program.cs:
 | 页面 | 步骤数 | 目标控件 |
 |------|--------|---------|
 | FreeformManagement | 3 | ImportCsvButton, AddPointButton, SaveLayoutButton |
-| PluginManagement | 2 | PluginListBox, PluginEnabledSwitch |
 
 ## 触发流程
 
@@ -260,8 +258,6 @@ OnboardingService.CompleteOnboardingAsync()
 | `ImportCsvButton` | FreeformManagementView | Button | 导入自由布局 |
 | `AddPointButton` | FreeformManagementView | Button | 添加坐标点 |
 | `SaveLayoutButton` | FreeformManagementView | Button | 保存自由布局 |
-| `PluginListBox` | PluginManagementView | ListBox | 插件列表 |
-| `PluginEnabledSwitch` | PluginManagementView | ToggleSwitch | 启用/禁用插件 |
 
 ## 文本风格指南
 

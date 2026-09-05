@@ -212,7 +212,6 @@ JSON 格式要求：
 | `Lang_` | 语言名称 |
 | `Member_` | 成员管理 |
 | `Nav_` | 导航栏 |
-| `Plugin_` | 插件管理 |
 | `Seating_` | 座位安排 |
 | `Settings_` | 设置页 |
 | `Snapshot_` | 快照历史 |

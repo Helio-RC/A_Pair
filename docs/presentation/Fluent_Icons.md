@@ -19,7 +19,6 @@ Usage: `<fic:FluentIcon Icon="{x:Static ficEnum:Icon.{Name}}" FontSize="18"/>`
 | `Options` | ⚙️ Options | 策略配置 / Strategy Configuration |
 | `Grid` | 📐 Grid | 座位安排 / Seating Arrangement |
 | `History` | 🕐 History | 历史快照 / Snapshot History |
-| `PuzzlePiece` | 🧩 Puzzle Piece | 插件管理 / Plugin Management |
 | `Settings` | ⚙️ Settings | 设置 / Settings |
 | `Info` | ℹ️ Info | 关于 / About |
 

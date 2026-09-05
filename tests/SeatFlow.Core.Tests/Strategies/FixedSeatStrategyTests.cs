@@ -12,7 +12,6 @@ public class FixedSeatStrategyTests
         var students = new[] { new Student { Id = "s1" } };
         var seats = new[] { new GridSeat { Id = "seat1" } };
         var ws = new SeatingWorkspace(students , seats);
-        ws.RegisterCapabilities("FixedSeat" , ["MarkFixedSeat"]);
 
         var strategy = new FixedSeatStrategy(config);
         await strategy.ExecuteAsync(ws , CancellationToken.None);
@@ -104,7 +103,6 @@ public class FixedSeatStrategyTests
 
         // s1 already occupies seat1 (non-fixed)
         ws.TryAssignSeat("seat1" , "s1" , out _);
-        ws.RegisterCapabilities("FixedSeat" , ["MarkFixedSeat"]);
 
         var strategy = new FixedSeatStrategy(config);
         await strategy.ExecuteAsync(ws , CancellationToken.None);
@@ -123,7 +121,6 @@ public class FixedSeatStrategyTests
         var students = new[] { new Student { Id = "s1" } };
         var seats = new[] { new GridSeat { Id = "seat1" } };
         var ws = new SeatingWorkspace(students , seats);
-        ws.RegisterCapabilities("FixedSeat" , ["MarkFixedSeat"]);
 
         var strategy = new FixedSeatStrategy(config);
         await strategy.ExecuteAsync(ws , CancellationToken.None);

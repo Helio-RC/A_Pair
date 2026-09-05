@@ -27,12 +27,6 @@ public static class LogModule
     /// <summary>策略管道与外观服务模块</summary>
     public const string Pipeline = "Application.Services";
 
-    /// <summary>插件管理模块</summary>
-    public const string Plugins = "Application.Plugins";
-
-    /// <summary>脚本引擎模块：Lua / C# Script</summary>
-    public const string Scripting = "Application.Scripting";
-
     /// <summary>UI ViewModel 模块</summary>
     public const string ViewModels = "Presentation.Avalonia.ViewModels";
 

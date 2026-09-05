@@ -55,13 +55,6 @@ public sealed class StrategyManifest
     public string ManifestVersion { get; init; } = "1.0";
 
     /// <summary>
-    /// 策略声明的能力列表（可选）。能力常量定义在 <see cref="Strategies.Capability"/> 中。
-    /// 策略必须先在 manifest 中声明能力，运行时方可调用对应的能力接口方法。
-    /// 未声明能力时调用会被拒绝并记录 LogWarning。
-    /// </summary>
-    public List<string>? Capabilities { get; init; }
-
-    /// <summary>
     /// 策略执行消息的多语言模板（可选）。key 为消息标识符，value 为多语言词典。
     /// 模板中用 {0} {1} 占位，运行时 string.Format 替换。
     /// </summary>

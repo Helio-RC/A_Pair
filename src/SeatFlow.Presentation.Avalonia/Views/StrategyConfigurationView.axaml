@@ -114,11 +114,6 @@
                           <TextBlock Classes="small"
                                      Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
                                      Text="{Binding PriorityDisplay}" />
-                          <Border CornerRadius="2" Padding="4,1"
-                                  Background="{DynamicResource SystemControlAccentBrush}"
-                                  IsVisible="{Binding IsBuiltIn, Converter={x:Static conv:BoolConverters.Negate}}">
-                            <TextBlock Text="{x:Static lang:Resources.Strategy_Plugin}" FontSize="9" Foreground="White" />
-                          </Border>
                         </StackPanel>
                       </StackPanel>
                     </DockPanel>

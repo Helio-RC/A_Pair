@@ -1,5 +1,4 @@
 using SeatFlow.Application.Interfaces;
-using SeatFlow.Contracts.Interfaces;
 using SeatFlow.Core.Strategies;
 using SeatFlow.Core.Workspace;
 using Microsoft.Extensions.Logging;
@@ -23,11 +22,6 @@ namespace SeatFlow.Application.Services
     /// <item><b>RandomFill(1)</b>：最终兜底，填满所有剩余空座</item>
     /// </list>
     /// <para>
-    /// 内置策略（<see cref="ISeatingStrategy"/>）与插件策略（<see cref="IPluginSeatingStrategy"/>）
-    /// 为一级类型混排执行：两者共享同一 Priority 空间，按数值统一排序。
-    /// 插件策略通过 <see cref="IPluginWorkspace"/>（<see cref="SeatingWorkspace"/> 实现）访问受限 API。
-    /// </para>
-    /// <para>
     /// 策略间冲突解决 = Priority 数值（先到先得）。该设计是一个有意妥协——"后可覆盖"模型
     /// 因 Workspace API 限制（GetEmptySeats+TryAssignSeat 仅支持填空语义）无法实现。
     /// 详见 docs/adr/ADR-006.md。
@@ -36,7 +30,7 @@ namespace SeatFlow.Application.Services
     public class StrategyExecutionPipeline
     {
         /// <summary>
-        /// 管道内部统一执行项，屏蔽内置策略与插件策略的类型差异。
+        /// 管道内部统一执行项。
         /// </summary>
         private sealed record PipelineStrategyItem (
             string Id ,
@@ -50,66 +44,24 @@ namespace SeatFlow.Application.Services
         private readonly bool _throwOnFailure;
 
         /// <summary>
-        /// 初始化策略执行管道（仅内置策略），并按优先级排序策略列表。
+        /// 初始化策略执行管道，并按优先级排序策略列表。
         /// </summary>
-        /// <param name="strategies">要执行的内置策略集合。</param>
+        /// <param name="strategies">要执行的策略集合。</param>
         /// <param name="logger">日志记录器。</param>
         /// <param name="throwOnFailure">是否在策略失败时抛出异常。</param>
         public StrategyExecutionPipeline (
             IEnumerable<ISeatingStrategy> strategies ,
             ILogger<StrategyExecutionPipeline>? logger = null ,
             bool throwOnFailure = false)
-            : this(strategies , pluginStrategies: null , logger , throwOnFailure)
         {
-        }
-
-        /// <summary>
-        /// 初始化策略执行管道（仅插件策略），并按优先级排序策略列表。
-        /// </summary>
-        /// <param name="pluginStrategies">要执行的插件策略集合。</param>
-        /// <param name="logger">日志记录器。</param>
-        /// <param name="throwOnFailure">是否在策略失败时抛出异常。</param>
-        public StrategyExecutionPipeline (
-            IEnumerable<IPluginSeatingStrategy> pluginStrategies ,
-            ILogger<StrategyExecutionPipeline>? logger = null ,
-            bool throwOnFailure = false)
-            : this(strategies: null , pluginStrategies , logger , throwOnFailure)
-        {
-        }
-
-        /// <summary>
-        /// 初始化策略执行管道（内置 + 插件混排），并按优先级排序策略列表。
-        /// </summary>
-        /// <param name="strategies">要执行的内置策略集合（可为 null）。</param>
-        /// <param name="pluginStrategies">要执行的插件策略集合（可为 null）。</param>
-        /// <param name="logger">日志记录器。</param>
-        /// <param name="throwOnFailure">是否在策略失败时抛出异常。</param>
-        public StrategyExecutionPipeline (
-            IEnumerable<ISeatingStrategy>? strategies ,
-            IEnumerable<IPluginSeatingStrategy>? pluginStrategies ,
-            ILogger<StrategyExecutionPipeline>? logger = null ,
-            bool throwOnFailure = false)
-        {
-            if (strategies != null)
-            {
-                _strategies.AddRange(strategies.Select(s => new PipelineStrategyItem(
-                    s.Id , s.Name , s.Priority , s.IsEnabled ,
-                    async (w , ct) =>
-                    {
-                        var r = await s.ExecuteAsync(w , ct);
-                        return (r.Success , r.Message);
-                    })));
-            }
-            if (pluginStrategies != null)
-            {
-                _strategies.AddRange(pluginStrategies.Select(s => new PipelineStrategyItem(
-                    s.Id , s.Name , s.Priority , s.IsEnabled ,
-                    async (w , ct) =>
-                    {
-                        var r = await s.ExecuteAsync(w , ct);
-                        return (r.Success , r.Message);
-                    })));
-            }
+            ArgumentNullException.ThrowIfNull(strategies);
+            _strategies.AddRange(strategies.Select(s => new PipelineStrategyItem(
+                s.Id , s.Name , s.Priority , s.IsEnabled ,
+                async (w , ct) =>
+                {
+                    var r = await s.ExecuteAsync(w , ct);
+                    return (r.Success , r.Message);
+                })));
             _logger = logger;
             _throwOnFailure = throwOnFailure;
         }

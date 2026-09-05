@@ -104,7 +104,6 @@ MIT License © 2026 SeatFlow Contributors
 | [docs/adr/](docs/adr/) | 架构决策记录 |
 | [Design_Spec.md](docs/presentation/Design_Spec.md) | UI 设计规范 |
 | [Fluent_Icons.md](docs/presentation/Fluent_Icons.md) | 图标参考 |
-| [Plugins.Sdk/README.md](docs/sdk/README.md) | 插件开发 SDK 文档 |
 
 ---
 

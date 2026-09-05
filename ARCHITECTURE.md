@@ -53,17 +53,13 @@
 SeatFlow.slnx
 ├── src/
 │   ├── SeatFlow.Core              # 领域核心
-│   ├── SeatFlow.Contracts         # 共享契约（插件接口）
 │   ├── SeatFlow.Application       # 应用层（编排、策略调度）
 │   ├── SeatFlow.Infrastructure    # 基础设施（数据访问、布局实现）
-│   ├── SeatFlow.Plugins.Sdk       # 插件 SDK
 │   ├── SeatFlow.Presentation.Avalonia  # Avalonia UI 主程序
-│   └── plugin-examples/           # 示例插件
 └── tests/
     ├── SeatFlow.Core.Tests          # 核心领域测试
     ├── SeatFlow.Application.Tests   # 应用层测试
     ├── SeatFlow.Infrastructure.Tests # 基础设施测试
-    └── SeatFlow.Plugin.TestFixture  # 插件测试辅助
 ```
 
 ---
@@ -318,16 +314,6 @@ UI 层通过 `LocalizeHelper.Resolve(dict)` 按 `CurrentUICulture` 解析。
 消息（含 `StrategyDisplayName`、`MessageKey`、`Args`）收集在 `SeatingWorkspace.Messages` 中供 UI 展示。
 日志同时记录原始 ID，UI 层将学生 ID 解析为姓名后显示。
 
-插件 manifest 同样支持 `parameters`、`codeBlocks` 和 `messages`——声明后即可自动获得配置 UI 和消息支持。
-
-4.6 插件化策略
-
-· Assembly 插件：编译为 DLL，实现 IPluginSeatingStrategy。
-· Script 插件：支持 Lua / C# Script，逻辑完全由脚本文件描述（脚本宿主直接实现插件接口，无适配器包装）。
-· 依赖策略插件：`isIndependent: false`，实现 IPluginDependentSeatingStrategy，由 Core 层 PluginDependentAdapter 接入 RandomFill 评估循环（批准/拒绝/已处理三态）。
-· 插件清单：双层架构（v2，ADR-012）— `plugins-manifest.json`（包级，`plugins[]` 加载指令 + `kind` 类型字段）+ 策略 `manifest.json`（定义 ID、parameters、codeBlocks 等，格式与内置策略一致）。
-· 插件为策略管线一级类型：StrategyExecutionPipeline 直接执行 IPluginSeatingStrategy（与内置策略按 Priority 混排）。
-
 ---
 
 五、配置文件与存储结构
@@ -339,7 +325,6 @@ UI 层通过 `LocalizeHelper.Resolve(dict)` 按 `CurrentUICulture` 解析。
 会场定义 Venues/*.venue.json 单个物理空间
 人员名单 Rosters/*.roster.json 单次活动
 座位安排结果 Assignments/{venue}/{date}/snapshot.json 特定场次
-插件配置 Plugins/{plugin-id}/config.json 单个插件
 
 5.2 数据存储位置
 
@@ -362,8 +347,6 @@ UI 层通过 `LocalizeHelper.Resolve(dict)` 按 `CurrentUICulture` 解析。
 ├── Logs/
 └── Temp/
 ```
-
-插件目录：Velopack 安装时位于 `RootAppDir/Plugins/`，开发/便携模式位于 `{exeDir}/Plugins/`。
 
 5.4 版本管理与升级
 
@@ -496,12 +479,10 @@ Phase 8 测试与文档 单元测试覆盖、用户手册
 接口 所在层 用途
 IApplicationFacade Application UI 与业务逻辑通信外观
 ISeatingStrategy Domain 座位安排策略
-IPluginSeatingStrategy Contracts 插件策略契约
 IClassroomLayout Domain 教室布局抽象
 IStudentProvider Infrastructure 学生数据加载
 ISeatingPlanExporter Infrastructure 结果导出
 IConflictResolver Application 座位冲突解决
-IPluginManager Application 插件发现与加载
 
 ---
 

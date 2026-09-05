@@ -87,7 +87,7 @@ FixedSeat(100)     → 直接操控 OccupantId → 覆盖成功
 - 座位安排页侧栏不显示（`SeatingArrangementViewModel` 过滤）
 - **执行管道跳过**（`ApplicationFacade` 执行前收集 `visible=false` 的 manifest ID 并过滤策略列表）
 
-实现：`ApplicationFacade` 在准备策略列表时，从 `StrategyManifestProvider` 获取内置 manifest 并从插件加载结果中提取 `PluginManifest.Visible`，构建不可见 ID 集合，统一过滤。`StrategyExecutionPipeline` 仅执行过滤后的策略列表。
+实现：`ApplicationFacade` 在准备策略列表时，从 `StrategyManifestProvider` 获取内置 manifest 的 `Visible`，构建不可见 ID 集合，统一过滤。`StrategyExecutionPipeline` 仅执行过滤后的策略列表。
 
 DeskMate 策略（同桌分组）默认 `visible: false`。原因：该策略受前排分配和固定座位影响较大，组员被拆散后仅能就近安插单人，对多数用户场景不适用。高级用户通过配置页手动启用后配置。
 
@@ -146,47 +146,6 @@ while 还有未分配学生 AND 空座位:
 **负面：**
 - 接口数量增加（`IDependentSeatingStrategy` + `IRandomFillContext` + `DependentEvaluationResult`），学习曲线略高
 - RandomFill 的上下文循环增加了复杂度
-- 插件依赖策略当前仅支持默认 Approve，需要后续扩展 `IPluginSeatingStrategy` 添加 `EvaluateAsync`
-
 **未来方向：**
-- 扩展 `IPluginSeatingStrategy` 支持依赖策略的 `EvaluateAsync`
 - 支持多个依赖策略在同一上下文中协同工作
 - `maxRerolls` 可配置化
-
-## 补充 (2026-06-14)：策略能力声明系统
-
-### 背景
-
-`FixedSeatStrategy` 通过直接操作 `seat.IsFixed = true` 锁定座位，插件虽可通过 `IPluginSeat.IsFixed { get; set; }` 设置但缺少声明式约束和操作日志。需要一个可拓展的能力声明机制：策略必须在 manifest 中声明能力，运行时方可调用对应的能力接口。
-
-### 决策
-
-引入 **能力声明系统**，集中在 `src/SeatFlow.Core/Strategies/Capability.cs`：
-
-- **`Capability` 静态类**：定义能力标识常量（如 `MarkFixedSeat`），日后新增能力时在此追加 `const` + 对应接口
-- **`IFixedSeatCapability` 接口**：提供 `TryMarkFixed(seatId, studentId, strategyId, displayName, out error)` 方法，由 `SeatingWorkspace` 实现
-- **Manifest `capabilities` 字段**：`List<string>?`，策略声明其所需能力
-- **执行链**：`ApplicationFacade` 从 manifest 读取 capabilities → 调用 `workspace.RegisterCapabilities()` → 策略调用 `TryMarkFixed()` 时 workspace 校验声明状态 → 未声明则拒绝并记录警告
-
-`TryMarkFixed` 行为：
-1. 校验策略是否声明了 `MarkFixedSeat` 能力
-2. 查找座位、可选分配学生（`TryAssignSeat`）
-3. 设置 `seat.IsFixed = true`
-4. 记录 Info 日志追踪操作来源
-
-`IPluginWorkspace` 直接暴露 `TryMarkFixed` 方法，插件无需额外注入即可使用。
-
-### 后果
-
-**正面：**
-- `FixedSeatStrategy` 的 `IsFixed` 操作现在经过能力校验，有日志可追踪
-- 插件可通过 manifest 声明 + `IPluginWorkspace.TryMarkFixed()` 标准化地保护座位
-- `Capability.cs` 单一文件集中管理，新增能力只需加 `const` + `interface`
-- 未声明能力的调用被明确拒绝（而非静默成功），安全性提升
-
-**负面：**
-- 现有测试需要显式调用 `RegisterCapabilities` 注册能力
-- `SeatingWorkspace` 增加约 50 行能力相关代码
-
-**未来方向：**
-- 新增能力（如 `SwapSeats`）时在 `Capability.cs` 追加 `const` + 接口，在 `SeatingWorkspace` 实现，在 `IPluginWorkspace` 暴露

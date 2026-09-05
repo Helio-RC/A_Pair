@@ -42,9 +42,8 @@ public class ServiceCollectionExtensionsTests : IDisposable
     {
         var services = new ServiceCollection();
         var snapshotBasePath = Path.Combine(_tempDir , "Snapshots");
-        var pluginsPath = Path.Combine(_tempDir , "Plugins");
 
-        services.AddSeatFlowApplication(snapshotBasePath , pluginsPath);
+        services.AddSeatFlowApplication(snapshotBasePath);
         var provider = services.BuildServiceProvider();
 
         // 外观
@@ -68,10 +67,6 @@ public class ServiceCollectionExtensionsTests : IDisposable
         writers.Should().HaveCount(3);
         // 快照存储库（接口）
         provider.GetService<ISeatingSnapshotRepository>().Should().NotBeNull();
-        // 插件管理器
-        provider.GetService<IPluginManager>().Should().NotBeNull();
-        // 插件配置服务
-        provider.GetService<IPluginConfigurationService>().Should().NotBeNull();
         // 场地仓储
         provider.GetService<IVenueRepository>().Should().NotBeNull();
         // 应用设置仓储
@@ -87,14 +82,9 @@ public class ServiceCollectionExtensionsTests : IDisposable
     {
         var services = new ServiceCollection();
         var snapshotBasePath = Path.Combine(_tempDir , "Snapshots");
-        var pluginsPath = Path.Combine(_tempDir , "Plugins");
 
-        services.AddSeatFlowApplication(snapshotBasePath , pluginsPath);
+        services.AddSeatFlowApplication(snapshotBasePath);
         var provider = services.BuildServiceProvider();
-
-        // 解析 IPluginManager 以触发其构造函数创建目录
-        provider.GetService<IPluginManager>();
-        Directory.Exists(pluginsPath).Should().BeTrue();
 
         // 快照目录由 Repository 在保存时按需创建
         var snapshotRepo = provider.GetRequiredService<ISeatingSnapshotRepository>();

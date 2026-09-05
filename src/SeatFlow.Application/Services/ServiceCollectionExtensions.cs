@@ -1,7 +1,5 @@
 using System.Text.Json;
 using SeatFlow.Application.Interfaces;
-using SeatFlow.Application.Plugins;
-using SeatFlow.Contracts.Interfaces;
 using SeatFlow.Core.Exporters;
 using SeatFlow.Core.Interfaces;
 using SeatFlow.Core.Models;
@@ -35,7 +33,6 @@ namespace SeatFlow.Application.Services
     ///   <item>导出器（Excel、CSV、PDF）</item>
     ///   <item>学生写入器（JSON、CSV、XLSX）</item>
     ///   <item><see cref="IConflictResolver"/> — 冲突解决器</item>
-    ///   <item><see cref="PluginManager"/> 与 <see cref="IPluginConfigurationService"/> — 插件管理</item>
     ///   <item><see cref="IVenueRepository"/> 与 <see cref="IAppSettingsRepository"/> — 数据持久化</item>
     ///   <item><see cref="SeatingSnapshotRepository"/> — 快照存储</item>
     /// </list>
@@ -49,9 +46,8 @@ namespace SeatFlow.Application.Services
         /// </summary>
         /// <param name="services">服务集合。</param>
         /// <param name="snapshotBasePath">数据存储的默认基路径。</param>
-        /// <param name="pluginsPath">插件目录的路径。</param>
         /// <returns>服务集合，支持链式调用。</returns>
-        public static IServiceCollection AddSeatFlowApplication (this IServiceCollection services , string snapshotBasePath , string pluginsPath)
+        public static IServiceCollection AddSeatFlowApplication (this IServiceCollection services , string snapshotBasePath)
         {
             // 解析有效数据目录 + 读取日志配置（单次 I/O）
             var defaultSettingsPath = Path.Combine(snapshotBasePath , "AppSettings.json");
@@ -163,13 +159,6 @@ namespace SeatFlow.Application.Services
 
             // 注册冲突解决器
             services.AddSingleton<IConflictResolver , DefaultConflictResolver>();
-
-            // 注册插件管理器与配置服务
-            services.AddSingleton<IPluginManager>(sp =>
-                new PluginManager(pluginsPath , sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<PluginManager>>()));
-            services.AddSingleton<IPluginConfigurationService>(sp => new PluginConfigurationService(pluginsPath ,
-                sp.GetRequiredService<ILogger<PluginConfigurationService>>()));
-            services.AddSingleton<PluginPackageConfigService>();
 
             // 注册场地仓储（全局单例，使用有效数据路径）
             var venuesPath = Path.Combine(effectiveDataPath , "Venues");

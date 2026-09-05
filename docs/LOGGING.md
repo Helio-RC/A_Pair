@@ -63,7 +63,6 @@ ServiceCollectionExtensions.AddSeatFlowApplication()
     "CategoryOverrides": {
       "Core.Strategies": "Debug",
       "Infrastructure.Exporters": "Debug",
-      "Application.Plugins": "Warning"
     }
   }
 }
@@ -103,8 +102,6 @@ ServiceCollectionExtensions.AddSeatFlowApplication()
 | `Migration` | `Infrastructure.Migration` | FileMigrationService、Migrators |
 | `SeatSets` | `Infrastructure.Services` | SeatSetsService |
 | `Pipeline` | `Application.Services` | ApplicationFacade、StrategyExecutionPipeline、CommandHistory 等 |
-| `Plugins` | `Application.Plugins` | PluginManager、PluginConfigurationService 等 |
-| `Scripting` | `Application.Scripting` | CSharpScriptStrategy、LuaScriptStrategy |
 | `ViewModels` | `Presentation.Avalonia.ViewModels` | 所有页面 ViewModel |
 | `Navigation` | `Presentation.Avalonia.Services` | NavigationService、DialogService、FileService 等 |
 | `Onboarding` | `Presentation.Avalonia.Services.OnboardingService` | 引导系统 |
