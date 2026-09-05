@@ -29,13 +29,84 @@ concurrency: release-${{ github.ref }}
 
 jobs:
   # ──────────────────────────────────────────────
-  # Job 1: 多平台构建 + vpk 打包（含 delta 增量）
+  # Job 0: 版本预检（独立执行，先行于构建）
+  #   - tag 不得已存在
+  #   - 版本必须大于当前最新 release，否则中止（不触发构建）
   # ──────────────────────────────────────────────
-  build:
-    timeout-minutes: 45
+  preflight:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       version: ${{ steps.version.outputs.version }}
       is_pre: ${{ steps.version.outputs.is_pre }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install packaging
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            V="${{ inputs.version }}"
+            SUFFIX="${{ inputs.suffix }}"
+            if [ -n "$SUFFIX" ]; then V="${V}-${SUFFIX}"; fi
+            echo "is_pre=true" >> "$GITHUB_OUTPUT"
+            echo "Is manual release (pre-release)"
+          else
+            V=$(python3 -c "import json; print(json.load(open('version.json'))['version'])")
+            echo "is_pre=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "Version: $V"
+
+      - name: Pre-flight checks
+        run: |
+          V="${{ steps.version.outputs.version }}"
+          TAG="v${V}"
+          echo "Target: $TAG"
+
+          # 1. 禁止发布已存在的 Release
+          if gh release view "$TAG" --repo "${{ github.repository }}" &>/dev/null; then
+            echo "✗ Release $TAG already exists. Abort."
+            exit 1
+          fi
+
+          # 2. 版本号必须大于当前最大 Release tag
+          LATEST_TAG=$(gh release list --repo "${{ github.repository }}" -L 1 --order desc --exclude-pre-releases --json tagName -q '.[0].tagName' 2>/dev/null || echo "")
+          if [[ -n "$LATEST_TAG" ]]; then
+            LATEST=${LATEST_TAG#v}
+            echo "Latest release: $LATEST_TAG"
+            RESULT=$(python3 -c "
+          from packaging.version import Version
+          print('ok' if Version('$V') > Version('$LATEST') else 'fail')
+          ")
+            if [[ "$RESULT" == "fail" ]]; then
+              echo "✗ Version $V is not greater than latest $LATEST. Abort."
+              exit 1
+            fi
+            echo "✓ Version $V > $LATEST"
+          else
+            echo "No existing releases — first release, proceeding."
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  # ──────────────────────────────────────────────
+  # Job 1: 多平台构建 + vpk 打包（含 delta 增量）
+  # ──────────────────────────────────────────────
+  build:
+    needs: preflight
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -76,24 +147,6 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
-
-      - name: Resolve version
-        id: version
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            V="${{ inputs.version }}"
-            SUFFIX="${{ inputs.suffix }}"
-            if [ -n "$SUFFIX" ]; then V="${V}-${SUFFIX}"; fi
-            echo "is_pre=true" >> "$GITHUB_OUTPUT"
-            echo "Is manual release (pre-release)"
-          else
-            V=$(python3 -c "import json; print(json.load(open('version.json'))['version'])")
-            echo "is_pre=false" >> "$GITHUB_OUTPUT"
-          fi
-          echo "version=$V" >> "$GITHUB_OUTPUT"
-          echo "Version: $V"
 
       - uses: actions/setup-dotnet@v6
         with:
@@ -144,7 +197,7 @@ jobs:
           if [ -n "${VPK_KEY_PASSWORD:-}" ]; then SIGN_ARGS+=(--keyPassword "$VPK_KEY_PASSWORD"); fi
           vpk ${{ matrix.vpk-directive }} pack \
             --packId SeatFlow \
-            --packVersion ${{ steps.version.outputs.version }} \
+            --packVersion ${{ needs.preflight.outputs.version }} \
             --packDir publish/tmp \
             --mainExe ${{ matrix.main-exe }} \
             --runtime ${{ matrix.rid }} \
@@ -179,7 +232,7 @@ jobs:
   # Job 2: GitHub Release + OSS 上传（自动发布）
   # ──────────────────────────────────────────────
   release:
-    needs: build
+    needs: [build, preflight]
     timeout-minutes: 15
     runs-on: ubuntu-latest
     environment: OSS
@@ -192,50 +245,10 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Resolve version
-        id: version
-        shell: bash
-        run: |
-          V="${{ needs.build.outputs.version }}"
-          echo "version=$V" >> "$GITHUB_OUTPUT"
-          echo "Version: $V"
-
       - name: Install dependencies
         env:
           PIP_BREAK_SYSTEM_PACKAGES: '1'
-        run: pip install oss2 packaging
-
-      - name: Pre-flight checks
-        run: |
-          V="${{ steps.version.outputs.version }}"
-          TAG="v${V}"
-          echo "Target: $TAG"
-
-          # 1. 禁止发布已存在的 Release
-          if gh release view "$TAG" --repo "${{ github.repository }}" &>/dev/null; then
-            echo "✗ Release $TAG already exists. Abort."
-            exit 1
-          fi
-
-          # 2. 版本号必须大于当前最大 Release tag
-          LATEST_TAG=$(gh release list --repo "${{ github.repository }}" -L 1 --order desc --exclude-pre-releases --json tagName -q '.[0].tagName' 2>/dev/null || echo "")
-          if [[ -n "$LATEST_TAG" ]]; then
-            LATEST=${LATEST_TAG#v}
-            echo "Latest release: $LATEST_TAG"
-            RESULT=$(python3 -c "
-          from packaging.version import Version
-          print('ok' if Version('$V') > Version('$LATEST') else 'fail')
-          ")
-            if [[ "$RESULT" == "fail" ]]; then
-              echo "✗ Version $V is not greater than latest $LATEST. Abort."
-              exit 1
-            fi
-            echo "✓ Version $V > $LATEST"
-          else
-            echo "No existing releases — first release, proceeding."
-          fi
-        env:
-          GH_TOKEN: ${{ github.token }}
+        run: pip install oss2
 
       - name: Download all artifacts
         uses: actions/download-artifact@v8
@@ -250,7 +263,7 @@ jobs:
       - name: Version installer filenames
         shell: bash
         run: |
-          V="${{ steps.version.outputs.version }}"
+          V="${{ needs.preflight.outputs.version }}"
           echo "Versioning installer files with ${V}..."
           shopt -s nullglob
           for f in all-artifacts/*.exe all-artifacts/*.AppImage all-artifacts/*.pkg all-artifacts/*.dmg; do
@@ -304,7 +317,7 @@ jobs:
           OSS_BUCKET: ${{ vars.OSS_BUCKET }}
         run: |
           python3 scripts/ci/upload_oss.py \
-            --version "${{ steps.version.outputs.version }}" \
+            --version "${{ needs.preflight.outputs.version }}" \
             --artifacts-dir all-artifacts \
             --release-md RELEASE.md \
             --commit-id "${{ github.sha }}"
@@ -313,8 +326,8 @@ jobs:
         shell: bash
         run: |
           shopt -s nullglob
-          V="${{ steps.version.outputs.version }}"
-          PRE="${{ needs.build.outputs.is_pre }}"
+          V="${{ needs.preflight.outputs.version }}"
+          PRE="${{ needs.preflight.outputs.is_pre }}"
           ARGS=()
           if [ "$PRE" = "true" ]; then
             ARGS+=(--prerelease)
